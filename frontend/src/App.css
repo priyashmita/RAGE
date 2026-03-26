@@ -1,0 +1,46 @@
+/* RAGE Platform — Brand Styles */
+
+/* ── Public (light) ── */
+.rage-overline {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #DC143C;
+}
+.rage-badge {
+    font-size: 0.6rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 0.15rem 0.45rem; border: 1px solid rgba(0,0,0,0.1); background: rgba(0,0,0,0.03);
+}
+.rage-btn-glow { box-shadow: 0 0 20px rgba(220,20,60,0.15); transition: box-shadow 0.3s ease, background-color 0.2s ease; }
+.rage-btn-glow:hover { box-shadow: 0 0 30px rgba(220,20,60,0.25); }
+.rage-page-in { animation: ragePageIn 0.4s ease-out forwards; }
+@keyframes ragePageIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+/* Status colors */
+.status-pending, .status-new { color: #D97706; }
+.status-active, .status-confirmed, .status-completed, .status-accepted, .status-payment_received { color: #059669; }
+.status-matched, .status-session_created { color: #2563EB; }
+.status-declined, .status-failed, .status-cancelled { color: #DC2626; }
+.status-awaiting_payment, .status-bank_details_shared { color: #D97706; }
+.status-suggested, .status-reviewed { color: #7C3AED; }
+.status-shortlisted { color: #7C3AED; }
+.status-converted { color: #059669; }
+.status-closed, .status-deactivated, .status-refunded { color: #9CA3AF; }
+
+/* ── Dark UI (admin/dashboard) ── */
+.dark-ui .rage-glass {
+    background: rgba(5,5,5,0.7); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.dark-ui .rage-badge { border-color: rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); }
+.dark-ui .rage-stat { background: #111; border: 1px solid rgba(255,255,255,0.06); padding: 1.5rem; }
+.dark-ui .rage-table th {
+    font-family: 'Manrope', sans-serif; font-weight: 600; text-transform: uppercase;
+    font-size: 0.7rem; letter-spacing: 0.1em; color: #71717A;
+}
+.dark-ui input:focus, .dark-ui textarea:focus, .dark-ui select:focus {
+    outline: none; border-color: #DC143C !important; box-shadow: 0 0 0 1px rgba(220,20,60,0.3);
+}
+.dark-ui .nav-active { color: #DC143C; border-bottom: 2px solid #DC143C; }
