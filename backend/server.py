@@ -40,6 +40,11 @@ except ImportError:
     pass
 
 app = FastAPI()
+from content_seed import seed_content
+
+@app.on_event("startup")
+def run_seed():
+    seed_content()
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 logging.basicConfig(level=logging.INFO)
