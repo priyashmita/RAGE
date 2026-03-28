@@ -25,3 +25,8 @@ def create_allocation(data: dict):
 @router.patch("/member/respond/{id}")
 def member_respond(id: str, data: dict):
     return {"status": "updated"}
+
+@router.get("/seed")
+def seed():
+    db.enquiries.insert_one({"id": "1", "name": "Test Enquiry"})
+    return {"status": "seeded"}
