@@ -1,17 +1,19 @@
 from fastapi import APIRouter
-from bson import ObjectId
 
 router = APIRouter()
 
-# TEMP FAKE DB (so it doesn't crash)
 fake_db = {
-    "enquiries": [],
+    "enquiries": [{"id": "1", "name": "Test Enquiry"}],
     "allocations": []
 }
 
 @router.get("/admin/enquiries")
 def get_enquiries():
     return fake_db["enquiries"]
+
+@router.get("/admin/allocations")
+def get_allocations():
+    return fake_db["allocations"]
 
 @router.post("/admin/allocations")
 def create_allocation(data: dict):
