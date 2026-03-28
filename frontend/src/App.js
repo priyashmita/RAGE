@@ -16,21 +16,40 @@ import ClosedTableRequestPage from '@/pages/ClosedTableRequestPage';
 import FounderDashboard from '@/pages/FounderDashboard';
 import ExpertDashboard from '@/pages/ExpertDashboard';
 import MemberDashboard from '@/pages/MemberDashboard';
-import AdminDashboard from '@/pages/AdminDashboard';
+import AdminDashboard from '@/pages/admin/AdminDashboard';
+import MatchingPanel from '@/pages/admin/MatchingPanel';
 import EventsPage from '@/pages/EventsPage';
 import '@/App.css';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="dark-ui min-h-screen bg-[#050505] flex items-center justify-center"><div className="text-[#A1A1AA]">Loading...</div></div>;
+
+  if (loading) {
+    return (
+      <div className="dark-ui min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="text-[#A1A1AA]">Loading...</div>
+      </div>
+    );
+  }
+
   if (!user) return <Navigate to="/member-login" replace />;
+
   return children;
 }
 
 function DashboardRouter() {
   const { user } = useAuth();
+
   if (!user) return <Navigate to="/member-login" replace />;
-  const dashboards = { founder: <FounderDashboard />, expert: <ExpertDashboard />, member: <MemberDashboard />, admin: <AdminDashboard />, sponsor: <MemberDashboard /> };
+
+  const dashboards = {
+    founder: <FounderDashboard />,
+    expert: <ExpertDashboard />,
+    member: <MemberDashboard />,
+    admin: <AdminDashboard />,
+    sponsor: <MemberDashboard />
+  };
+
   return dashboards[user.role] || <MemberDashboard />;
 }
 
@@ -38,7 +57,19 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Toaster theme="dark" position="top-right" toastOptions={{ style: { background: '#111', border: '1px solid rgba(255,255,255,0.1)', color: '#F5F5F0', borderRadius: 0 }}} />
+        <Toaster
+          theme="dark"
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#111',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#F5F5F0',
+              borderRadius: 0
+            }
+          }}
+        />
+
         <Routes>
           <Route element={<PublicLayout />}>
             <Route path="/" element={<LandingPage />} />
@@ -51,12 +82,16 @@ function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
           </Route>
+
           <Route path="/member-login" element={<LoginPage />} />
+
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/dashboard" element={<DashboardRouter />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/matching" element={<MatchingPanel />} />
           </Route>
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
