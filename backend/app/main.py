@@ -7,4 +7,4 @@ app = FastAPI()
 def home():
     return {"message": "RAGE backend is running"}
 
-app.include_router(operations.router)
+app.include_router(operations.router, prefix="/api")
