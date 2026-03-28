@@ -1,23 +1,25 @@
 from fastapi import APIRouter
+from pymongo import MongoClient
+import os
 
 router = APIRouter()
 
-fake_db = {
-    "enquiries": [{"id": "1", "name": "Test Enquiry"}],
-    "allocations": []
-}
+client = MongoClient(os.getenv("MONGO_URL"))
+db = client.get_default_database()
 
 @router.get("/admin/enquiries")
 def get_enquiries():
-    return fake_db["enquiries"]
+    items = list(db.enquiries.find({}, {"_id": 0}))
+    return items
 
 @router.get("/admin/allocations")
 def get_allocations():
-    return fake_db["allocations"]
+    items = list(db.allocations.find({}, {"_id": 0}))
+    return items
 
 @router.post("/admin/allocations")
 def create_allocation(data: dict):
-    fake_db["allocations"].append(data)
+    db.allocations.insert_one(data)
     return {"status": "created"}
 
 @router.patch("/member/respond/{id}")
