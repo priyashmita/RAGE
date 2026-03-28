@@ -17,6 +17,7 @@ import FounderDashboard from '@/pages/FounderDashboard';
 import ExpertDashboard from '@/pages/ExpertDashboard';
 import MemberDashboard from '@/pages/MemberDashboard';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
+import AdminContentEditor from '@/pages/admin/AdminContentEditor';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
 import EventsPage from '@/pages/EventsPage';
 import '@/App.css';
@@ -85,11 +86,19 @@ function App() {
 
           <Route path="/member-login" element={<LoginPage />} />
 
-          <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route path="/admin/matching" element={<MatchingPanel />} />
+
+          <Route
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
             <Route path="/dashboard" element={<DashboardRouter />} />
             <Route path="/events" element={<EventsPage />} />
             <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/matching" element={<MatchingPanel />} />
+            <Route path="/admin/content" element={<AdminContentEditor />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
