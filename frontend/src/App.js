@@ -22,7 +22,7 @@ import MatchingPanel from '@/pages/admin/MatchingPanel';
 import EventsPage from '@/pages/EventsPage';
 import '@/App.css';
 
-function ProtectedRoute({ children }) {
+function ProtectedRoute({ children, allowedRoles = null }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -33,13 +33,27 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  if (!user) return <Navigate to="/member-login" replace />;
+  if (!user) {
+    return <Navigate to="/member-login" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return children;
 }
 
 function DashboardRouter() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="dark-ui min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="text-[#A1A1AA]">Loading...</div>
+      </div>
+    );
+  }
 
   if (!user) return <Navigate to="/member-login" replace />;
 
@@ -86,8 +100,6 @@ function App() {
 
           <Route path="/member-login" element={<LoginPage />} />
 
-          <Route path="/admin/matching" element={<MatchingPanel />} />
-
           <Route
             element={
               <ProtectedRoute>
@@ -97,8 +109,19 @@ function App() {
           >
             <Route path="/dashboard" element={<DashboardRouter />} />
             <Route path="/events" element={<EventsPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/content" element={<AdminContentEditor />} />
+          </Route>
+
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="content" element={<AdminContentEditor />} />
+            <Route path="matching" element={<MatchingPanel />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
