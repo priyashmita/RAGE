@@ -7,8 +7,15 @@ const D = { hero:{overline:'',title:'',body:''}, details:{email:'contact@ragefor
 export default function ContactPage() {
   const c = useSiteContent('contact', D);
   return (
-    <div data-testid="contact-page" className="rage-page-in">
-      <section className="py-24 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6"><p className="rage-overline mb-4">{c.hero.overline}</p><h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl">{c.hero.title}</h1><p className="mt-8 text-lg text-gray-600 max-w-xl leading-relaxed">{c.hero.body}</p></div></section>
+    <div data-testid="contact-page">
+
+      {c.hero.title && (
+        <section className="py-24 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6">
+          {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl">{c.hero.title}</h1>
+          {c.hero.body && <p className="mt-8 text-lg text-gray-600 max-w-xl leading-relaxed">{c.hero.body}</p>}
+        </div></section>
+      )}
 
       <section className="py-20"><div className="max-w-[1400px] mx-auto px-6"><div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
         <div>
@@ -19,10 +26,12 @@ export default function ContactPage() {
           </div>
         </div>
         <div>
-          <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-6" style={{fontFamily:'Playfair Display'}}>{c.cta.title || 'Submit an enquiry'}</h2>
+          {c.cta.title && <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-6" style={{fontFamily:'Playfair Display'}}>{c.cta.title}</h2>}
+          {c.cta.body && <p className="text-sm text-gray-600 mb-6">{c.cta.body}</p>}
           <EnquiryDialog interest="general" title="Get in Touch" trigger={<Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="contact-enquiry-btn">Send Enquiry <ArrowRight className="w-4 h-4 ml-2" /></Button>} />
         </div>
       </div></div></section>
+
     </div>
   );
 }
