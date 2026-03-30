@@ -171,7 +171,7 @@ export default function LoginPage() {
               <p className="text-xs text-[#71717A] mb-2 uppercase tracking-wider font-semibold">Demo Access</p>
               <p className="text-xs text-[#A1A1AA]">admin@rage.com / admin123</p>
               <p className="text-xs text-[#52525B] break-all">
-                API: {process.env.REACT_APP_BACKEND_URL || <span className="text-red-500">NOT SET</span>}
+                API: {process.env.REACT_APP_BACKEND_URL || 'https://rage-production.up.railway.app (fallback)'}
               </p>
             </div>
           )}
