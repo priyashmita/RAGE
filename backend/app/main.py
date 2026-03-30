@@ -8,6 +8,7 @@ from app.api.member import router as member_router
 from app.api.seed import router as seed_router
 from app.api.content import router as content_router, DEFAULT_CONTENT
 from app.api.ragers import router as ragers_router
+from app.api.matching import router as matching_router
 from app.core.db import db
 
 app = FastAPI()
@@ -36,7 +37,8 @@ def auto_seed_content():
     """On every deploy: upsert any page that is missing or has legacy flat format."""
     for item in DEFAULT_CONTENT:
         existing = db.content.find_one({"page": item["page"]}, {"_id": 0})
-        if not existing or _is_legacy_sections(existing.get("sections", {})):
+        existing_sections = existing.get("sections", {}) if existing else {}
+        if not existing or not existing_sections or _is_legacy_sections(existing_sections):
             db.content.replace_one({"page": item["page"]}, item, upsert=True)
 
 
@@ -69,3 +71,4 @@ app.include_router(member_router, prefix="/api")
 app.include_router(seed_router, prefix="/api")
 app.include_router(content_router, prefix="/api")
 app.include_router(ragers_router, prefix="/api")
+app.include_router(matching_router, prefix="/api")

@@ -150,7 +150,7 @@ export default function AdminContentEditor() {
           <a href={PAGES.find(function(p) { return p.key === activePage; })?.path || '/'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#A1A1AA] border border-white/15 hover:border-white/30 hover:text-[#F5F5F0] transition-colors" data-testid="content-preview-btn">
             <ExternalLink className="w-3.5 h-3.5" /> Preview
           </a>
-          <button onClick={handleSeed} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#71717A] border border-white/8 hover:border-white/20 hover:text-[#A1A1AA] transition-colors" title="Re-seed all pages with defaults" data-testid="content-reseed-btn">
+          <button type="button" onClick={handleSeed} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#71717A] border border-white/8 hover:border-white/20 hover:text-[#A1A1AA] transition-colors" title="Re-seed all pages with defaults" data-testid="content-reseed-btn">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Re-seed'}
           </button>
           <Button onClick={handleSave} disabled={saving || !editing} className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none h-9 px-5 text-xs uppercase tracking-wider" data-testid="content-save-btn">
@@ -181,7 +181,7 @@ function SectionPanel(props) {
 
   return (
     <div className="bg-[#111111] border border-white/8">
-      <button onClick={function() { setOpen(!open); }} className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.02] transition-colors" data-testid={'section-toggle-' + name}>
+      <button type="button" onClick={function() { setOpen(!open); }} className="w-full flex items-center justify-between p-4 text-left hover:bg-white/[0.02] transition-colors" data-testid={'section-toggle-' + name}>
         <span className="text-xs uppercase tracking-[0.15em] text-[#A1A1AA] font-semibold">{name.replace(/_/g, ' ')}</span>
         <span className="flex items-center gap-2 text-[10px] text-[#71717A]">
           {summary}
@@ -237,11 +237,11 @@ function renderArray(arr, path, onUpdate) {
             <div key={i} className="flex gap-2 items-center">
               <span className="text-[10px] text-[#71717A] font-mono w-5 shrink-0">{i + 1}</span>
               <Input value={item} onChange={function(e) { onUpdate(path + '.' + i, e.target.value); }} className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] rounded-none text-sm h-8 flex-1" />
-              <button onClick={function() { removeItem(i); }} className="text-[#52525B] hover:text-red-500 transition-colors shrink-0"><Trash2 className="w-3 h-3" /></button>
+              <button type="button" onClick={function() { removeItem(i); }} className="text-[#52525B] hover:text-red-500 transition-colors shrink-0"><Trash2 className="w-3 h-3" /></button>
             </div>
           );
         })}
-        <button onClick={addItem} className="flex items-center gap-1 text-[10px] text-[#52525B] hover:text-[#A1A1AA] transition-colors mt-1">
+        <button type="button" onClick={addItem} className="flex items-center gap-1 text-[10px] text-[#52525B] hover:text-[#A1A1AA] transition-colors mt-1">
           <Plus className="w-3 h-3" /> Add item
         </button>
       </div>
