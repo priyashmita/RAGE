@@ -10,16 +10,21 @@ ALLOWED_ROLES = {"member", "founder", "expert", "sponsor"}
 
 @router.post("/auth/login", response_model=LoginResponse)
 def login(payload: LoginRequest):
-    user = db.users.find_one({"email": payload.email.lower().strip()}, {"_id": 0})
+    try:
+        user = db.users.find_one({"email": payload.email.lower().strip()}, {"_id": 0})
 
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if not verify_password(payload.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        if not verify_password(payload.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = create_access_token(user)
-    return {"token": token, "user": serialize_user(user)}
+        token = create_access_token(user)
+        return {"token": token, "user": serialize_user(user)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login error: {str(e)}")
 
 @router.post("/auth/signup", response_model=LoginResponse)
 def signup(payload: SignupRequest):
