@@ -4,6 +4,12 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+class SignupRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: str = "member"
+
 class AuthUser(BaseModel):
     id: str
     email: EmailStr

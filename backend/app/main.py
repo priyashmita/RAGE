@@ -9,7 +9,8 @@ from app.api.seed import router as seed_router
 
 app = FastAPI()
 
-origins = [os.getenv("CORS_ORIGINS", "http://localhost:3000")]
+cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,

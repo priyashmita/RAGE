@@ -19,7 +19,7 @@ api.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('rage_token');
       localStorage.removeItem('rage_user');
-      window.location.href = '/login';
+      window.location.href = '/member-login';
     }
     return Promise.reject(err);
   }
