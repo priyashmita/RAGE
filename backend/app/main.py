@@ -48,7 +48,6 @@ def home():
 @app.get("/api/health")
 def health():
     """Quick status check — use this to confirm a deploy worked."""
-    pages = [d["name"] for d in db.content.find({}, {"name": 0, "page": 1, "_id": 0})]
     content_pages = [d["page"] for d in db.content.find({}, {"page": 1, "_id": 0})]
     return {
         "status": "ok",
