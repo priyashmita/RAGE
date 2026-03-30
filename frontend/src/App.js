@@ -22,6 +22,7 @@ import AdminContentEditor from '@/pages/admin/AdminContentEditor';
 import AdminLoginPage from '@/pages/admin/AdminLoginPage';
 import AdminRagersPage from '@/pages/admin/AdminRagersPage';
 import AdminAnalyticsPage from '@/pages/admin/AdminAnalyticsPage';
+import AdminEnquiriesPage from '@/pages/admin/AdminEnquiriesPage';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
 import AdminLayout from '@/components/AdminLayout';
 import EventsPage from '@/pages/EventsPage';
@@ -131,6 +132,7 @@ function App() {
             <Route path="content" element={<AdminContentEditor />} />
             <Route path="ragers" element={<AdminRagersPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
+            <Route path="enquiries" element={<AdminEnquiriesPage />} />
             <Route path="matching" element={<MatchingPanel />} />
           </Route>
 

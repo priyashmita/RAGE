@@ -40,6 +40,20 @@ def submit_enquiry(data: EnquiryRequest):
     doc.pop("_id", None)
     return {"status": "submitted", "id": doc["id"]}
 
+@router.post("/closed-table-requests")
+def submit_closed_table_request(data: dict):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "format": "closed_table",
+        "status": "new",
+        "created_at": datetime.utcnow().isoformat(),
+        **{k: v for k, v in data.items() if k not in ("id", "status", "created_at", "format")},
+    }
+    db.enquiries.insert_one(doc)
+    doc.pop("_id", None)
+    return {"status": "submitted", "id": doc["id"]}
+
+
 @router.patch("/member/respond/{id}")
 def member_respond(id: str, data: MemberResponseRequest):
     if data.response not in ["accept", "decline"]:
