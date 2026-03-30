@@ -382,10 +382,14 @@ def seed_content(admin=Depends(require_admin)):
     return {"status": "seeded", "pages": [i["page"] for i in DEFAULT_CONTENT]}
 
 
-# Public — no auth required
+# Public — no auth required (two URL aliases for compatibility)
 @router.get("/public/content/{page}")
 def get_public_content(page: str):
     doc = db.content.find_one({"page": page}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Not found")
     return doc
+
+@router.get("/content/{page}")
+def get_public_content_alias(page: str):
+    return get_public_content(page)

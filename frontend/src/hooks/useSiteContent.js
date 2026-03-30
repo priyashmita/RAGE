@@ -31,9 +31,13 @@ export function useSiteContent(page, defaults = {}) {
         if (!cancelled && res.data?.sections) {
           cache[page] = res.data.sections;
           setContent(merge(defaults, res.data.sections));
+        } else {
+          console.warn('[RAGE content] no sections in response for', page, res.data);
         }
       })
-      .catch(() => {});
+      .catch(err => {
+        console.error('[RAGE content] failed to load', page, err?.response?.status, err?.message);
+      });
     return () => { cancelled = true; };
   }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
 
