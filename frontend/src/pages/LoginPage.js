@@ -53,10 +53,10 @@ export default function LoginPage() {
         </div>
         <div className="relative z-10">
           <h1 className="text-5xl md:text-6xl font-light tracking-tighter text-[#F5F5F0] leading-tight">
-            Member &<br />Admin Access
+            Rager<br />Access
           </h1>
           <p className="mt-6 text-lg text-[#A1A1AA] max-w-md leading-relaxed">
-            This login is for RAGE network members, internal experts, and administrators. If you're a founder or institution looking to work with RAGE, visit our public pages.
+            This login is for RAGE network members, founders, and experts. If you're not yet part of the network, reach out through our public pages.
           </p>
         </div>
         <div className="relative z-10">
@@ -83,7 +83,7 @@ export default function LoginPage() {
               {mode === 'login' ? 'Sign in to your account' : 'Join the RAGE Network'}
             </h2>
             <p className="text-sm text-[#71717A] mt-2">
-              {mode === 'login' ? 'For RAGE members, experts, and administrators.' : 'Create your RAGE member or expert account.'}
+              {mode === 'login' ? 'For RAGE members, founders, and experts.' : 'Create your RAGE member or expert account.'}
             </p>
           </div>
 
@@ -166,15 +166,6 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {mode === 'login' && (
-            <div className="mt-8 p-4 border border-white/5 bg-[#0A0A0A] space-y-2">
-              <p className="text-xs text-[#71717A] mb-2 uppercase tracking-wider font-semibold">Demo Access</p>
-              <p className="text-xs text-[#A1A1AA]">admin@rage.com / admin123</p>
-              <p className="text-xs text-[#52525B] break-all">
-                API: {process.env.REACT_APP_BACKEND_URL || 'https://rage-production.up.railway.app (fallback)'}
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

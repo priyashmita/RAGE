@@ -18,11 +18,12 @@ import ExpertDashboard from '@/pages/ExpertDashboard';
 import MemberDashboard from '@/pages/MemberDashboard';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminContentEditor from '@/pages/admin/AdminContentEditor';
+import AdminLoginPage from '@/pages/admin/AdminLoginPage';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
 import EventsPage from '@/pages/EventsPage';
 import '@/App.css';
 
-function ProtectedRoute({ children, allowedRoles = null }) {
+function ProtectedRoute({ children, adminOnly = false }) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -34,10 +35,10 @@ function ProtectedRoute({ children, allowedRoles = null }) {
   }
 
   if (!user) {
-    return <Navigate to="/member-login" replace />;
+    return <Navigate to={adminOnly ? '/admin-login' : '/member-login'} replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  if (adminOnly && user.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -57,11 +58,12 @@ function DashboardRouter() {
 
   if (!user) return <Navigate to="/member-login" replace />;
 
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+
   const dashboards = {
     founder: <FounderDashboard />,
     expert: <ExpertDashboard />,
     member: <MemberDashboard />,
-    admin: <AdminDashboard />,
     sponsor: <MemberDashboard />
   };
 
@@ -99,6 +101,7 @@ function App() {
           </Route>
 
           <Route path="/member-login" element={<LoginPage />} />
+          <Route path="/admin-login" element={<AdminLoginPage />} />
 
           <Route
             element={
@@ -114,7 +117,7 @@ function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute allowedRoles={['admin']}>
+              <ProtectedRoute adminOnly>
                 <Layout />
               </ProtectedRoute>
             }
