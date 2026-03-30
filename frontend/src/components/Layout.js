@@ -17,7 +17,7 @@ export default function Layout() {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate(user?.role === 'admin' ? '/admin-login' : '/member-login');
   };
 
   const filtered = navItems.filter(item => item.roles.includes(user?.role));
