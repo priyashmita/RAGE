@@ -1,0 +1,188 @@
+import uuid
+import os
+import json
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from typing import Optional, List
+from app.core.db import db
+from app.core.auth import require_admin
+
+router = APIRouter()
+
+CATEGORIES = [
+    "Finance & Fundraising",
+    "Legal & Compliance",
+    "Marketing & Brand",
+    "Operations & Scale",
+    "Technology & Product",
+    "Strategy & Growth",
+    "People & Culture",
+    "Sales & Distribution",
+    "Media & Communications",
+    "International Expansion",
+]
+
+KEYWORD_MAP = {
+    "Finance & Fundraising": ["finance", "funding", "investor", "vc", "venture", "fundrais", "cfo", "investment", "capital", "equity", "fund", "banking", "pe", "angel"],
+    "Legal & Compliance": ["legal", "lawyer", "attorney", "compliance", "regulatory", "law", "counsel", "ip", "patent", "trademark", "contract", "advocate"],
+    "Marketing & Brand": ["marketing", "brand", "growth", "digital", "content", "social media", "cmo", "advertis", "pr", "communications", "campaign", "seo", "creative"],
+    "Operations & Scale": ["operations", "supply chain", "logistics", "process", "coo", "manufacturing", "scale", "procurement", "execution"],
+    "Technology & Product": ["technology", "tech", "product", "engineering", "software", "cto", "developer", "data", "ai", "ml", "saas", "platform", "architect"],
+    "Strategy & Growth": ["strategy", "consulting", "management", "ceo", "founder", "business development", "growth", "transformation", "advisory"],
+    "People & Culture": ["hr", "human resources", "people", "talent", "culture", "recrui", "organization", "dei", "inclusion"],
+    "Sales & Distribution": ["sales", "distribution", "retail", "b2b", "revenue", "channel", "partnership", "business development", "gtm"],
+    "Media & Communications": ["media", "journalist", "editor", "film", "documentary", "publishing", "communications", "press", "television", "broadcast"],
+    "International Expansion": ["international", "global", "export", "overseas", "cross-border", "expansion", "foreign", "eu", "us", "uk"],
+}
+
+
+class RagerIn(BaseModel):
+    name: str
+    email: Optional[str] = ""
+    photo_url: Optional[str] = ""
+    title: Optional[str] = ""
+    company: Optional[str] = ""
+    bio: Optional[str] = ""
+    expertise: Optional[List[str]] = []
+    categories: Optional[List[str]] = []
+    location: Optional[str] = ""
+    linkedin: Optional[str] = ""
+    is_public: Optional[bool] = False
+    table_types: Optional[List[str]] = []
+    availability: Optional[str] = "available"
+
+
+def _keyword_categorize(text: str) -> List[str]:
+    text_lower = text.lower()
+    cats = []
+    for cat, keywords in KEYWORD_MAP.items():
+        if any(kw in text_lower for kw in keywords):
+            cats.append(cat)
+    return cats[:3] if cats else ["Strategy & Growth"]
+
+
+def _ai_categorize(name: str, title: str, bio: str, expertise: list) -> List[str]:
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        return _keyword_categorize(f"{title} {bio} {' '.join(expertise)}")
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
+
+        prompt = f"""Categorize this advisor for a women founders network in India.
+
+Name: {name}
+Title: {title}
+Bio: {bio}
+Expertise: {', '.join(expertise) if expertise else 'Not listed'}
+
+Pick 1–3 categories from this exact list:
+{chr(10).join(f'- {c}' for c in CATEGORIES)}
+
+Return ONLY a JSON array, e.g. ["Finance & Fundraising", "Strategy & Growth"]"""
+
+        response = model.generate_content(prompt)
+        text = response.text.strip().strip("```json").strip("```").strip()
+        categories = json.loads(text)
+        return [c for c in categories if c in CATEGORIES]
+    except Exception:
+        return _keyword_categorize(f"{title} {bio} {' '.join(expertise)}")
+
+
+@router.get("/admin/ragers")
+def list_ragers(admin=Depends(require_admin)):
+    return list(db.ragers.find({}, {"_id": 0}))
+
+
+@router.post("/admin/ragers")
+def create_rager(data: RagerIn, admin=Depends(require_admin)):
+    rager = {"id": str(uuid.uuid4()), **data.dict()}
+    db.ragers.insert_one(rager)
+    rager.pop("_id", None)
+    return rager
+
+
+@router.put("/admin/ragers/{rager_id}")
+def update_rager(rager_id: str, data: RagerIn, admin=Depends(require_admin)):
+    result = db.ragers.update_one({"id": rager_id}, {"$set": data.dict()})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Rager not found")
+    return {"status": "updated"}
+
+
+@router.delete("/admin/ragers/{rager_id}")
+def delete_rager(rager_id: str, admin=Depends(require_admin)):
+    db.ragers.delete_one({"id": rager_id})
+    return {"status": "deleted"}
+
+
+@router.post("/admin/ragers/{rager_id}/categorize")
+def categorize_rager(rager_id: str, admin=Depends(require_admin)):
+    rager = db.ragers.find_one({"id": rager_id})
+    if not rager:
+        raise HTTPException(status_code=404, detail="Rager not found")
+    categories = _ai_categorize(
+        rager.get("name", ""), rager.get("title", ""),
+        rager.get("bio", ""), rager.get("expertise", [])
+    )
+    db.ragers.update_one({"id": rager_id}, {"$set": {"categories": categories}})
+    return {"categories": categories}
+
+
+@router.post("/admin/ragers/bulk")
+def bulk_create(data: dict, admin=Depends(require_admin)):
+    profiles = data.get("profiles", [])
+    if not isinstance(profiles, list) or not profiles:
+        raise HTTPException(status_code=400, detail="profiles array required")
+
+    auto_categorize = data.get("auto_categorize", True)
+    created = []
+
+    for p in profiles:
+        cats = p.get("categories", [])
+        if auto_categorize and not cats:
+            cats = _ai_categorize(
+                p.get("name", ""), p.get("title", ""),
+                p.get("bio", ""), p.get("expertise", [])
+            )
+        rager = {
+            "id": str(uuid.uuid4()),
+            "name": p.get("name", ""),
+            "email": p.get("email", ""),
+            "photo_url": p.get("photo_url", ""),
+            "title": p.get("title", ""),
+            "company": p.get("company", ""),
+            "bio": p.get("bio", ""),
+            "expertise": p.get("expertise", []),
+            "categories": cats,
+            "location": p.get("location", ""),
+            "linkedin": p.get("linkedin", ""),
+            "is_public": p.get("is_public", False),
+            "table_types": p.get("table_types", []),
+            "availability": p.get("availability", "available"),
+        }
+        db.ragers.insert_one(rager)
+        rager.pop("_id", None)
+        created.append(rager)
+
+    return {"created": len(created), "ragers": created}
+
+
+@router.get("/admin/stats")
+def admin_stats(admin=Depends(require_admin)):
+    return {
+        "ragers": db.ragers.count_documents({}),
+        "public_ragers": db.ragers.count_documents({"is_public": True}),
+        "enquiries": db.enquiries.count_documents({}),
+        "allocations": db.allocations.count_documents({}),
+        "pending_allocations": db.allocations.count_documents({"member_response": "pending"}),
+        "users": db.users.count_documents({}),
+    }
+
+
+# Public endpoint for the network page
+@router.get("/public/ragers")
+def public_ragers():
+    return list(db.ragers.find({"is_public": True}, {"_id": 0, "email": 0}))

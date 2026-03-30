@@ -1,108 +1,82 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { Users, Zap, Calendar, CreditCard, FileText, Activity, Plus, Play, CheckCircle, Loader2, ShieldCheck, Mail, MessageSquare, PenLine, UserPlus } from 'lucide-react';
+import { FileText, Users, Inbox, Zap, ArrowRight, Loader2 } from 'lucide-react';
 
-/* ✅ FIXED IMPORT */
-import AdminContentEditor from '@/pages/admin/AdminContentEditor';
+const STAT_CARDS = [
+  { key: 'ragers', label: 'Ragers', sub: 'public_ragers', subLabel: 'public', href: '/admin/ragers', icon: Users, color: '#DC143C' },
+  { key: 'enquiries', label: 'Enquiries', href: '/admin/enquiries', icon: Inbox, color: '#A1A1AA' },
+  { key: 'pending_allocations', label: 'Pending Matches', href: '/admin/matching', icon: Zap, color: '#A1A1AA' },
+  { key: 'users', label: 'Platform Users', href: '/admin/ragers', icon: Users, color: '#A1A1AA' },
+];
+
+const QUICK_LINKS = [
+  { to: '/admin/content', icon: FileText, label: 'Edit Content', desc: 'Update page copy, logos, and CMS' },
+  { to: '/admin/ragers', icon: Users, label: 'Manage Ragers', desc: 'Add, edit, and publish Rager profiles' },
+  { to: '/admin/matching', icon: Zap, label: 'Matching', desc: 'Allocate advisors to enquiries' },
+  { to: '/admin/enquiries', icon: Inbox, label: 'Enquiries', desc: 'View all submitted requests' },
+];
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
-  const [stats, setStats] = useState({});
-  const [users, setUsers] = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [matches, setMatches] = useState([]);
-  const [sessions, setSessions] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [auditLogs, setAuditLogs] = useState([]);
-  const [enquiries, setEnquiries] = useState([]);
-  const [ctRequests, setCtRequests] = useState([]);
-  const [bookings, setBookings] = useState([]);
-  const [networkMembers, setNetworkMembers] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview');
-
-  const fetchAll = useCallback(async () => {
-    try {
-      const [statsR, usersR, reqsR, matchR, sessR, evtR, payR, logR, enqR] = await Promise.all([
-        api.get('/admin/stats'),
-        api.get('/admin/users'),
-        api.get('/admin/requests'),
-        api.get('/admin/matches'),
-        api.get('/admin/sessions'),
-        api.get('/events'),
-        api.get('/admin/payments'),
-        api.get('/admin/audit-logs'),
-        api.get('/admin/enquiries')
-      ]);
-
-      setStats(statsR.data);
-      setUsers(usersR.data);
-      setRequests(reqsR.data);
-      setMatches(matchR.data);
-      setSessions(sessR.data);
-      setEvents(evtR.data);
-      setPayments(payR.data);
-      setAuditLogs(logR.data);
-      setEnquiries(enqR.data);
-
-    } catch {
-      toast.error('Failed to load admin data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   useEffect(() => {
-    if (user?.role === 'admin') fetchAll();
-  }, [user, fetchAll]);
-
-  if (user?.role !== 'admin')
-    return <div className="text-[#71717A] text-center py-20">Access denied</div>;
-
-  if (loading)
-    return <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>;
+    api.get('/admin/stats')
+      .then(r => setStats(r.data))
+      .catch(() => setStats({}))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div>
-      <h1>Admin Dashboard</h1>
+      <div className="mb-8">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#DC143C] mb-2 font-semibold">Admin</p>
+        <h1 className="text-3xl font-light text-[#F5F5F0] tracking-tight">Overview</h1>
+      </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="enquiries">Enquiries</TabsTrigger>
-          <TabsTrigger value="content">Content</TabsTrigger>
-        </TabsList>
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-10">
+        {STAT_CARDS.map(card => (
+          <Link key={card.key} to={card.href} className="bg-[#0A0A0A] border border-white/8 p-5 hover:border-white/20 transition-colors group">
+            <div className="flex items-center justify-between mb-3">
+              <card.icon className="w-4 h-4" style={{ color: card.color }} />
+              <ArrowRight className="w-3.5 h-3.5 text-[#52525B] group-hover:text-[#A1A1AA] transition-colors" />
+            </div>
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-[#52525B]" />
+            ) : (
+              <>
+                <p className="text-2xl font-light text-[#F5F5F0]">{stats?.[card.key] ?? '—'}</p>
+                <p className="text-xs text-[#52525B] mt-0.5">
+                  {card.label}
+                  {card.sub && stats?.[card.sub] !== undefined
+                    ? ` · ${stats[card.sub]} ${card.subLabel}`
+                    : ''}
+                </p>
+              </>
+            )}
+          </Link>
+        ))}
+      </div>
 
-        {/* OVERVIEW */}
-        <TabsContent value="overview">
-          <div>Users: {stats.users || 0}</div>
-        </TabsContent>
-
-        {/* ENQUIRIES */}
-        <TabsContent value="enquiries">
-          {enquiries.map(e => (
-            <div key={e.id}>{e.name}</div>
+      {/* Quick links */}
+      <div>
+        <p className="text-xs uppercase tracking-[0.15em] text-[#52525B] mb-4 font-semibold">Quick Access</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {QUICK_LINKS.map(link => (
+            <Link key={link.to} to={link.to} className="flex items-start gap-4 bg-[#0A0A0A] border border-white/8 p-5 hover:border-white/20 transition-colors group">
+              <div className="w-9 h-9 bg-[#111] border border-white/8 flex items-center justify-center shrink-0 mt-0.5">
+                <link.icon className="w-4 h-4 text-[#71717A] group-hover:text-[#DC143C] transition-colors" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[#F5F5F0]">{link.label}</p>
+                <p className="text-xs text-[#52525B] mt-0.5">{link.desc}</p>
+              </div>
+            </Link>
           ))}
-        </TabsContent>
-
-        {/* CONTENT */}
-        <TabsContent value="content">
-          <AdminContentEditor />
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
     </div>
   );
 }

@@ -10,12 +10,15 @@ import { toast } from 'sonner';
 import { Save, Loader2, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
 
 const PAGES = [
-  { key: 'landing', label: 'Landing', path: '/' },
+  { key: 'brand', label: 'Brand', path: '/' },
+  { key: 'landing', label: 'Homepage', path: '/' },
   { key: 'about', label: 'About', path: '/about' },
-  { key: 'private_table', label: 'Private Table', path: '/private-table' },
   { key: 'closed_table', label: 'Closed Table', path: '/closed-table' },
+  { key: 'private_table', label: 'Private Table', path: '/private-table' },
   { key: 'sunday_table', label: 'Sunday Table', path: '/sunday-table' },
-  { key: 'network', label: 'Network', path: '/network' },
+  { key: 'network', label: 'Ragers', path: '/network' },
+  { key: 'contact', label: 'Contact', path: '/contact' },
+  { key: 'legal', label: 'Legal', path: '/privacy' },
 ];
 
 function setDeep(obj, path, value) {
@@ -94,14 +97,35 @@ export default function AdminContentEditor() {
     setEditing(function(prev) { return setDeep(prev, path, value); });
   };
 
+  var handleSeed = function() {
+    setSaving(true);
+    api.post('/admin/content/seed')
+      .then(function() { toast.success('Content seeded'); fetchAll(); })
+      .catch(function() { toast.error('Seed failed'); })
+      .finally(function() { setSaving(false); });
+  };
+
   if (loading) return <div className="flex items-center justify-center h-40 text-[#A1A1AA]"><Loader2 className="w-5 h-5 animate-spin" /></div>;
 
-  if (!editing) return <div className="border border-white/5 bg-[#0A0A0A] p-8 text-center text-[#71717A]">No content. Restart backend to seed.</div>;
+  if (!editing) return (
+    <div className="border border-white/5 bg-[#0A0A0A] p-10 text-center">
+      <p className="text-[#71717A] mb-4">No content found. Click below to seed default content for all pages.</p>
+      <button onClick={handleSeed} disabled={saving} className="inline-flex items-center gap-2 bg-[#DC143C] hover:bg-[#B01030] text-white px-6 py-2 text-xs uppercase tracking-wider font-semibold transition-colors">
+        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+        Seed Default Content
+      </button>
+    </div>
+  );
 
   var sectionKeys = Object.keys(editing);
 
   return (
     <div data-testid="admin-content-editor">
+      <div className="mb-8">
+        <p className="text-xs uppercase tracking-[0.2em] text-[#DC143C] mb-2 font-semibold">Admin</p>
+        <h1 className="text-3xl font-light text-[#F5F5F0] tracking-tight">Content</h1>
+        <p className="text-sm text-[#52525B] mt-1">Edit page copy, logos, and site content.</p>
+      </div>
       <div className="flex items-center justify-between mb-6">
         <Tabs value={activePage} onValueChange={setActivePage}>
           <TabsList className="bg-[#111111] border border-white/8 rounded-none p-1 h-auto flex flex-wrap">

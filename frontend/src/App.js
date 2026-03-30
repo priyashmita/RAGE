@@ -19,7 +19,9 @@ import MemberDashboard from '@/pages/MemberDashboard';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminContentEditor from '@/pages/admin/AdminContentEditor';
 import AdminLoginPage from '@/pages/admin/AdminLoginPage';
+import AdminRagersPage from '@/pages/admin/AdminRagersPage';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
+import AdminLayout from '@/components/AdminLayout';
 import EventsPage from '@/pages/EventsPage';
 import '@/App.css';
 
@@ -118,12 +120,13 @@ function App() {
             path="/admin"
             element={
               <ProtectedRoute adminOnly>
-                <Layout />
+                <AdminLayout />
               </ProtectedRoute>
             }
           >
             <Route index element={<AdminDashboard />} />
             <Route path="content" element={<AdminContentEditor />} />
+            <Route path="ragers" element={<AdminRagersPage />} />
             <Route path="matching" element={<MatchingPanel />} />
           </Route>
 
