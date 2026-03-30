@@ -11,6 +11,7 @@ import SundayTablePage from '@/pages/SundayTablePage';
 import NetworkPage from '@/pages/NetworkPage';
 import ContactPage from '@/pages/ContactPage';
 import PrivacyPage from '@/pages/PrivacyPage';
+import InsightsPage from '@/pages/InsightsPage';
 import LoginPage from '@/pages/LoginPage';
 import ClosedTableRequestPage from '@/pages/ClosedTableRequestPage';
 import FounderDashboard from '@/pages/FounderDashboard';
@@ -101,6 +102,7 @@ function App() {
             <Route path="/network" element={<NetworkPage />} />
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/insights" element={<InsightsPage />} />
           </Route>
 
           <Route path="/member-login" element={<LoginPage />} />

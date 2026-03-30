@@ -39,6 +39,7 @@ KEYWORD_MAP = {
 class RagerIn(BaseModel):
     name: str
     email: Optional[str] = ""
+    phone: Optional[str] = ""
     photo_url: Optional[str] = ""
     title: Optional[str] = ""
     company: Optional[str] = ""
@@ -182,7 +183,7 @@ def admin_stats(admin=Depends(require_admin)):
     }
 
 
-# Public endpoint for the network page
+# Public endpoint for the network page — strips all contact info
 @router.get("/public/ragers")
 def public_ragers():
-    return list(db.ragers.find({"is_public": True}, {"_id": 0, "email": 0}))
+    return list(db.ragers.find({"is_public": True}, {"_id": 0, "email": 0, "phone": 0}))

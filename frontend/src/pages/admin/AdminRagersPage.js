@@ -23,7 +23,7 @@ const CATEGORIES = [
 const TABLE_TYPES = ['closed_table', 'private_table', 'sunday_table'];
 
 const EMPTY_FORM = {
-  name: '', email: '', photo_url: '', title: '', company: '',
+  name: '', email: '', phone: '', photo_url: '', title: '', company: '',
   bio: '', expertise: [], categories: [], location: '',
   linkedin: '', is_public: false, table_types: [], availability: 'available',
 };
@@ -100,9 +100,13 @@ function RagerForm({ form, setForm, onSubmit, onCategorize, categorizing, saving
           <Input value={form.name} onChange={e => update('name', e.target.value)} required className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-9 rounded-none text-sm" />
         </div>
         <div>
-          <Label className="text-xs uppercase tracking-wider text-[#71717A] mb-1.5 block">Email</Label>
+          <Label className="text-xs uppercase tracking-wider text-[#71717A] mb-1.5 block">Email <span className="text-[#52525B] normal-case tracking-normal">(private)</span></Label>
           <Input type="email" value={form.email} onChange={e => update('email', e.target.value)} className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-9 rounded-none text-sm" />
         </div>
+      </div>
+      <div>
+        <Label className="text-xs uppercase tracking-wider text-[#71717A] mb-1.5 block">Phone <span className="text-[#52525B] normal-case tracking-normal">(private — never shown publicly)</span></Label>
+        <Input type="tel" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="+91 98XXX XXXXX" className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-9 rounded-none text-sm" />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

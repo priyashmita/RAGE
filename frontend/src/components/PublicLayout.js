@@ -11,6 +11,7 @@ const navLinks = [
   { to: '/closed-table', label: 'Closed Table' },
   { to: '/sunday-table', label: 'Sunday Table' },
   { to: '/network', label: 'Network' },
+  { to: '/insights', label: 'Insights' },
   { to: '/contact', label: 'Contact' },
 ];
 
