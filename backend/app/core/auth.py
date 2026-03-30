@@ -21,17 +21,18 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 def create_access_token(user: dict) -> str:
     now = datetime.now(timezone.utc)
+    user_id = user.get("id") or str(user.get("_id", ""))
     payload = {
-        "sub": user["id"],
+        "sub": user_id,
         "email": user["email"],
-        "role": user["role"],
+        "role": user.get("role", "member"),
         "exp": int((now + timedelta(minutes=JWT_EXPIRE_MINUTES)).timestamp())
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def serialize_user(user: dict) -> dict:
     return {
-        "id": user["id"],
+        "id": user.get("id") or str(user.get("_id", "")),
         "email": user["email"],
         "name": user.get("name", ""),
         "role": user.get("role", "member"),
