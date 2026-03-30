@@ -167,9 +167,12 @@ export default function LoginPage() {
           </div>
 
           {mode === 'login' && (
-            <div className="mt-8 p-4 border border-white/5 bg-[#0A0A0A]">
+            <div className="mt-8 p-4 border border-white/5 bg-[#0A0A0A] space-y-2">
               <p className="text-xs text-[#71717A] mb-2 uppercase tracking-wider font-semibold">Demo Access</p>
               <p className="text-xs text-[#A1A1AA]">admin@rage.com / admin123</p>
+              <p className="text-xs text-[#52525B] break-all">
+                API: {process.env.REACT_APP_BACKEND_URL || <span className="text-red-500">NOT SET</span>}
+              </p>
             </div>
           )}
         </div>
