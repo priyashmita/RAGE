@@ -26,7 +26,7 @@ export function useSiteContent(page, defaults = {}) {
   useEffect(() => {
     if (cache[page]) { setContent(merge(defaults, cache[page])); return; }
     let cancelled = false;
-    api.get(`/content/${page}`)
+    api.get(`/public/content/${page}`)
       .then(res => {
         if (!cancelled && res.data?.sections) {
           cache[page] = res.data.sections;

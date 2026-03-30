@@ -30,7 +30,7 @@ export default function AdminLayout() {
     <div className="flex flex-col h-full">
       <div className="px-5 py-5 border-b border-white/8">
         <NavLink to="/admin" onClick={onNavClick}>
-          <img src={LOGO_URL} alt="RAGE" className="h-7 w-auto invert" />
+          <img src={LOGO_URL} alt="RAGE" className="h-10 w-auto invert" />
         </NavLink>
         <p className="text-[10px] text-[#DC143C] uppercase tracking-[0.2em] mt-1.5 font-semibold">Admin</p>
       </div>
@@ -88,7 +88,7 @@ export default function AdminLayout() {
 
       {/* Mobile header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-[#080808] border-b border-white/8 flex items-center justify-between px-4">
-        <img src={LOGO_URL} alt="RAGE" className="h-6 w-auto invert" />
+        <img src={LOGO_URL} alt="RAGE" className="h-8 w-auto invert" />
         <button onClick={() => setMobileOpen(!mobileOpen)} className="text-[#A1A1AA] hover:text-[#F5F5F0] transition-colors">
           {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
