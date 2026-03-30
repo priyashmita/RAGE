@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, Loader2, ChevronDown, ChevronRight, ExternalLink } from 'lucide-react';
+import { Save, Loader2, ChevronDown, ChevronRight, ExternalLink, Plus, Trash2 } from 'lucide-react';
 
 const PAGES = [
   { key: 'brand', label: 'Brand', path: '/' },
@@ -33,6 +33,16 @@ function setDeep(obj, path, value) {
   const last = isNaN(parts[parts.length - 1]) ? parts[parts.length - 1] : parseInt(parts[parts.length - 1]);
   cur[last] = value;
   return copy;
+}
+
+function emptyClone(val) {
+  if (Array.isArray(val)) return [];
+  if (typeof val === 'object' && val !== null) {
+    const out = {};
+    for (const k of Object.keys(val)) out[k] = emptyClone(val[k]);
+    return out;
+  }
+  return '';
 }
 
 function flattenFields(obj, prefix) {
@@ -140,6 +150,9 @@ export default function AdminContentEditor() {
           <a href={PAGES.find(function(p) { return p.key === activePage; })?.path || '/'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#A1A1AA] border border-white/15 hover:border-white/30 hover:text-[#F5F5F0] transition-colors" data-testid="content-preview-btn">
             <ExternalLink className="w-3.5 h-3.5" /> Preview
           </a>
+          <button onClick={handleSeed} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#71717A] border border-white/8 hover:border-white/20 hover:text-[#A1A1AA] transition-colors" title="Re-seed all pages with defaults" data-testid="content-reseed-btn">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Re-seed'}
+          </button>
           <Button onClick={handleSave} disabled={saving || !editing} className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none h-9 px-5 text-xs uppercase tracking-wider" data-testid="content-save-btn">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Save className="w-3.5 h-3.5 mr-1.5" /> Save</>}
           </Button>
@@ -208,19 +221,29 @@ function renderValue(val, path, onUpdate) {
 }
 
 function renderArray(arr, path, onUpdate) {
-  if (arr.length === 0) return <p className="text-xs text-[#71717A] italic">No items</p>;
+  var addItem = function() {
+    var template = arr.length > 0 ? emptyClone(arr[0]) : '';
+    onUpdate(path, arr.concat([template]));
+  };
+  var removeItem = function(i) {
+    onUpdate(path, arr.filter(function(_, idx) { return idx !== i; }));
+  };
 
-  if (typeof arr[0] === 'string') {
+  if (arr.length === 0 || typeof arr[0] === 'string') {
     return (
       <div className="space-y-1">
         {arr.map(function(item, i) {
           return (
-            <div key={i} className="flex gap-2">
-              <span className="text-[10px] text-[#71717A] font-mono w-5 pt-2 shrink-0">{i + 1}</span>
+            <div key={i} className="flex gap-2 items-center">
+              <span className="text-[10px] text-[#71717A] font-mono w-5 shrink-0">{i + 1}</span>
               <Input value={item} onChange={function(e) { onUpdate(path + '.' + i, e.target.value); }} className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] rounded-none text-sm h-8 flex-1" />
+              <button onClick={function() { removeItem(i); }} className="text-[#52525B] hover:text-red-500 transition-colors shrink-0"><Trash2 className="w-3 h-3" /></button>
             </div>
           );
         })}
+        <button onClick={addItem} className="flex items-center gap-1 text-[10px] text-[#52525B] hover:text-[#A1A1AA] transition-colors mt-1">
+          <Plus className="w-3 h-3" /> Add item
+        </button>
       </div>
     );
   }
@@ -231,7 +254,10 @@ function renderArray(arr, path, onUpdate) {
         if (typeof item !== 'object' || item === null) return null;
         return (
           <div key={i} className="bg-[#0A0A0A] border border-white/5 p-3 space-y-2">
-            <span className="text-[10px] text-[#71717A] font-mono">#{i + 1}</span>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] text-[#71717A] font-mono">#{i + 1}</span>
+              <button onClick={function() { removeItem(i); }} className="text-[#52525B] hover:text-red-500 transition-colors"><Trash2 className="w-3 h-3" /></button>
+            </div>
             {Object.entries(item).map(function(entry) {
               var k = entry[0];
               var v = entry[1];
@@ -240,7 +266,11 @@ function renderArray(arr, path, onUpdate) {
                 <div key={k}>
                   <Label className="text-[10px] text-[#71717A] uppercase tracking-wider">{k.replace(/_/g, ' ')}</Label>
                   {Array.isArray(v) ? (
-                    <Textarea value={v.join('\n')} onChange={function(e) { onUpdate(fieldPath, e.target.value.split('\n').filter(Boolean)); }} className="bg-[#050505] border-white/10 text-[#F5F5F0] rounded-none text-xs min-h-[40px] mt-0.5" />
+                    typeof v[0] === 'string' || v.length === 0
+                      ? <Textarea value={v.join('\n')} onChange={function(e) { onUpdate(fieldPath, e.target.value.split('\n').filter(Boolean)); }} className="bg-[#050505] border-white/10 text-[#F5F5F0] rounded-none text-xs min-h-[40px] mt-0.5" />
+                      : <div className="mt-0.5">{renderArray(v, fieldPath, onUpdate)}</div>
+                  ) : typeof v === 'object' && v !== null ? (
+                    <div className="mt-0.5 pl-2 border-l border-white/5">{renderObject(v, fieldPath, onUpdate)}</div>
                   ) : typeof v === 'string' && v.length > 80 ? (
                     <Textarea value={v} onChange={function(e) { onUpdate(fieldPath, e.target.value); }} className="bg-[#050505] border-white/10 text-[#F5F5F0] rounded-none text-xs min-h-[40px] mt-0.5" />
                   ) : (
@@ -252,6 +282,9 @@ function renderArray(arr, path, onUpdate) {
           </div>
         );
       })}
+      <button onClick={addItem} className="flex items-center gap-1.5 text-[10px] text-[#52525B] hover:text-[#A1A1AA] border border-white/5 hover:border-white/15 px-3 py-2 w-full transition-colors">
+        <Plus className="w-3 h-3" /> Add item
+      </button>
     </div>
   );
 }

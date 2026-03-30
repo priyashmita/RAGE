@@ -148,6 +148,9 @@ DEFAULT_CONTENT = [
                     {"title": "Institutional", "points": ["Governance & compliance", "Strategic partnerships", "Exit planning", "Board composition"]}
                 ]
             },
+            "team": [
+                {"name": "", "title": "", "bio": "", "photo_url": ""}
+            ],
             "cta": {
                 "title": "Become part of the RAGE network.",
                 "body": "Whether you're a founder looking for support, or an operator who wants to give back — we'd like to hear from you."
@@ -191,6 +194,11 @@ DEFAULT_CONTENT = [
                 "body": "Fundraising strategy, hiring decisions, co-founder conflicts, regulatory challenges, pricing models, board dynamics — if it's real and it matters, bring it.",
                 "items": []
             },
+            "faqs": [
+                {"q": "How long is a session?", "a": "60–90 minutes depending on the tier you book."},
+                {"q": "Is everything confidential?", "a": "Yes. Nothing leaves the session without your explicit consent."},
+                {"q": "Can I book more than one session?", "a": "Yes. There's no limit and no retainer commitment."}
+            ],
             "cta": {
                 "title": "Ready to book a session?",
                 "body": "Tell us what you need. We'll match you within 48 hours."
@@ -238,6 +246,14 @@ DEFAULT_CONTENT = [
                 ],
                 "note": "Private Table is by invitation only. Submit an enquiry to be considered."
             },
+            "upcoming": [
+                {"title": "", "date": "", "location": "", "type": "Founders Table", "desc": ""}
+            ],
+            "faqs": [
+                {"q": "Who gets invited?", "a": "Women founders building serious companies. Every guest is vetted by RAGE."},
+                {"q": "Is there a cost to attend?", "a": "Private Table is by invitation only. There is no ticket price."},
+                {"q": "What is discussed?", "a": "There is no set agenda. One theme is introduced at the start of dinner and the conversation flows from there."}
+            ],
             "cta": {
                 "title": "Request an invitation",
                 "body": ""
@@ -259,7 +275,9 @@ DEFAULT_CONTENT = [
             },
             "episodes": {
                 "theme": "Season 1 — In Development",
-                "list": []
+                "list": [
+                    {"title": "", "founder": "", "company": "", "desc": "", "date": ""}
+                ]
             },
             "production": [
                 {"label": "Format", "text": "Short documentary. 20–30 minutes per episode."},
@@ -277,6 +295,11 @@ DEFAULT_CONTENT = [
                 ],
                 "stats": []
             },
+            "faqs": [
+                {"q": "How do I apply to be featured?", "a": "Submit an enquiry through the Contact page and tell us about your business and story."},
+                {"q": "Is there a cost to be featured?", "a": "No. Sunday Table is editorially independent. There is no fee to be featured."},
+                {"q": "Who owns the footage?", "a": "RAGE retains distribution rights. Founders retain rights to their own story."}
+            ],
             "cta": {
                 "title": "Interested in sponsoring?",
                 "body": "We're selective. If you think there's a fit, send us a note."
@@ -289,7 +312,7 @@ DEFAULT_CONTENT = [
             "hero": {
                 "overline": "The Network",
                 "title": "India's best operators. All women.",
-                "body": "Ragers are the backbone of RAGE — senior operators, investors, founders, and specialists who make themselves available to the founders in our network."
+                "body": "RAGERS are the core network behind R.A.G.E.—a curated group of experienced operators, investors, founders, and leaders across capital, entrepreneurship, policy, and technology. They engage through structured formats, not informal advisory—contributing to Private Tables, Closed Tables, and other platform interactions where their experience directly supports access, decisions, and credibility. This is not a directory. It is an active, high-trust network where participation is intentional, relevant, and outcome-oriented."
             },
             "stats": [
                 {"value": "20+", "label": "Active Ragers"},
@@ -304,6 +327,11 @@ DEFAULT_CONTENT = [
                 "International Expansion"
             ],
             "members": [],
+            "faqs": [
+                {"q": "How do I book a Rager?", "a": "Submit a Closed Table request and we'll match you with the right advisor within 48 hours."},
+                {"q": "Can I request a specific Rager?", "a": "Yes. If you have someone in mind, mention their name in your submission."},
+                {"q": "How are Ragers vetted?", "a": "Every Rager is assessed for real operating experience, not just credentials. We review their background before inviting them to join."}
+            ],
             "cta": {
                 "title": "Want to become a Rager?",
                 "body": "We're always looking for senior operators who want to give back. If that's you, get in touch."
@@ -386,9 +414,13 @@ def seed_content(admin=Depends(require_admin)):
 @router.get("/public/content/{page}")
 def get_public_content(page: str):
     doc = db.content.find_one({"page": page}, {"_id": 0})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Not found")
-    return doc
+    if doc:
+        return doc
+    # Fall back to hardcoded defaults so pages always render
+    default = next((d for d in DEFAULT_CONTENT if d["page"] == page), None)
+    if default:
+        return default
+    raise HTTPException(status_code=404, detail="Not found")
 
 @router.get("/content/{page}")
 def get_public_content_alias(page: str):

@@ -23,7 +23,7 @@ export default function PublicLayout() {
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-white/90 backdrop-blur-md border-b border-gray-100" data-testid="public-header">
         <div className="h-full max-w-[1400px] mx-auto px-6 flex items-center justify-between">
           <Link to="/" className="shrink-0" data-testid="public-logo-link">
-            <img src={LOGO_URL} alt="RAGE" className="h-7 w-auto" />
+            <img src={LOGO_URL} alt="RAGE" className="h-10 w-auto" />
           </Link>
           <nav className="hidden lg:flex items-center gap-1" data-testid="public-nav">
             {navLinks.map(l => (
@@ -62,7 +62,7 @@ export default function PublicLayout() {
         <div className="max-w-[1400px] mx-auto px-6 py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
-              <img src={LOGO_URL} alt="RAGE" className="h-6 w-auto mb-4" />
+              <img src={LOGO_URL} alt="RAGE" className="h-8 w-auto mb-4" />
               <p className="text-sm text-gray-500 max-w-sm leading-relaxed">The Radical Alliance for Gender Equity. Addressing gender inequity through outcomes, not advocacy.</p>
             </div>
             <div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,11 +14,18 @@ export default function LoginPage() {
   const [mode, setMode] = useState('login');
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({ email: '', password: '', name: '', role: 'member' });
-  const { login, signup, user } = useAuth();
+  const { login, signup, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // If already logged in, redirect to dashboard
-  if (user) { navigate('/dashboard', { replace: true }); return null; }
+  useEffect(() => {
+    if (!authLoading && user) navigate('/dashboard', { replace: true });
+  }, [authLoading, user, navigate]);
+
+  if (authLoading) return (
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <Loader2 className="w-5 h-5 animate-spin text-[#52525B]" />
+    </div>
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();

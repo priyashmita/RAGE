@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,14 +10,21 @@ import { Loader2 } from 'lucide-react';
 export default function AdminLoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
-  const { login, user } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  if (user) {
-    if (user.role === 'admin') navigate('/admin', { replace: true });
-    else navigate('/dashboard', { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'admin') navigate('/admin', { replace: true });
+      else navigate('/dashboard', { replace: true });
+    }
+  }, [authLoading, user, navigate]);
+
+  if (authLoading) return (
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+      <Loader2 className="w-5 h-5 animate-spin text-[#52525B]" />
+    </div>
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();

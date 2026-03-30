@@ -20,6 +20,7 @@ import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminContentEditor from '@/pages/admin/AdminContentEditor';
 import AdminLoginPage from '@/pages/admin/AdminLoginPage';
 import AdminRagersPage from '@/pages/admin/AdminRagersPage';
+import AdminAnalyticsPage from '@/pages/admin/AdminAnalyticsPage';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
 import AdminLayout from '@/components/AdminLayout';
 import EventsPage from '@/pages/EventsPage';
@@ -127,6 +128,7 @@ function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="content" element={<AdminContentEditor />} />
             <Route path="ragers" element={<AdminRagersPage />} />
+            <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="matching" element={<MatchingPanel />} />
           </Route>
 
