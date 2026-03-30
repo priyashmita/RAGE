@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,15 +17,13 @@ export default function LoginPage() {
   const { login, signup, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!authLoading && user) navigate('/dashboard', { replace: true });
-  }, [authLoading, user, navigate]);
-
   if (authLoading) return (
     <div className="min-h-screen bg-[#050505] flex items-center justify-center">
       <Loader2 className="w-5 h-5 animate-spin text-[#52525B]" />
     </div>
   );
+
+  if (user) return <Navigate to="/dashboard" replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

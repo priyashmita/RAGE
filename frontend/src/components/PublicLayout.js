@@ -24,7 +24,7 @@ export default function PublicLayout() {
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-white/90 backdrop-blur-md border-b border-gray-100" data-testid="public-header">
         <div className="h-full max-w-[1400px] mx-auto px-6 flex items-center justify-between">
           <Link to="/" className="shrink-0" data-testid="public-logo-link">
-            <img src={LOGO_URL} alt="RAGE" className="h-10 w-auto" />
+            <img src={LOGO_URL} alt="RAGE" className="h-12 w-auto" />
           </Link>
           <nav className="hidden lg:flex items-center gap-1" data-testid="public-nav">
             {navLinks.map(l => (

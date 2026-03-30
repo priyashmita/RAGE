@@ -410,13 +410,21 @@ def seed_content(admin=Depends(require_admin)):
     return {"status": "seeded", "pages": [i["page"] for i in DEFAULT_CONTENT]}
 
 
+def _is_legacy_sections(sections: dict) -> bool:
+    """Old DB content uses flat string keys like hero_title. New format has nested dicts."""
+    if not sections:
+        return False
+    return all(isinstance(v, str) for v in sections.values())
+
+
 # Public — no auth required (two URL aliases for compatibility)
 @router.get("/public/content/{page}")
 def get_public_content(page: str):
     doc = db.content.find_one({"page": page}, {"_id": 0})
-    if doc:
+    # Return DB content only if it uses the current nested format
+    if doc and not _is_legacy_sections(doc.get("sections", {})):
         return doc
-    # Fall back to hardcoded defaults so pages always render
+    # Fall back to hardcoded defaults (covers missing OR legacy-format docs)
     default = next((d for d in DEFAULT_CONTENT if d["page"] == page), None)
     if default:
         return default
