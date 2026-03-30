@@ -9,13 +9,16 @@ from app.api.seed import router as seed_router
 
 app = FastAPI()
 
-cors_raw = os.getenv("CORS_ORIGINS", "http://localhost:3000")
-origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
+cors_raw = os.getenv("CORS_ORIGINS", "*")
+if cors_raw.strip() == "*":
+    origins = ["*"]
+else:
+    origins = [o.strip() for o in cors_raw.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -23,6 +26,13 @@ app.add_middleware(
 @app.get("/")
 def home():
     return {"message": "RAGE backend is running"}
+
+@app.get("/api/debug/cors")
+def debug_cors():
+    return {
+        "configured_origins": origins,
+        "cors_raw_env": cors_raw
+    }
 
 app.include_router(auth_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")

@@ -32,7 +32,9 @@ export default function LoginPage() {
       toast.success(mode === 'login' ? 'Welcome back' : 'Account created');
       navigate('/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Authentication failed');
+      const detail = err.response?.data?.detail;
+      const network = !err.response ? `Network error — check API URL (${process.env.REACT_APP_BACKEND_URL || 'NOT SET'})` : null;
+      toast.error(detail || network || err.message || 'Authentication failed');
     } finally {
       setLoading(false);
     }
