@@ -17,7 +17,7 @@ from app.core.auth import require_admin
 
 router = APIRouter()
 
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://rage-v5xv.vercel.app")
+BACKEND_URL = os.getenv("BACKEND_URL", "https://rage-production.up.railway.app")
 FROM_EMAIL = "RAGE <hello@rageforgood.com>"
 
 
@@ -123,8 +123,8 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
         created.append(allocation)
 
         # Send anonymised email to Rager
-        accept_link = f"{FRONTEND_URL}/respond/{anon_token}?r=accept"
-        decline_link = f"{FRONTEND_URL}/respond/{anon_token}?r=decline"
+        accept_link = f"{BACKEND_URL}/api/respond/{anon_token}?r=accept"
+        decline_link = f"{BACKEND_URL}/api/respond/{anon_token}?r=decline"
         format_label = enq.get("format", "Advisory Session").replace("_", " ").title()
         challenge = enq.get("challenge") or enq.get("message", "Not specified")
 

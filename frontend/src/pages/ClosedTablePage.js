@@ -11,7 +11,7 @@ export default function ClosedTablePage() {
     <div data-testid="closed-table-page">
 
       {c.hero.title && (
-        <section className="py-24 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6">
+        <section className="py-16 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6">
           {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-4xl">{c.hero.title}</h1>
           {c.hero.body && <p className="mt-6 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.body}</p>}

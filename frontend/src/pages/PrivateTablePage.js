@@ -12,6 +12,7 @@ export default function PrivateTablePage() {
     <div data-testid="private-table-page">
 
       {c.hero.title && (
+        c.hero.image_url ? (
         <section className="relative h-[60vh] min-h-[400px] flex items-end">
           <div className="absolute inset-0"><img src={c.hero.image_url} alt="" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/10" /></div>
           <div className="relative z-10 max-w-[1400px] mx-auto px-6 pb-16 w-full">
@@ -20,6 +21,15 @@ export default function PrivateTablePage() {
             {c.hero.subtitle && <p className="mt-4 text-lg text-white/70 max-w-xl">{c.hero.subtitle}</p>}
           </div>
         </section>
+        ) : (
+        <section className="py-16 border-b border-gray-100">
+          <div className="max-w-[1400px] mx-auto px-6">
+            {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
+            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900">{c.hero.title}</h1>
+            {c.hero.subtitle && <p className="mt-6 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
+          </div>
+        </section>
+        )
       )}
 
       {(c.what.title || c.table_types.length > 0) && (

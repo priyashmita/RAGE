@@ -17,7 +17,7 @@ export default function NetworkPage() {
 
   return (
     <div data-testid="network-page">
-      <section className="py-24 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6"><p className="rage-overline mb-4">{c.hero.overline}</p><h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-4xl leading-[1.05]">{c.hero.title}</h1><p className="mt-8 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.body}</p></div></section>
+      <section className="py-16 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6"><p className="rage-overline mb-4">{c.hero.overline}</p><h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-4xl leading-[1.05]">{c.hero.title}</h1><p className="mt-8 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.body}</p></div></section>
 
       <section className="border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6"><div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-gray-200">{c.stats.map(s=>(<div key={s.label} className="bg-white p-8 text-center"><p className="text-4xl font-light text-gray-900 font-mono">{s.value}</p><p className="text-xs text-gray-400 uppercase tracking-wider mt-2">{s.label}</p></div>))}</div></div></section>
 

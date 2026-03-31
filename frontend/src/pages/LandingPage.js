@@ -13,18 +13,32 @@ export default function LandingPage() {
     <div data-testid="landing-page">
 
       {c.hero.title && (
-        <section className="relative min-h-[90vh] flex items-end" data-testid="hero-section">
-          <div className="absolute inset-0"><img src={c.hero.image_url} alt="" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/20" /></div>
-          <div className="relative z-10 max-w-[1400px] mx-auto px-6 pb-20 w-full">
-            {c.hero.overline && <p className="rage-overline mb-6 !text-white/70">{c.hero.overline}</p>}
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white leading-[1.05] max-w-4xl">{c.hero.title}</h1>
-            {c.hero.body && <p className="mt-8 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.body}</p>}
-            <div className="mt-10 flex flex-wrap gap-4">
-              {c.hero.cta_primary_text && <Link to={c.hero.cta_primary_link || '/private-table'}><Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-explore-btn">{c.hero.cta_primary_text} <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>}
-              {c.hero.cta_secondary_text && <EnquiryDialog interest="general" title="Talk to Us" trigger={<Button variant="outline" className="border-white/30 text-white hover:bg-white/10 rounded-none h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-enquiry-btn">{c.hero.cta_secondary_text}</Button>} />}
+        c.hero.image_url ? (
+          <section className="relative min-h-[90vh] flex items-end" data-testid="hero-section">
+            <div className="absolute inset-0"><img src={c.hero.image_url} alt="" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-black/20" /></div>
+            <div className="relative z-10 max-w-[1400px] mx-auto px-6 pb-20 w-full">
+              {c.hero.overline && <p className="rage-overline mb-6 !text-white/70">{c.hero.overline}</p>}
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white leading-[1.05] max-w-4xl">{c.hero.title}</h1>
+              {c.hero.body && <p className="mt-8 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.body}</p>}
+              <div className="mt-10 flex flex-wrap gap-4">
+                {c.hero.cta_primary_text && <Link to={c.hero.cta_primary_link || '/private-table'}><Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-explore-btn">{c.hero.cta_primary_text} <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>}
+                {c.hero.cta_secondary_text && <EnquiryDialog interest="general" title="Talk to Us" trigger={<Button variant="outline" className="border-white/30 text-white hover:bg-white/10 rounded-none h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-enquiry-btn">{c.hero.cta_secondary_text}</Button>} />}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="py-16 border-b border-gray-100" data-testid="hero-section">
+            <div className="max-w-[1400px] mx-auto px-6">
+              {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 leading-[1.05] max-w-4xl">{c.hero.title}</h1>
+              {c.hero.body && <p className="mt-6 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.body}</p>}
+              <div className="mt-10 flex flex-wrap gap-4">
+                {c.hero.cta_primary_text && <Link to={c.hero.cta_primary_link || '/private-table'}><Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-explore-btn">{c.hero.cta_primary_text} <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>}
+                {c.hero.cta_secondary_text && <EnquiryDialog interest="general" title="Talk to Us" trigger={<Button variant="outline" className="border-gray-300 text-gray-900 hover:bg-gray-100 rounded-none h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-enquiry-btn">{c.hero.cta_secondary_text}</Button>} />}
+              </div>
+            </div>
+          </section>
+        )
       )}
 
       {(c.problem.title || c.stats.length > 0) && (

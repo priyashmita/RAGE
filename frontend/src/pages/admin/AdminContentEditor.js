@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@/lib/api';
 import { invalidateContentCache } from '@/hooks/useSiteContent';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, Loader2, ChevronDown, ChevronRight, ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { Save, Loader2, ChevronDown, ChevronRight, ExternalLink, Plus, Trash2, Upload, X } from 'lucide-react';
 
 const PAGES = [
   { key: 'brand', label: 'Brand', path: '/' },
@@ -168,6 +168,70 @@ export default function AdminContentEditor() {
   );
 }
 
+function ImageField({ value, onChange }) {
+  const inputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 1400;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        onChange(canvas.toDataURL('image/jpeg', 0.82));
+        setUploading(false);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  return (
+    <div className="space-y-2 mt-0.5">
+      {value && (
+        <div className="relative inline-block">
+          <img src={value} alt="" className="h-24 w-auto object-cover border border-white/10 max-w-full" />
+          <button type="button" onClick={() => onChange('')} className="absolute -top-1.5 -right-1.5 bg-[#DC143C] rounded-full p-0.5 text-white hover:bg-red-700 transition-colors">
+            <X className="w-2.5 h-2.5" />
+          </button>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input
+          value={value && value.startsWith('data:') ? '(uploaded image)' : (value || '')}
+          onChange={e => onChange(e.target.value)}
+          placeholder="https://... or click Upload"
+          className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] rounded-none text-sm h-8 flex-1"
+          readOnly={value && value.startsWith('data:')}
+        />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex items-center gap-1.5 px-3 h-8 border border-white/10 text-[#A1A1AA] hover:text-white hover:border-white/30 transition-colors text-xs shrink-0 disabled:opacity-50"
+        >
+          {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+          Upload
+        </button>
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </div>
+  );
+}
+
+function isImageKey(k) {
+  return k.endsWith('_url') || k === 'image' || k === 'photo';
+}
+
 function SectionPanel(props) {
   var name = props.name;
   var data = props.data;
@@ -197,8 +261,11 @@ function SectionPanel(props) {
   );
 }
 
-function renderValue(val, path, onUpdate) {
+function renderValue(val, path, onUpdate, fieldKey) {
   if (typeof val === 'string') {
+    if (isImageKey(fieldKey || '')) {
+      return <ImageField value={val} onChange={function(v) { onUpdate(path, v); }} />;
+    }
     if (val.length > 80) {
       return <Textarea value={val} onChange={function(e) { onUpdate(path, e.target.value); }} className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] rounded-none text-sm min-h-[60px]" />;
     }
@@ -271,6 +338,8 @@ function renderArray(arr, path, onUpdate) {
                       : <div className="mt-0.5">{renderArray(v, fieldPath, onUpdate)}</div>
                   ) : typeof v === 'object' && v !== null ? (
                     <div className="mt-0.5 pl-2 border-l border-white/5">{renderObject(v, fieldPath, onUpdate)}</div>
+                  ) : typeof v === 'string' && isImageKey(k) ? (
+                    <ImageField value={v} onChange={function(val) { onUpdate(fieldPath, val); }} />
                   ) : typeof v === 'string' && v.length > 80 ? (
                     <Textarea value={v} onChange={function(e) { onUpdate(fieldPath, e.target.value); }} className="bg-[#050505] border-white/10 text-[#F5F5F0] rounded-none text-xs min-h-[40px] mt-0.5" />
                   ) : (
@@ -318,7 +387,9 @@ function renderObject(obj, path, onUpdate) {
         return (
           <div key={k}>
             <Label className="text-[10px] text-[#71717A] uppercase tracking-wider">{k.replace(/_/g, ' ')}</Label>
-            {typeof v === 'string' && v.length > 80 ? (
+            {typeof v === 'string' && isImageKey(k) ? (
+              <ImageField value={v} onChange={function(val) { onUpdate(fieldPath, val); }} />
+            ) : typeof v === 'string' && v.length > 80 ? (
               <Textarea value={v} onChange={function(e) { onUpdate(fieldPath, e.target.value); }} className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] rounded-none text-sm min-h-[60px] mt-0.5" data-testid={'field-' + k} />
             ) : (
               <Input value={v != null ? String(v) : ''} onChange={function(e) { onUpdate(fieldPath, e.target.value); }} className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] rounded-none text-sm h-8 mt-0.5" data-testid={'field-' + k} />

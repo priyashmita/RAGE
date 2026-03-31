@@ -8,7 +8,7 @@ export default function SundayTablePage() {
   const c = useSiteContent('sunday_table', D);
   return (
     <div data-testid="sunday-table-page">
-      <section className="py-24 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6"><p className="rage-overline mb-4">{c.hero.overline}</p><h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-4xl">{c.hero.title}</h1><p className="mt-6 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.body}</p></div></section>
+      <section className="py-16 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6"><p className="rage-overline mb-4">{c.hero.overline}</p><h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-4xl">{c.hero.title}</h1><p className="mt-6 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.body}</p></div></section>
 
       <section className="py-20 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6"><div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
         <div><h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-6">{c.format.title}</h2><p className="text-base text-gray-600 leading-relaxed mb-6">{c.format.body}</p><p className="text-sm text-gray-600 leading-relaxed">{c.format.body2}</p></div>
