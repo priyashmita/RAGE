@@ -291,8 +291,8 @@ def approve_and_invite_rager(rager_id: str, admin=Depends(require_admin)):
         {"$set": {"status": "invited", "last_contacted_at": now, "updated_at": now}},
     )
 
-    setup_url = f"{FRONTEND_URL}/setup-account?token={plain_token}"
-    send_email(
+    setup_url    = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+    email_result = send_email(
         to_email=email,
         to_name=contact["name"],
         template="invite_setup",
@@ -302,7 +302,13 @@ def approve_and_invite_rager(rager_id: str, admin=Depends(require_admin)):
         entity_id=contact_id,
     )
 
-    return {"ok": True, "user_id": user_id, "login_status": "pending_setup"}
+    return {
+        "ok":           True,
+        "user_id":      user_id,
+        "login_status": "pending_setup",
+        "email_sent":   email_result["sent"],
+        "email_error":  email_result["error"],
+    }
 
 
 @router.post("/admin/ragers/{rager_id}/categorize")

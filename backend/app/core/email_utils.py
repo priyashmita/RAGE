@@ -17,17 +17,22 @@ def send_email(
     entity_type: str,
     entity_id:   str,
     anon_token:  str | None = None,
-) -> str | None:
+) -> dict:
     """
     Send via Resend, write an EmailLog entry.
-    Returns resend message id, or None in dev mode (no API key).
-    Never raises — email failure must not crash the calling request.
+    Returns {"sent": bool, "message_id": str|None, "error": str|None}.
+    Raises RuntimeError if RESEND_API_KEY is configured but the send fails,
+    so callers can surface the failure. Silent no-op only in dev (no API key).
     """
     resend_message_id = None
-    status = "queued"
+    status    = "queued"
     error_msg = None
 
-    if RESEND_API_KEY:
+    if not RESEND_API_KEY:
+        # Dev / unconfigured — log and return without raising
+        error_msg = "RESEND_API_KEY not configured — email not sent"
+        status    = "skipped"
+    else:
         try:
             import resend
             resend.api_key = RESEND_API_KEY
@@ -43,8 +48,8 @@ def send_email(
             )
             status = "sent"
         except Exception as exc:
-            status = "queued"
             error_msg = str(exc)
+            status    = "failed"
 
     db.email_logs.insert_one({
         "id":                str(uuid.uuid4()),
@@ -64,7 +69,10 @@ def send_email(
         "error":             error_msg,
     })
 
-    return resend_message_id
+    if status == "failed":
+        raise RuntimeError(f"Email send failed: {error_msg}")
+
+    return {"sent": status == "sent", "message_id": resend_message_id, "error": error_msg}
 
 
 # ── Email HTML templates ──────────────────────────────────────────────────────
