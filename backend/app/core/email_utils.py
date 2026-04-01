@@ -5,7 +5,7 @@ from app.core.db import db
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 FRONTEND_URL   = os.getenv("FRONTEND_URL", "https://rage-v5xv.vercel.app")
-FROM_EMAIL     = "R.A.G.E. <hello@rage.community>"
+FROM_EMAIL     = "R.A.G.E. <noreply@rageforchange.com>"
 
 
 def send_email(
