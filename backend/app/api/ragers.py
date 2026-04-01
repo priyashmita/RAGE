@@ -353,7 +353,7 @@ def resend_rager_invite(rager_id: str, admin=Depends(require_admin)):
         {"$set": {"last_contacted_at": now, "updated_at": now}},
     )
 
-    setup_url = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+    setup_url   = f"{FRONTEND_URL}/setup-account?token={plain_token}"
     email_sent  = False
     email_error = None
     try:
@@ -368,7 +368,7 @@ def resend_rager_invite(rager_id: str, admin=Depends(require_admin)):
         )
         email_sent  = result["sent"]
         email_error = result["error"]
-    except RuntimeError as exc:
+    except Exception as exc:
         email_error = str(exc)
 
     return {
@@ -381,40 +381,45 @@ def resend_rager_invite(rager_id: str, admin=Depends(require_admin)):
 
 @router.post("/admin/ragers/{rager_id}/revoke-invite")
 def revoke_rager_invite(rager_id: str, admin=Depends(require_admin)):
-    rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})
-    if not rager:
-        raise HTTPException(status_code=404, detail="Rager not found")
+    try:
+        rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})
+        if not rager:
+            raise HTTPException(status_code=404, detail="Rager not found")
 
-    contact_id = rager.get("contact_id")
-    if not contact_id:
-        raise HTTPException(status_code=400, detail="No contact linked")
+        contact_id = rager.get("contact_id")
+        if not contact_id:
+            raise HTTPException(status_code=400, detail="No contact linked")
 
-    contact = db.contacts.find_one({"id": contact_id, "is_deleted": False}, {"_id": 0})
-    if not contact:
-        raise HTTPException(status_code=400, detail="Contact not found")
+        contact = db.contacts.find_one({"id": contact_id, "is_deleted": False}, {"_id": 0})
+        if not contact:
+            raise HTTPException(status_code=400, detail="Contact not found")
 
-    now     = datetime.now(timezone.utc).isoformat()
-    user_id = contact.get("user_id")
+        now     = datetime.now(timezone.utc).isoformat()
+        user_id = contact.get("user_id")
 
-    if user_id:
-        user = db.users.find_one({"id": user_id}, {"_id": 0})
-        if user and user.get("status") == "active":
-            raise HTTPException(status_code=400, detail="Cannot revoke an active account")
-        if user:
-            db.users.update_one({"id": user_id}, {"$set": {
-                "status":               "disabled",
-                "invite_token_hash":    None,
-                "invite_token_expires": None,
-                "updated_at":           now,
-            }})
+        if user_id:
+            user = db.users.find_one({"id": user_id}, {"_id": 0})
+            if user and user.get("status") == "active":
+                raise HTTPException(status_code=400, detail="Cannot revoke an active account")
+            if user:
+                db.users.update_one({"id": user_id}, {"$set": {
+                    "status":               "disabled",
+                    "invite_token_hash":    None,
+                    "invite_token_expires": None,
+                    "updated_at":           now,
+                }})
 
-    # Unlink user from contact, reset contact to approved so invite can be re-sent
-    db.contacts.update_one(
-        {"id": contact_id},
-        {"$set": {"user_id": None, "status": "approved", "updated_at": now}},
-    )
+        # Unlink user from contact, reset contact to approved so invite can be re-sent
+        db.contacts.update_one(
+            {"id": contact_id},
+            {"$set": {"user_id": None, "status": "approved", "updated_at": now}},
+        )
 
-    return {"ok": True, "login_status": "approved"}
+        return {"ok": True, "login_status": "approved"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"[revoke] {type(exc).__name__}: {exc}")
 
 
 @router.post("/admin/ragers/{rager_id}/categorize")
