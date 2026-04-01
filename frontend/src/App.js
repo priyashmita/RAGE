@@ -12,11 +12,8 @@ import NetworkPage from '@/pages/NetworkPage';
 import ContactPage from '@/pages/ContactPage';
 import PrivacyPage from '@/pages/PrivacyPage';
 import InsightsPage from '@/pages/InsightsPage';
-import LoginPage from '@/pages/LoginPage';
 import ClosedTableRequestPage from '@/pages/ClosedTableRequestPage';
 import FounderDashboard from '@/pages/FounderDashboard';
-import ExpertDashboard from '@/pages/ExpertDashboard';
-import MemberDashboard from '@/pages/MemberDashboard';
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminContentEditor from '@/pages/admin/AdminContentEditor';
 import AdminLoginPage from '@/pages/admin/AdminLoginPage';
@@ -26,6 +23,12 @@ import AdminEnquiriesPage from '@/pages/admin/AdminEnquiriesPage';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
 import AdminLayout from '@/components/AdminLayout';
 import EventsPage from '@/pages/EventsPage';
+import RagerLoginPage from '@/pages/RagerLoginPage';
+import RagerDashboard from '@/pages/RagerDashboard';
+import SetupAccountPage from '@/pages/SetupAccountPage';
+import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
+import ResetPasswordPage from '@/pages/ResetPasswordPage';
+import RespondPage from '@/pages/RespondPage';
 import '@/App.css';
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -40,7 +43,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   if (!user) {
-    return <Navigate to={adminOnly ? '/admin-login' : '/member-login'} replace />;
+    return <Navigate to={adminOnly ? '/admin-login' : '/rager-login'} replace />;
   }
 
   if (adminOnly && user.role !== 'admin') {
@@ -61,18 +64,13 @@ function DashboardRouter() {
     );
   }
 
-  if (!user) return <Navigate to="/member-login" replace />;
+  if (!user) return <Navigate to="/rager-login" replace />;
 
   if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  if (user.role === 'rager') return <Navigate to="/rager-dashboard" replace />;
+  if (user.role === 'founder') return <FounderDashboard />;
 
-  const dashboards = {
-    founder: <FounderDashboard />,
-    expert: <ExpertDashboard />,
-    member: <MemberDashboard />,
-    sponsor: <MemberDashboard />
-  };
-
-  return dashboards[user.role] || <MemberDashboard />;
+  return <Navigate to="/rager-login" replace />;
 }
 
 function App() {
@@ -106,8 +104,13 @@ function App() {
             <Route path="/insights" element={<InsightsPage />} />
           </Route>
 
-          <Route path="/member-login" element={<LoginPage />} />
           <Route path="/admin-login" element={<AdminLoginPage />} />
+          <Route path="/rager-login" element={<RagerLoginPage />} />
+          <Route path="/rager-dashboard" element={<RagerDashboard />} />
+          <Route path="/setup-account" element={<SetupAccountPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/respond/:anon_token" element={<RespondPage />} />
 
           <Route
             element={

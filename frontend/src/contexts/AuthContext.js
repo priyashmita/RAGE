@@ -3,19 +3,38 @@ import api from '@/lib/api';
 
 const AuthContext = createContext(null);
 
+function getToken() {
+  return localStorage.getItem('rage_token') || sessionStorage.getItem('rage_token');
+}
+
+function setToken(token, remember) {
+  if (remember) {
+    localStorage.setItem('rage_token', token);
+    sessionStorage.removeItem('rage_token');
+  } else {
+    sessionStorage.setItem('rage_token', token);
+    localStorage.removeItem('rage_token');
+  }
+}
+
+function clearToken() {
+  localStorage.removeItem('rage_token');
+  localStorage.removeItem('rage_user');
+  sessionStorage.removeItem('rage_token');
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUser = useCallback(async () => {
-    const token = localStorage.getItem('rage_token');
+    const token = getToken();
     if (!token) { setLoading(false); return; }
     try {
       const res = await api.get('/auth/me');
       setUser(res.data);
     } catch {
-      localStorage.removeItem('rage_token');
-      localStorage.removeItem('rage_user');
+      clearToken();
     } finally {
       setLoading(false);
     }
@@ -23,28 +42,32 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { fetchUser(); }, [fetchUser]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, remember = true) => {
     const res = await api.post('/auth/login', { email, password });
-    localStorage.setItem('rage_token', res.data.token);
+    setToken(res.data.token, remember);
     setUser(res.data.user);
     return res.data;
   };
 
   const signup = async (data) => {
     const res = await api.post('/auth/signup', data);
-    localStorage.setItem('rage_token', res.data.token);
+    setToken(res.data.token, true);
     setUser(res.data.user);
     return res.data;
   };
 
   const logout = () => {
-    localStorage.removeItem('rage_token');
-    localStorage.removeItem('rage_user');
+    clearToken();
     setUser(null);
   };
 
+  const loginWithData = (token, user) => {
+    setToken(token, true);
+    setUser(user);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginWithData }}>
       {children}
     </AuthContext.Provider>
   );

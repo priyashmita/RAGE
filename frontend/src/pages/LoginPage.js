@@ -13,7 +13,8 @@ const HERO_IMG = 'https://images.unsplash.com/photo-1670383050616-682df7d57b22?c
 export default function LoginPage() {
   const [mode, setMode] = useState('login');
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '', name: '', role: 'member' });
+  const [remember, setRemember] = useState(true);
+  const [form, setForm] = useState({ email: '', password: '', name: '', role: 'founder' }); // role fixed; only founders self-signup
   const { login, signup, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
@@ -30,7 +31,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (mode === 'login') {
-        await login(form.email, form.password);
+        await login(form.email, form.password, remember);
       } else {
         await signup(form);
       }
@@ -58,15 +59,15 @@ export default function LoginPage() {
         </div>
         <div className="relative z-10">
           <h1 className="text-5xl md:text-6xl font-light tracking-tighter text-[#F5F5F0] leading-tight">
-            Rager<br />Access
+            Founder<br />Access
           </h1>
           <p className="mt-6 text-lg text-[#A1A1AA] max-w-md leading-relaxed">
-            This login is for RAGE network members, founders, and experts. If you're not yet part of the network, reach out through our public pages.
+            For RAGE founders building companies that matter. New accounts require an invitation — reach out through our public pages.
           </p>
         </div>
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-2 text-sm text-[#A1A1AA] hover:text-[#DC143C] transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Back to rageforgood.com
+            <ArrowLeft className="w-4 h-4" /> Back to rageforchange.com
           </Link>
         </div>
       </div>
@@ -83,12 +84,12 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-10">
-            <p className="rage-overline mb-3">{mode === 'login' ? 'Member Login' : 'Create Account'}</p>
+            <p className="rage-overline mb-3">{mode === 'login' ? 'Founder Login' : 'Create Account'}</p>
             <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-[#F5F5F0]">
               {mode === 'login' ? 'Sign in to your account' : 'Join the RAGE Network'}
             </h2>
-            <p className="text-sm text-[#71717A] mt-2">
-              {mode === 'login' ? 'For RAGE members, founders, and experts.' : 'Create your RAGE member or expert account.'}
+            <p className="text-sm text-[#A1A1AA] mt-2">
+              {mode === 'login' ? 'For RAGE founders.' : 'Create your RAGE founder account.'}
             </p>
           </div>
 
@@ -105,20 +106,6 @@ export default function LoginPage() {
                     placeholder="Your full name"
                     required
                   />
-                </div>
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-[#71717A] mb-2 block">Role</Label>
-                  <select
-                    value={form.role}
-                    onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))}
-                    className="bg-[#0A0A0A] border border-white/15 text-[#F5F5F0] h-12 rounded-none w-full px-3 focus:ring-1 focus:ring-[#DC143C] focus:border-[#DC143C] outline-none appearance-none cursor-pointer"
-                    data-testid="signup-role-select"
-                  >
-                    <option value="member" className="bg-[#111] text-[#F5F5F0]">Member</option>
-                    <option value="founder" className="bg-[#111] text-[#F5F5F0]">Founder</option>
-                    <option value="expert" className="bg-[#111] text-[#F5F5F0]">Expert / Advisor</option>
-                    <option value="sponsor" className="bg-[#111] text-[#F5F5F0]">Sponsor</option>
-                  </select>
                 </div>
               </>
             )}
@@ -147,6 +134,23 @@ export default function LoginPage() {
                 minLength={6}
               />
             </div>
+
+            {mode === 'login' && (
+              <div className="flex items-center justify-between border-t border-white/5 pt-4">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={e => setRemember(e.target.checked)}
+                    className="w-4 h-4 accent-[#DC143C]"
+                  />
+                  <span className="text-sm text-[#A1A1AA]">Remember me</span>
+                </label>
+                <Link to="/forgot-password" className="text-sm text-[#A1A1AA] hover:text-[#DC143C] transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
+            )}
 
             <Button
               type="submit"

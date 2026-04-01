@@ -6,8 +6,8 @@ import { LayoutDashboard, Calendar, Shield, User, LogOut, ChevronDown } from 'lu
 const LOGO_URL = '/logo.png';
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['founder', 'expert', 'member', 'sponsor', 'admin'] },
-  { to: '/events', label: 'Private Tables', icon: Calendar, roles: ['founder', 'expert', 'member', 'sponsor', 'admin'] },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['founder', 'admin'] },
+  { to: '/events', label: 'Private Tables', icon: Calendar, roles: ['founder', 'admin'] },
   { to: '/admin', label: 'Admin', icon: Shield, roles: ['admin'] },
 ];
 
@@ -17,7 +17,7 @@ export default function Layout() {
 
   const handleLogout = () => {
     logout();
-    navigate(user?.role === 'admin' ? '/admin-login' : '/member-login');
+    navigate(user?.role === 'admin' ? '/admin-login' : '/rager-login');
   };
 
   const filtered = navItems.filter(item => item.roles.includes(user?.role));

@@ -38,7 +38,7 @@ export default function PublicLayout() {
             {user ? (
               <Link to="/dashboard" className="flex items-center gap-2 px-5 py-2 text-[13px] font-semibold tracking-wider uppercase text-white bg-[#DC143C] hover:bg-[#B01030] transition-colors" data-testid="go-to-dashboard-btn">Dashboard <ArrowRight className="w-3.5 h-3.5" /></Link>
             ) : (
-              <Link to="/member-login" className="flex items-center gap-2 px-5 py-2 text-[13px] font-semibold tracking-wider uppercase text-gray-900 border border-gray-300 hover:border-gray-500 hover:bg-gray-50 transition-all" data-testid="member-login-btn">Member Login</Link>
+              <Link to="/rager-login" className="flex items-center gap-2 px-5 py-2 text-[13px] font-semibold tracking-wider uppercase text-gray-900 border border-gray-300 hover:border-gray-500 hover:bg-gray-50 transition-all" data-testid="member-login-btn">Rager Login</Link>
             )}
           </div>
           <button onClick={() => setMenuOpen(!menuOpen)} className="lg:hidden text-gray-700 p-2" data-testid="mobile-menu-toggle">
@@ -53,7 +53,7 @@ export default function PublicLayout() {
               >{l.label}</NavLink>
             ))}
             <div className="pt-3 border-t border-gray-100">
-              <Link to={user ? '/dashboard' : '/member-login'} onClick={() => setMenuOpen(false)} className="block px-3 py-2.5 text-sm text-[#DC143C] font-semibold">{user ? 'Dashboard' : 'Member Login'}</Link>
+              <Link to={user ? '/dashboard' : '/rager-login'} onClick={() => setMenuOpen(false)} className="block px-3 py-2.5 text-sm text-[#DC143C] font-semibold">{user ? 'Dashboard' : 'Rager Login'}</Link>
             </div>
           </div>
         )}
