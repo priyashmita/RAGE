@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import {
   Plus, Upload, Search, Edit2, Trash2, Sparkles, Loader2, Globe, GlobeLock, ChevronDown,
-  Send, UserPlus,
+  Send, UserPlus, X,
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -205,7 +205,7 @@ function RagerForm({ form, setForm, onSubmit, onCategorize, categorizing, saving
   );
 }
 
-function LoginCell({ r, creating, approving, onCreateContact, onApproveAndInvite }) {
+function LoginCell({ r, creating, approving, resending, revoking, onCreateContact, onApproveAndInvite, onResendInvite, onRevokeInvite }) {
   const ls = r.login_status || 'no_contact';
   const cfg = LOGIN_STATUS[ls] || LOGIN_STATUS.no_contact;
 
@@ -238,6 +238,32 @@ function LoginCell({ r, creating, approving, onCreateContact, onApproveAndInvite
     );
   }
 
+  if (ls === 'pending_setup') {
+    return (
+      <div className="flex items-center gap-1.5">
+        <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border whitespace-nowrap ${cfg.color}`}>
+          {cfg.label}
+        </span>
+        <button
+          disabled={resending === r.id || revoking === r.id}
+          onClick={() => onResendInvite(r.id)}
+          title="Resend invite email"
+          className="p-1 text-[#52525B] hover:text-orange-400 transition-colors disabled:opacity-40"
+        >
+          {resending === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+        </button>
+        <button
+          disabled={revoking === r.id || resending === r.id}
+          onClick={() => onRevokeInvite(r.id)}
+          title="Revoke invite"
+          className="p-1 text-[#52525B] hover:text-red-500 transition-colors disabled:opacity-40"
+        >
+          {revoking === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border whitespace-nowrap ${cfg.color}`}>
       {cfg.label}
@@ -259,6 +285,8 @@ export default function AdminRagersPage() {
 
   const [creating, setCreating] = useState(null);
   const [approving, setApproving] = useState(null);
+  const [resending, setResending] = useState(null);
+  const [revoking, setRevoking] = useState(null);
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkJson, setBulkJson] = useState('');
@@ -333,6 +361,36 @@ export default function AdminRagersPage() {
       toast.error(err.response?.data?.detail || 'Failed to create contact');
     } finally {
       setCreating(null);
+    }
+  };
+
+  const handleResendInvite = async (ragerId) => {
+    setResending(ragerId);
+    try {
+      const res = await api.post(`/admin/ragers/${ragerId}/resend-invite`);
+      if (res.data.email_sent) {
+        toast.success('Invite resent — new setup email sent');
+      } else {
+        toast.warning(`Token refreshed but email failed: ${res.data.email_error || 'unknown error'}`);
+      }
+      fetchRagers();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to resend invite');
+    } finally {
+      setResending(null);
+    }
+  };
+
+  const handleRevokeInvite = async (ragerId) => {
+    setRevoking(ragerId);
+    try {
+      await api.post(`/admin/ragers/${ragerId}/revoke-invite`);
+      toast.success('Invite revoked — row reset to Approved');
+      fetchRagers();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to revoke invite');
+    } finally {
+      setRevoking(null);
     }
   };
 
@@ -490,8 +548,12 @@ export default function AdminRagersPage() {
                       r={r}
                       creating={creating}
                       approving={approving}
+                      resending={resending}
+                      revoking={revoking}
                       onCreateContact={handleCreateContact}
                       onApproveAndInvite={handleApproveAndInvite}
+                      onResendInvite={handleResendInvite}
+                      onRevokeInvite={handleRevokeInvite}
                     />
                   </td>
                   <td className="px-4 py-3">

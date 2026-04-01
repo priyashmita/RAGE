@@ -311,6 +311,105 @@ def approve_and_invite_rager(rager_id: str, admin=Depends(require_admin)):
     }
 
 
+@router.post("/admin/ragers/{rager_id}/resend-invite")
+def resend_rager_invite(rager_id: str, admin=Depends(require_admin)):
+    rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})
+    if not rager:
+        raise HTTPException(status_code=404, detail="Rager not found")
+
+    contact_id = rager.get("contact_id")
+    if not contact_id:
+        raise HTTPException(status_code=400, detail="No contact linked")
+
+    contact = db.contacts.find_one({"id": contact_id, "is_deleted": False}, {"_id": 0})
+    if not contact:
+        raise HTTPException(status_code=400, detail="Contact not found")
+
+    user_id = contact.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="No user record — use Approve & Send Invite instead")
+
+    user = db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=400, detail="User record missing")
+    if user.get("status") == "active":
+        raise HTTPException(status_code=400, detail="Account already active")
+    if user.get("status") == "disabled":
+        raise HTTPException(status_code=400, detail="Account disabled — revoke first, then re-invite")
+
+    now         = datetime.now(timezone.utc).isoformat()
+    plain_token = generate_secure_token()
+    token_hash  = hash_token(plain_token)
+    expires     = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
+
+    db.users.update_one({"id": user_id}, {"$set": {
+        "invite_token_hash":    token_hash,
+        "invite_token_expires": expires,
+        "invite_sent_at":       now,
+        "updated_at":           now,
+    }})
+    db.contacts.update_one(
+        {"id": contact_id},
+        {"$set": {"last_contacted_at": now, "updated_at": now}},
+    )
+
+    setup_url    = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+    email_result = send_email(
+        to_email=contact["email"],
+        to_name=contact["name"],
+        template="invite_setup",
+        subject="Your RAGE account setup link",
+        html_body=invite_email_html(contact["name"], setup_url, "rager"),
+        entity_type="contact",
+        entity_id=contact_id,
+    )
+
+    return {
+        "ok":           True,
+        "login_status": "pending_setup",
+        "email_sent":   email_result["sent"],
+        "email_error":  email_result["error"],
+    }
+
+
+@router.post("/admin/ragers/{rager_id}/revoke-invite")
+def revoke_rager_invite(rager_id: str, admin=Depends(require_admin)):
+    rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})
+    if not rager:
+        raise HTTPException(status_code=404, detail="Rager not found")
+
+    contact_id = rager.get("contact_id")
+    if not contact_id:
+        raise HTTPException(status_code=400, detail="No contact linked")
+
+    contact = db.contacts.find_one({"id": contact_id, "is_deleted": False}, {"_id": 0})
+    if not contact:
+        raise HTTPException(status_code=400, detail="Contact not found")
+
+    now     = datetime.now(timezone.utc).isoformat()
+    user_id = contact.get("user_id")
+
+    if user_id:
+        user = db.users.find_one({"id": user_id}, {"_id": 0})
+        if user and user.get("status") == "active":
+            raise HTTPException(status_code=400, detail="Cannot revoke an active account")
+        if user:
+            db.users.update_one({"id": user_id}, {"$set": {
+                "status":               "disabled",
+                "invite_token_hash":    None,
+                "invite_token_expires": None,
+                "updated_at":           now,
+            }})
+
+    # Unlink user from contact, reset contact to approved so invite can be re-sent
+    db.contacts.update_one(
+        {"id": contact_id},
+        {"$set": {"user_id": None, "status": "approved", "updated_at": now}},
+    )
+
+    return {"ok": True, "login_status": "approved"}
+
+
 @router.post("/admin/ragers/{rager_id}/categorize")
 def categorize_rager(rager_id: str, admin=Depends(require_admin)):
     rager = db.ragers.find_one({"id": rager_id})
