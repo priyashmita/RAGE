@@ -62,7 +62,7 @@ export default function RagerDashboard() {
           ? { ...a, status: response === 'accept' ? 'rager_accepted' : 'rager_declined' }
           : a
       ));
-      toast.success(response === 'accept' ? 'You've accepted — RAGE will be in touch.' : 'Noted, you've declined this request.');
+      toast.success(response === 'accept' ? "You've accepted — RAGE will be in touch." : "Noted, you've declined this request.");
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Failed to respond');
     } finally {

@@ -101,8 +101,8 @@ export default function RespondPage() {
           </h1>
           <p className="text-sm text-[#71717A] leading-relaxed">
             {accepted
-              ? 'You've already confirmed interest. The RAGE team will be in touch.'
-              : 'You've already declined this request. No further action needed.'
+              ? "You've already confirmed interest. The RAGE team will be in touch."
+              : "You've already declined this request. No further action needed."
             }
           </p>
         </div>
