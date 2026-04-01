@@ -16,10 +16,13 @@ api.interceptors.request.use(config => {
 api.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
+    const isAuthEndpoint = err.config?.url?.includes('/auth/login') || err.config?.url?.includes('/rager/login');
+    if (err.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('rage_token');
       localStorage.removeItem('rage_user');
-      window.location.href = '/rager-login';
+      sessionStorage.removeItem('rage_token');
+      const isAdminPath = window.location.pathname.startsWith('/admin');
+      window.location.href = isAdminPath ? '/admin/login' : '/rager-login';
     }
     return Promise.reject(err);
   }
