@@ -16,7 +16,7 @@ ALLOWED_TAGS = [
     "expert", "mentor", "sponsor", "press",
 ]
 
-ALLOWED_STATUSES = {"cold", "contacted", "invited", "engaged", "inactive"}
+ALLOWED_STATUSES = {"cold", "contacted", "approved", "invited", "engaged", "inactive"}
 INVITE_EXPIRY_HOURS = 72
 
 
@@ -258,6 +258,13 @@ def invite_contact(
     existing_user = db.users.find_one({"email": email}, {"_id": 0})
     if existing_user and existing_user.get("status") == "active":
         raise HTTPException(status_code=409, detail="This contact already has an active account")
+
+    # Gate: first-time invite requires explicit admin approval
+    if not existing_user and contact.get("status") != "approved":
+        raise HTTPException(
+            status_code=403,
+            detail="Contact must be approved for login before sending an invite",
+        )
 
     plain_token = generate_secure_token()
     token_hash  = hash_token(plain_token)

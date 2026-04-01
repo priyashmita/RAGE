@@ -1,6 +1,7 @@
 import uuid
 import os
 import json
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
@@ -95,7 +96,30 @@ Return ONLY a JSON array, e.g. ["Finance & Fundraising", "Strategy & Growth"]"""
 
 @router.get("/admin/ragers")
 def list_ragers(admin=Depends(require_admin)):
-    return list(db.ragers.find({}, {"_id": 0}))
+    ragers = list(db.ragers.find({}, {"_id": 0}))
+
+    # Batch-derive login_status for each rager
+    contact_ids = [r["contact_id"] for r in ragers if r.get("contact_id")]
+    contacts = {}
+    if contact_ids:
+        contacts = {c["id"]: c for c in db.contacts.find({"id": {"$in": contact_ids}}, {"_id": 0})}
+
+    user_ids = [c["user_id"] for c in contacts.values() if c.get("user_id")]
+    users = {}
+    if user_ids:
+        users = {u["id"]: u for u in db.users.find({"id": {"$in": user_ids}}, {"_id": 0})}
+
+    for r in ragers:
+        contact = contacts.get(r.get("contact_id"))
+        if not contact:
+            r["login_status"] = "no_contact"
+        elif not contact.get("user_id"):
+            r["login_status"] = "approved" if contact.get("status") == "approved" else "not_approved"
+        else:
+            user = users.get(contact["user_id"])
+            r["login_status"] = user.get("status", "active") if user else "not_approved"
+
+    return ragers
 
 
 @router.post("/admin/ragers")
@@ -138,6 +162,35 @@ def update_rager(rager_id: str, data: RagerIn, admin=Depends(require_admin)):
 def delete_rager(rager_id: str, admin=Depends(require_admin)):
     db.ragers.delete_one({"id": rager_id})
     return {"status": "deleted"}
+
+
+@router.post("/admin/ragers/{rager_id}/approve-login")
+def approve_rager_login(rager_id: str, admin=Depends(require_admin)):
+    rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})
+    if not rager:
+        raise HTTPException(status_code=404, detail="Rager not found")
+    if not rager.get("email"):
+        raise HTTPException(status_code=400, detail="Rager has no email — add email before approving")
+
+    contact_id = rager.get("contact_id")
+    if not contact_id:
+        contact = db.contacts.find_one(
+            {"email": rager["email"].lower().strip(), "is_deleted": False}, {"_id": 0}
+        )
+        if not contact:
+            raise HTTPException(
+                status_code=400,
+                detail="No contact record linked — create a contact for this rager first",
+            )
+        contact_id = contact["id"]
+        db.ragers.update_one({"id": rager_id}, {"$set": {"contact_id": contact_id}})
+
+    now = datetime.now(timezone.utc).isoformat()
+    db.contacts.update_one(
+        {"id": contact_id},
+        {"$set": {"status": "approved", "updated_at": now}},
+    )
+    return {"ok": True, "contact_id": contact_id, "login_status": "approved"}
 
 
 @router.post("/admin/ragers/{rager_id}/categorize")

@@ -10,7 +10,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import {
-  Plus, Upload, Search, Edit2, Trash2, Sparkles, Loader2, Globe, GlobeLock, ChevronDown
+  Plus, Upload, Search, Edit2, Trash2, Sparkles, Loader2, Globe, GlobeLock, ChevronDown,
+  ShieldCheck, Send,
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -26,6 +27,16 @@ const EMPTY_FORM = {
   name: '', email: '', phone: '', photo_url: '', title: '', company: '',
   bio: '', expertise: [], categories: [], location: '',
   linkedin: '', is_public: false, table_types: [], availability: 'available',
+};
+
+const LOGIN_STATUS = {
+  no_contact:    { label: 'No contact',    color: 'text-[#52525B] border-white/10' },
+  not_approved:  { label: 'Not approved',  color: 'text-[#71717A] border-white/10' },
+  approved:      { label: 'Approved',      color: 'text-yellow-400 border-yellow-500/20' },
+  pending_setup: { label: 'Pending setup', color: 'text-orange-400 border-orange-500/20' },
+  active:        { label: 'Active',        color: 'text-emerald-400 border-emerald-500/20' },
+  locked:        { label: 'Locked',        color: 'text-red-400 border-red-500/20' },
+  disabled:      { label: 'Disabled',      color: 'text-[#52525B] border-white/10' },
 };
 
 function TagInput({ label, value, onChange, placeholder }) {
@@ -206,6 +217,9 @@ export default function AdminRagersPage() {
   const [saving, setSaving] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
 
+  const [approving, setApproving] = useState(null);
+  const [inviting, setInviting] = useState(null);
+
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkJson, setBulkJson] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -265,6 +279,33 @@ export default function AdminRagersPage() {
       toast.error('Categorization failed');
     } finally {
       setCategorizing(false);
+    }
+  };
+
+  const handleApprove = async (ragerId) => {
+    setApproving(ragerId);
+    try {
+      await api.post(`/admin/ragers/${ragerId}/approve-login`);
+      toast.success('Rager approved for login — you can now send the invite');
+      fetchRagers();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Approval failed');
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const handleSendInvite = async (ragerId, contactId) => {
+    if (!contactId) { toast.error('No contact linked — approve first'); return; }
+    setInviting(ragerId);
+    try {
+      await api.post(`/admin/contacts/${contactId}/invite`, { role: 'rager' });
+      toast.success('Invite sent — rager will receive a setup email');
+      fetchRagers();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to send invite');
+    } finally {
+      setInviting(null);
     }
   };
 
@@ -360,6 +401,7 @@ export default function AdminRagersPage() {
                 <th className="text-left text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium hidden md:table-cell">Categories</th>
                 <th className="text-left text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium hidden lg:table-cell">Tables</th>
                 <th className="text-center text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium">Public</th>
+                <th className="text-left text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium hidden xl:table-cell">Login</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -402,6 +444,39 @@ export default function AdminRagersPage() {
                         ? <Globe className="w-4 h-4 text-emerald-500 mx-auto" />
                         : <GlobeLock className="w-4 h-4 text-[#52525B] mx-auto" />}
                     </button>
+                  </td>
+                  <td className="px-4 py-3 hidden xl:table-cell">
+                    {(() => {
+                      const ls = r.login_status || 'no_contact';
+                      const cfg = LOGIN_STATUS[ls] || LOGIN_STATUS.no_contact;
+                      return (
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border whitespace-nowrap ${cfg.color}`}>
+                            {cfg.label}
+                          </span>
+                          {ls === 'not_approved' && (
+                            <button
+                              disabled={approving === r.id}
+                              onClick={() => handleApprove(r.id)}
+                              title="Approve for login"
+                              className="p-1 text-[#52525B] hover:text-yellow-400 transition-colors disabled:opacity-40"
+                            >
+                              {approving === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
+                          {ls === 'approved' && (
+                            <button
+                              disabled={inviting === r.id}
+                              onClick={() => handleSendInvite(r.id, r.contact_id)}
+                              title="Send invite email"
+                              className="p-1 text-[#52525B] hover:text-[#DC143C] transition-colors disabled:opacity-40"
+                            >
+                              {inviting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
