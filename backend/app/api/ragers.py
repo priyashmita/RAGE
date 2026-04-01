@@ -164,6 +164,49 @@ def delete_rager(rager_id: str, admin=Depends(require_admin)):
     return {"status": "deleted"}
 
 
+@router.post("/admin/ragers/{rager_id}/create-contact")
+def create_rager_contact(rager_id: str, admin=Depends(require_admin)):
+    rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})
+    if not rager:
+        raise HTTPException(status_code=404, detail="Rager not found")
+    if not rager.get("email"):
+        raise HTTPException(status_code=400, detail="Rager has no email — add email before creating contact")
+    if rager.get("contact_id"):
+        raise HTTPException(status_code=400, detail="Rager already has a linked contact")
+
+    email = rager["email"].lower().strip()
+    now   = datetime.now(timezone.utc).isoformat()
+
+    # If a contact already exists for this email, just link it
+    existing = db.contacts.find_one({"email": email, "is_deleted": False}, {"_id": 0})
+    if existing:
+        db.ragers.update_one({"id": rager_id}, {"$set": {"contact_id": existing["id"]}})
+        return {"ok": True, "contact_id": existing["id"], "created": False}
+
+    contact_id = str(uuid.uuid4())
+    db.contacts.insert_one({
+        "id":                contact_id,
+        "name":              rager["name"],
+        "email":             email,
+        "phone":             rager.get("phone") or None,
+        "company":           rager.get("company") or None,
+        "title":             rager.get("title") or None,
+        "city":              None,
+        "tags":              ["rager"],
+        "source":            "rager_profile",
+        "status":            "cold",
+        "user_id":           None,
+        "notes":             None,
+        "last_activity_at":  now,
+        "last_contacted_at": None,
+        "is_deleted":        False,
+        "created_at":        now,
+        "updated_at":        now,
+    })
+    db.ragers.update_one({"id": rager_id}, {"$set": {"contact_id": contact_id}})
+    return {"ok": True, "contact_id": contact_id, "created": True}
+
+
 @router.post("/admin/ragers/{rager_id}/approve-login")
 def approve_rager_login(rager_id: str, admin=Depends(require_admin)):
     rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})

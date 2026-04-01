@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import {
   Plus, Upload, Search, Edit2, Trash2, Sparkles, Loader2, Globe, GlobeLock, ChevronDown,
-  ShieldCheck, Send,
+  ShieldCheck, Send, UserPlus,
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -205,6 +205,57 @@ function RagerForm({ form, setForm, onSubmit, onCategorize, categorizing, saving
   );
 }
 
+function LoginCell({ r, creating, approving, inviting, onCreateContact, onApprove, onSendInvite }) {
+  const ls = r.login_status || 'no_contact';
+  const cfg = LOGIN_STATUS[ls] || LOGIN_STATUS.no_contact;
+
+  if (ls === 'no_contact') {
+    if (!r.email) {
+      return <span className="text-[10px] text-[#3F3F46]">No email</span>;
+    }
+    return (
+      <button
+        disabled={creating === r.id}
+        onClick={() => onCreateContact(r)}
+        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[#71717A] border border-white/10 px-2 py-1 hover:border-white/25 hover:text-[#F5F5F0] transition-colors disabled:opacity-40"
+      >
+        {creating === r.id
+          ? <Loader2 className="w-3 h-3 animate-spin" />
+          : <UserPlus className="w-3 h-3" />}
+        Create Contact
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border whitespace-nowrap ${cfg.color}`}>
+        {cfg.label}
+      </span>
+      {ls === 'not_approved' && (
+        <button
+          disabled={approving === r.id}
+          onClick={() => onApprove(r.id)}
+          title="Approve for login"
+          className="p-1 text-[#52525B] hover:text-yellow-400 transition-colors disabled:opacity-40"
+        >
+          {approving === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+        </button>
+      )}
+      {ls === 'approved' && (
+        <button
+          disabled={inviting === r.id}
+          onClick={() => onSendInvite(r.id, r.contact_id)}
+          title="Send invite email"
+          className="p-1 text-[#52525B] hover:text-[#DC143C] transition-colors disabled:opacity-40"
+        >
+          {inviting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function AdminRagersPage() {
   const [ragers, setRagers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -217,6 +268,7 @@ export default function AdminRagersPage() {
   const [saving, setSaving] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
 
+  const [creating, setCreating] = useState(null);
   const [approving, setApproving] = useState(null);
   const [inviting, setInviting] = useState(null);
 
@@ -279,6 +331,20 @@ export default function AdminRagersPage() {
       toast.error('Categorization failed');
     } finally {
       setCategorizing(false);
+    }
+  };
+
+  const handleCreateContact = async (r) => {
+    if (!r.email) { toast.error('Rager has no email — edit the profile to add one first'); return; }
+    setCreating(r.id);
+    try {
+      await api.post(`/admin/ragers/${r.id}/create-contact`);
+      toast.success('Contact created and linked — you can now approve for login');
+      fetchRagers();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to create contact');
+    } finally {
+      setCreating(null);
     }
   };
 
@@ -401,7 +467,7 @@ export default function AdminRagersPage() {
                 <th className="text-left text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium hidden md:table-cell">Categories</th>
                 <th className="text-left text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium hidden lg:table-cell">Tables</th>
                 <th className="text-center text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium">Public</th>
-                <th className="text-left text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium hidden xl:table-cell">Login</th>
+                <th className="text-left text-[10px] uppercase tracking-wider text-[#52525B] px-4 py-3 font-medium hidden lg:table-cell">Login</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -445,38 +511,16 @@ export default function AdminRagersPage() {
                         : <GlobeLock className="w-4 h-4 text-[#52525B] mx-auto" />}
                     </button>
                   </td>
-                  <td className="px-4 py-3 hidden xl:table-cell">
-                    {(() => {
-                      const ls = r.login_status || 'no_contact';
-                      const cfg = LOGIN_STATUS[ls] || LOGIN_STATUS.no_contact;
-                      return (
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border whitespace-nowrap ${cfg.color}`}>
-                            {cfg.label}
-                          </span>
-                          {ls === 'not_approved' && (
-                            <button
-                              disabled={approving === r.id}
-                              onClick={() => handleApprove(r.id)}
-                              title="Approve for login"
-                              className="p-1 text-[#52525B] hover:text-yellow-400 transition-colors disabled:opacity-40"
-                            >
-                              {approving === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                            </button>
-                          )}
-                          {ls === 'approved' && (
-                            <button
-                              disabled={inviting === r.id}
-                              onClick={() => handleSendInvite(r.id, r.contact_id)}
-                              title="Send invite email"
-                              className="p-1 text-[#52525B] hover:text-[#DC143C] transition-colors disabled:opacity-40"
-                            >
-                              {inviting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })()}
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    <LoginCell
+                      r={r}
+                      creating={creating}
+                      approving={approving}
+                      inviting={inviting}
+                      onCreateContact={handleCreateContact}
+                      onApprove={handleApprove}
+                      onSendInvite={handleSendInvite}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 justify-end">
