@@ -371,11 +371,12 @@ export default function AdminRagersPage() {
       if (res.data.email_sent) {
         toast.success('Invite resent — new setup email sent');
       } else {
-        toast.error(`Email failed: ${res.data.email_error || 'unknown error'}`);
+        toast.warning(`Token refreshed, email failed: ${res.data.email_error || 'unknown'}`);
       }
       fetchRagers();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to resend invite');
+      const detail = err.response?.data?.detail || err.response?.data || err.message || 'unknown';
+      toast.error(`Resend failed [${err.response?.status}]: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`);
     } finally {
       setResending(null);
     }
@@ -388,7 +389,8 @@ export default function AdminRagersPage() {
       toast.success('Invite revoked — row reset to Approved');
       fetchRagers();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to revoke invite');
+      const detail = err.response?.data?.detail || err.response?.data || err.message || 'unknown';
+      toast.error(`Revoke failed [${err.response?.status}]: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`);
     } finally {
       setRevoking(null);
     }
