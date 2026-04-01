@@ -51,6 +51,7 @@ class RagerIn(BaseModel):
     is_public: Optional[bool] = False
     table_types: Optional[List[str]] = []
     availability: Optional[str] = "available"
+    contact_id: Optional[str] = None
 
 
 def _keyword_categorize(text: str) -> List[str]:
@@ -99,15 +100,35 @@ def list_ragers(admin=Depends(require_admin)):
 
 @router.post("/admin/ragers")
 def create_rager(data: RagerIn, admin=Depends(require_admin)):
-    rager = {"id": str(uuid.uuid4()), **data.dict()}
-    db.ragers.insert_one(rager)
-    rager.pop("_id", None)
-    return rager
+    doc = data.dict()
+    doc["id"] = str(uuid.uuid4())
+
+    # Auto-link contact by email if contact_id not provided
+    if not doc.get("contact_id") and doc.get("email"):
+        contact = db.contacts.find_one(
+            {"email": doc["email"].lower().strip(), "is_deleted": False}, {"_id": 0}
+        )
+        if contact:
+            doc["contact_id"] = contact["id"]
+
+    db.ragers.insert_one(doc)
+    doc.pop("_id", None)
+
+    # Link user record: if there's a user with this email and role=rager, set rager_id
+    if doc.get("email"):
+        user = db.users.find_one(
+            {"email": doc["email"].lower().strip(), "role": "rager"}, {"_id": 0}
+        )
+        if user and not user.get("rager_id"):
+            db.users.update_one({"id": user["id"]}, {"$set": {"rager_id": doc["id"]}})
+
+    return doc
 
 
 @router.put("/admin/ragers/{rager_id}")
 def update_rager(rager_id: str, data: RagerIn, admin=Depends(require_admin)):
-    result = db.ragers.update_one({"id": rager_id}, {"$set": data.dict()})
+    updates = data.dict()
+    result = db.ragers.update_one({"id": rager_id}, {"$set": updates})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Rager not found")
     return {"status": "updated"}
