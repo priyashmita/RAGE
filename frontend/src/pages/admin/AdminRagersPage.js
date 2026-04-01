@@ -371,7 +371,7 @@ export default function AdminRagersPage() {
       if (res.data.email_sent) {
         toast.success('Invite resent — new setup email sent');
       } else {
-        toast.warning(`Token refreshed but email failed: ${res.data.email_error || 'unknown error'}`);
+        toast.error(`Email failed: ${res.data.email_error || 'unknown error'}`);
       }
       fetchRagers();
     } catch (err) {

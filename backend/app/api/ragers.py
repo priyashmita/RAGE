@@ -353,22 +353,29 @@ def resend_rager_invite(rager_id: str, admin=Depends(require_admin)):
         {"$set": {"last_contacted_at": now, "updated_at": now}},
     )
 
-    setup_url    = f"{FRONTEND_URL}/setup-account?token={plain_token}"
-    email_result = send_email(
-        to_email=contact["email"],
-        to_name=contact["name"],
-        template="invite_setup",
-        subject="Your RAGE account setup link",
-        html_body=invite_email_html(contact["name"], setup_url, "rager"),
-        entity_type="contact",
-        entity_id=contact_id,
-    )
+    setup_url = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+    email_sent  = False
+    email_error = None
+    try:
+        result      = send_email(
+            to_email=contact["email"],
+            to_name=contact["name"],
+            template="invite_setup",
+            subject="Your RAGE account setup link",
+            html_body=invite_email_html(contact["name"], setup_url, "rager"),
+            entity_type="contact",
+            entity_id=contact_id,
+        )
+        email_sent  = result["sent"]
+        email_error = result["error"]
+    except RuntimeError as exc:
+        email_error = str(exc)
 
     return {
         "ok":           True,
         "login_status": "pending_setup",
-        "email_sent":   email_result["sent"],
-        "email_error":  email_result["error"],
+        "email_sent":   email_sent,
+        "email_error":  email_error,
     }
 
 
