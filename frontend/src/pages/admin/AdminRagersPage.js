@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Switch } from '@/components/ui/switch';
 import {
   Plus, Upload, Search, Edit2, Trash2, Sparkles, Loader2, Globe, GlobeLock, ChevronDown,
-  ShieldCheck, Send, UserPlus,
+  Send, UserPlus,
 } from 'lucide-react';
 
 const CATEGORIES = [
@@ -205,13 +205,13 @@ function RagerForm({ form, setForm, onSubmit, onCategorize, categorizing, saving
   );
 }
 
-function LoginCell({ r, creating, approving, inviting, onCreateContact, onApprove, onSendInvite }) {
+function LoginCell({ r, creating, approving, onCreateContact, onApproveAndInvite }) {
   const ls = r.login_status || 'no_contact';
   const cfg = LOGIN_STATUS[ls] || LOGIN_STATUS.no_contact;
 
   if (ls === 'no_contact') {
     if (!r.email) {
-      return <span className="text-[10px] text-[#3F3F46]">No email</span>;
+      return <span className="text-[10px] text-[#3F3F46]">No email — edit profile</span>;
     }
     return (
       <button
@@ -219,40 +219,29 @@ function LoginCell({ r, creating, approving, inviting, onCreateContact, onApprov
         onClick={() => onCreateContact(r)}
         className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[#71717A] border border-white/10 px-2 py-1 hover:border-white/25 hover:text-[#F5F5F0] transition-colors disabled:opacity-40"
       >
-        {creating === r.id
-          ? <Loader2 className="w-3 h-3 animate-spin" />
-          : <UserPlus className="w-3 h-3" />}
+        {creating === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserPlus className="w-3 h-3" />}
         Create Contact
       </button>
     );
   }
 
+  if (ls === 'not_approved' || ls === 'approved') {
+    return (
+      <button
+        disabled={approving === r.id}
+        onClick={() => onApproveAndInvite(r.id)}
+        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[#71717A] border border-white/10 px-2 py-1 hover:border-[#DC143C]/40 hover:text-[#DC143C] transition-colors disabled:opacity-40"
+      >
+        {approving === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+        Approve & Send Invite
+      </button>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border whitespace-nowrap ${cfg.color}`}>
-        {cfg.label}
-      </span>
-      {ls === 'not_approved' && (
-        <button
-          disabled={approving === r.id}
-          onClick={() => onApprove(r.id)}
-          title="Approve for login"
-          className="p-1 text-[#52525B] hover:text-yellow-400 transition-colors disabled:opacity-40"
-        >
-          {approving === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-        </button>
-      )}
-      {ls === 'approved' && (
-        <button
-          disabled={inviting === r.id}
-          onClick={() => onSendInvite(r.id, r.contact_id)}
-          title="Send invite email"
-          className="p-1 text-[#52525B] hover:text-[#DC143C] transition-colors disabled:opacity-40"
-        >
-          {inviting === r.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-        </button>
-      )}
-    </div>
+    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border whitespace-nowrap ${cfg.color}`}>
+      {cfg.label}
+    </span>
   );
 }
 
@@ -270,7 +259,6 @@ export default function AdminRagersPage() {
 
   const [creating, setCreating] = useState(null);
   const [approving, setApproving] = useState(null);
-  const [inviting, setInviting] = useState(null);
 
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkJson, setBulkJson] = useState('');
@@ -348,30 +336,16 @@ export default function AdminRagersPage() {
     }
   };
 
-  const handleApprove = async (ragerId) => {
+  const handleApproveAndInvite = async (ragerId) => {
     setApproving(ragerId);
     try {
       await api.post(`/admin/ragers/${ragerId}/approve-login`);
-      toast.success('Rager approved for login — you can now send the invite');
+      toast.success('Approved — invite email sent to rager');
       fetchRagers();
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Approval failed');
+      toast.error(err.response?.data?.detail || 'Failed');
     } finally {
       setApproving(null);
-    }
-  };
-
-  const handleSendInvite = async (ragerId, contactId) => {
-    if (!contactId) { toast.error('No contact linked — approve first'); return; }
-    setInviting(ragerId);
-    try {
-      await api.post(`/admin/contacts/${contactId}/invite`, { role: 'rager' });
-      toast.success('Invite sent — rager will receive a setup email');
-      fetchRagers();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to send invite');
-    } finally {
-      setInviting(null);
     }
   };
 
@@ -516,10 +490,8 @@ export default function AdminRagersPage() {
                       r={r}
                       creating={creating}
                       approving={approving}
-                      inviting={inviting}
                       onCreateContact={handleCreateContact}
-                      onApprove={handleApprove}
-                      onSendInvite={handleSendInvite}
+                      onApproveAndInvite={handleApproveAndInvite}
                     />
                   </td>
                   <td className="px-4 py-3">

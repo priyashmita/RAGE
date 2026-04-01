@@ -1,12 +1,13 @@
 import uuid
 import os
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.db import db
-from app.core.auth import require_admin
+from app.core.auth import require_admin, generate_secure_token, hash_token
+from app.core.email_utils import send_email, FRONTEND_URL, invite_email_html
 
 router = APIRouter()
 
@@ -208,15 +209,21 @@ def create_rager_contact(rager_id: str, admin=Depends(require_admin)):
 
 
 @router.post("/admin/ragers/{rager_id}/approve-login")
-def approve_rager_login(rager_id: str, admin=Depends(require_admin)):
+def approve_and_invite_rager(rager_id: str, admin=Depends(require_admin)):
+    """Approve rager for login AND send invite email in one atomic action."""
     rager = db.ragers.find_one({"id": rager_id}, {"_id": 0})
     if not rager:
         raise HTTPException(status_code=404, detail="Rager not found")
     if not rager.get("email"):
         raise HTTPException(status_code=400, detail="Rager has no email — add email before approving")
 
+    # Resolve contact
     contact_id = rager.get("contact_id")
-    if not contact_id:
+    if contact_id:
+        contact = db.contacts.find_one({"id": contact_id, "is_deleted": False}, {"_id": 0})
+        if not contact:
+            raise HTTPException(status_code=400, detail="Linked contact not found")
+    else:
         contact = db.contacts.find_one(
             {"email": rager["email"].lower().strip(), "is_deleted": False}, {"_id": 0}
         )
@@ -228,12 +235,74 @@ def approve_rager_login(rager_id: str, admin=Depends(require_admin)):
         contact_id = contact["id"]
         db.ragers.update_one({"id": rager_id}, {"$set": {"contact_id": contact_id}})
 
-    now = datetime.now(timezone.utc).isoformat()
+    email = contact["email"]
+    now   = datetime.now(timezone.utc).isoformat()
+
+    # Block if already active
+    existing_user = db.users.find_one({"email": email}, {"_id": 0})
+    if existing_user and existing_user.get("status") == "active":
+        raise HTTPException(status_code=400, detail="This rager already has an active account")
+
+    plain_token = generate_secure_token()
+    token_hash  = hash_token(plain_token)
+    expires     = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
+
+    if existing_user:
+        user_id = existing_user["id"]
+        user_updates: dict = {
+            "invite_token_hash":    token_hash,
+            "invite_token_expires": expires,
+            "invite_sent_at":       now,
+            "role":                 "rager",
+            "updated_at":           now,
+        }
+        if not existing_user.get("rager_id"):
+            user_updates["rager_id"] = rager_id
+        db.users.update_one({"id": user_id}, {"$set": user_updates})
+    else:
+        user_id = str(uuid.uuid4())
+        db.users.insert_one({
+            "id":                    user_id,
+            "contact_id":            contact_id,
+            "email":                 email,
+            "name":                  contact["name"],
+            "password_hash":         None,
+            "role":                  "rager",
+            "status":                "pending_setup",
+            "rager_id":              rager_id,
+            "invite_token_hash":     token_hash,
+            "invite_token_expires":  expires,
+            "invite_sent_at":        now,
+            "reset_token_hash":      None,
+            "reset_token_expires":   None,
+            "failed_login_attempts": 0,
+            "locked_at":             None,
+            "last_login_at":         None,
+            "created_at":            now,
+            "updated_at":            now,
+        })
+        db.contacts.update_one(
+            {"id": contact_id},
+            {"$set": {"user_id": user_id, "updated_at": now}},
+        )
+
     db.contacts.update_one(
         {"id": contact_id},
-        {"$set": {"status": "approved", "updated_at": now}},
+        {"$set": {"status": "invited", "last_contacted_at": now, "updated_at": now}},
     )
-    return {"ok": True, "contact_id": contact_id, "login_status": "approved"}
+
+    setup_url = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+    send_email(
+        to_email=email,
+        to_name=contact["name"],
+        template="invite_setup",
+        subject="You've been invited to RAGE",
+        html_body=invite_email_html(contact["name"], setup_url, "rager"),
+        entity_type="contact",
+        entity_id=contact_id,
+    )
+
+    return {"ok": True, "user_id": user_id, "login_status": "pending_setup"}
 
 
 @router.post("/admin/ragers/{rager_id}/categorize")
