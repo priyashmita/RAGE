@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
+  const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
   const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await login(form.email, form.password);
+      const res = await login(form.email, form.password, remember);
       if (res.user.role !== 'admin') {
         toast.error('Admin access only');
         return;
@@ -73,6 +74,16 @@ export default function AdminLoginPage() {
               autoComplete="current-password"
             />
           </div>
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={e => setRemember(e.target.checked)}
+              className="w-3.5 h-3.5 accent-[#DC143C]"
+            />
+            <span className="text-xs text-[#71717A]">Remember me</span>
+          </label>
+
           <Button
             type="submit"
             disabled={loading}

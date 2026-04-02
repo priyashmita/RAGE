@@ -244,16 +244,40 @@ def approve_and_invite_rager(rager_id: str, admin=Depends(require_admin)):
         raise HTTPException(status_code=400, detail="This rager already has an active account")
 
     plain_token = generate_secure_token()
-    token_hash  = hash_token(plain_token)
     expires     = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
+    setup_url   = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+
+    # ── Send email FIRST — only write to DB if it succeeds ────────────────────
+    try:
+        send_email(
+            to_email=email,
+            to_name=contact["name"],
+            template="invite_setup",
+            subject="You've been invited to RAGE",
+            html_body=invite_email_html(contact["name"], setup_url, "rager"),
+            entity_type="contact",
+            entity_id=contact_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Email delivery failed — invite not created. Error: {str(exc)[:300]}",
+        )
+
+    # ── Email delivered — commit to DB ────────────────────────────────────────
+    token_hash = hash_token(plain_token)
 
     if existing_user:
-        user_id = existing_user["id"]
+        user_id       = existing_user["id"]
+        attempt_count = existing_user.get("invite_attempt_count", 0) + 1
         user_updates: dict = {
             "invite_token_hash":    token_hash,
             "invite_token_expires": expires,
             "invite_sent_at":       now,
             "role":                 "rager",
+            "invite_attempt_count": attempt_count,
+            "last_email_status":    "sent",
+            "last_email_error":     None,
             "updated_at":           now,
         }
         if not existing_user.get("rager_id"):
@@ -273,6 +297,9 @@ def approve_and_invite_rager(rager_id: str, admin=Depends(require_admin)):
             "invite_token_hash":     token_hash,
             "invite_token_expires":  expires,
             "invite_sent_at":        now,
+            "invite_attempt_count":  1,
+            "last_email_status":     "sent",
+            "last_email_error":      None,
             "reset_token_hash":      None,
             "reset_token_expires":   None,
             "failed_login_attempts": 0,
@@ -291,23 +318,10 @@ def approve_and_invite_rager(rager_id: str, admin=Depends(require_admin)):
         {"$set": {"status": "invited", "last_contacted_at": now, "updated_at": now}},
     )
 
-    setup_url    = f"{FRONTEND_URL}/setup-account?token={plain_token}"
-    email_result = send_email(
-        to_email=email,
-        to_name=contact["name"],
-        template="invite_setup",
-        subject="You've been invited to RAGE",
-        html_body=invite_email_html(contact["name"], setup_url, "rager"),
-        entity_type="contact",
-        entity_id=contact_id,
-    )
-
     return {
         "ok":           True,
         "user_id":      user_id,
         "login_status": "pending_setup",
-        "email_sent":   email_result["sent"],
-        "email_error":  email_result["error"],
     }
 
 
@@ -337,27 +351,15 @@ def resend_rager_invite(rager_id: str, admin=Depends(require_admin)):
     if user.get("status") == "disabled":
         raise HTTPException(status_code=400, detail="Account disabled — revoke first, then re-invite")
 
-    now         = datetime.now(timezone.utc).isoformat()
-    plain_token = generate_secure_token()
-    token_hash  = hash_token(plain_token)
-    expires     = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
+    now           = datetime.now(timezone.utc).isoformat()
+    plain_token   = generate_secure_token()
+    expires       = (datetime.now(timezone.utc) + timedelta(hours=72)).isoformat()
+    setup_url     = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+    attempt_count = user.get("invite_attempt_count", 0) + 1
 
-    db.users.update_one({"id": user_id}, {"$set": {
-        "invite_token_hash":    token_hash,
-        "invite_token_expires": expires,
-        "invite_sent_at":       now,
-        "updated_at":           now,
-    }})
-    db.contacts.update_one(
-        {"id": contact_id},
-        {"$set": {"last_contacted_at": now, "updated_at": now}},
-    )
-
-    setup_url   = f"{FRONTEND_URL}/setup-account?token={plain_token}"
-    email_sent  = False
-    email_error = None
+    # ── Send email FIRST — only update token if it succeeds ───────────────────
     try:
-        result      = send_email(
+        send_email(
             to_email=contact["email"],
             to_name=contact["name"],
             template="invite_setup",
@@ -366,17 +368,33 @@ def resend_rager_invite(rager_id: str, admin=Depends(require_admin)):
             entity_type="contact",
             entity_id=contact_id,
         )
-        email_sent  = result["sent"]
-        email_error = result["error"]
     except Exception as exc:
-        email_error = str(exc)
+        db.users.update_one({"id": user_id}, {"$set": {
+            "invite_attempt_count": attempt_count,
+            "last_email_status":    "failed",
+            "last_email_error":     str(exc)[:500],
+            "updated_at":           now,
+        }})
+        raise HTTPException(
+            status_code=502,
+            detail="Email delivery failed — previous link unchanged. Retry or check Resend dashboard.",
+        )
 
-    return {
-        "ok":           True,
-        "login_status": "pending_setup",
-        "email_sent":   email_sent,
-        "email_error":  email_error,
-    }
+    db.users.update_one({"id": user_id}, {"$set": {
+        "invite_token_hash":    hash_token(plain_token),
+        "invite_token_expires": expires,
+        "invite_sent_at":       now,
+        "invite_attempt_count": attempt_count,
+        "last_email_status":    "sent",
+        "last_email_error":     None,
+        "updated_at":           now,
+    }})
+    db.contacts.update_one(
+        {"id": contact_id},
+        {"$set": {"last_contacted_at": now, "updated_at": now}},
+    )
+
+    return {"ok": True, "login_status": "pending_setup"}
 
 
 @router.post("/admin/ragers/{rager_id}/revoke-invite")
@@ -481,7 +499,7 @@ def admin_stats(admin=Depends(require_admin)):
         "public_ragers": db.ragers.count_documents({"is_public": True}),
         "enquiries": db.enquiries.count_documents({}),
         "allocations": db.allocations.count_documents({}),
-        "pending_allocations": db.allocations.count_documents({"member_response": "pending"}),
+        "pending_allocations": db.allocations.count_documents({"status": "pending_rager"}),
         "users": db.users.count_documents({}),
     }
 

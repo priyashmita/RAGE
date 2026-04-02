@@ -26,6 +26,25 @@ const FORMAT_OPTIONS = [
   { value: 'general',       label: 'Other / general enquiry' },
 ];
 
+// Per-category session fees (INR) — indicative pricing shown to founder
+const CATEGORY_COSTS = {
+  'Finance & Fundraising':   12000,
+  'Legal & Compliance':      10000,
+  'Marketing & Brand':        8000,
+  'Operations & Scale':       8000,
+  'Technology & Product':    10000,
+  'Strategy & Growth':       12000,
+  'People & Culture':         7500,
+  'Sales & Distribution':     8000,
+  'Media & Communications':   7500,
+  'International Expansion': 15000,
+};
+
+const CATEGORIES = Object.keys(CATEGORY_COSTS);
+
+// Only show category picker for advisory (closed-table) enquiries
+const SHOW_CATEGORIES_FOR = ['closed-table', 'general'];
+
 export function EnquiryDialog({ trigger, interest = 'general', title = 'Get in Touch' }) {
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState(false);
@@ -33,9 +52,21 @@ export function EnquiryDialog({ trigger, interest = 'general', title = 'Get in T
   const [form, setForm] = useState({
     name: '', email: '', company: '', message: '',
     format: interest === 'general' ? '' : interest,
+    categories: [],
   });
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const toggleCategory = (cat) => {
+    setForm(f => ({
+      ...f,
+      categories: f.categories.includes(cat)
+        ? f.categories.filter(c => c !== cat)
+        : [...f.categories, cat],
+    }));
+  };
+
+  const showCategories = SHOW_CATEGORIES_FOR.includes(form.format) || SHOW_CATEGORIES_FOR.includes(interest);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,6 +81,7 @@ export function EnquiryDialog({ trigger, interest = 'general', title = 'Get in T
         interest: form.format,
         format: form.format,
         challenge: form.message,
+        categories: form.categories,
       });
       setSent(true);
     } catch {
@@ -61,13 +93,13 @@ export function EnquiryDialog({ trigger, interest = 'general', title = 'Get in T
 
   const reset = () => {
     setSent(false);
-    setForm({ name: '', email: '', company: '', message: '', format: interest === 'general' ? '' : interest });
+    setForm({ name: '', email: '', company: '', message: '', format: interest === 'general' ? '' : interest, categories: [] });
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="bg-[#111111] border-white/10 rounded-none max-w-md" data-testid="enquiry-dialog">
+      <DialogContent className="bg-[#111111] border-white/10 rounded-none max-w-md max-h-[90vh] overflow-y-auto" data-testid="enquiry-dialog">
         <DialogHeader>
           <DialogTitle className="text-[#F5F5F0] text-xl font-light">{title}</DialogTitle>
           {interest !== 'general' && FORMAT_LABELS[interest] && (
@@ -99,6 +131,42 @@ export function EnquiryDialog({ trigger, interest = 'general', title = 'Get in T
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
+              </div>
+            )}
+
+            {/* Category checkboxes — shown for advisory/general enquiries */}
+            {showCategories && (
+              <div>
+                <Label className="text-xs uppercase tracking-wider text-[#71717A] block mb-2">What do you need help with?</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CATEGORIES.map(cat => {
+                    const active = form.categories.includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => toggleCategory(cat)}
+                        className={`text-[11px] px-2.5 py-1 border transition-colors ${
+                          active
+                            ? 'bg-[#DC143C]/10 border-[#DC143C] text-[#DC143C]'
+                            : 'bg-transparent border-white/10 text-[#71717A] hover:border-white/25 hover:text-[#A1A1AA]'
+                        }`}
+                      >
+                        {cat}
+                        {active && (
+                          <span className="ml-1.5 text-[10px] text-[#DC143C]/70">
+                            from ₹{(CATEGORY_COSTS[cat] / 1000).toFixed(0)}k
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.categories.length > 0 && (
+                  <p className="text-[10px] text-[#52525B] mt-2">
+                    Session fee from ₹{Math.min(...form.categories.map(c => CATEGORY_COSTS[c])).toLocaleString('en-IN')}
+                  </p>
+                )}
               </div>
             )}
 

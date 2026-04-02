@@ -22,7 +22,7 @@ api.interceptors.response.use(
       localStorage.removeItem('rage_user');
       sessionStorage.removeItem('rage_token');
       const isAdminPath = window.location.pathname.startsWith('/admin');
-      window.location.href = isAdminPath ? '/admin/login' : '/rager-login';
+      window.location.href = isAdminPath ? '/admin-login' : '/rager-login';
     }
     return Promise.reject(err);
   }

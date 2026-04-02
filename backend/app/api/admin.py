@@ -102,6 +102,9 @@ def get_analytics(admin=Depends(require_admin)):
     }
 
 
+# User management is handled by users.py (paginated, filterable)
+
+
 # ── Reports ──────────────────────────────────────────────────────────────────
 
 @router.get("/admin/reports")
@@ -189,7 +192,7 @@ def email_report(report_id: str, data: EmailReportRequest, admin=Depends(require
         "https://api.resend.com/emails",
         headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
         json={
-            "from": "RAGE Reports <reports@rageforgood.com>",
+            "from": "R.A.G.E. <noreply@rageforchange.com>",
             "to": data.recipients,
             "subject": f"[RAGE Report] {doc['title']}{' — ' + period if period else ''}",
             "html": html,

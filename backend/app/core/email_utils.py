@@ -86,7 +86,7 @@ def _base(content: str) -> str:
   {content}
   <hr style="border:none;border-top:1px solid #e8e4dc;margin:40px 0 24px;">
   <p style="font-size:12px;color:#aaa;margin:0;">
-    Radical Alliance for Gender Equity · rage.community
+    Radical Alliance for Gender Equity · rageforchange.com
   </p>
 </div>"""
 

@@ -367,16 +367,11 @@ export default function AdminRagersPage() {
   const handleResendInvite = async (ragerId) => {
     setResending(ragerId);
     try {
-      const res = await api.post(`/admin/ragers/${ragerId}/resend-invite`);
-      if (res.data.email_sent) {
-        toast.success('Invite resent — new setup email sent');
-      } else {
-        toast.warning(`Token refreshed, email failed: ${res.data.email_error || 'unknown'}`);
-      }
+      await api.post(`/admin/ragers/${ragerId}/resend-invite`);
+      toast.success('Invite resent');
       fetchRagers();
     } catch (err) {
-      const detail = err.response?.data?.detail || err.response?.data || err.message || 'unknown';
-      toast.error(`Resend failed [${err.response?.status}]: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`);
+      toast.error(err.response?.data?.detail || 'Resend failed');
     } finally {
       setResending(null);
     }
@@ -386,11 +381,10 @@ export default function AdminRagersPage() {
     setRevoking(ragerId);
     try {
       await api.post(`/admin/ragers/${ragerId}/revoke-invite`);
-      toast.success('Invite revoked — row reset to Approved');
+      toast.success('Invite revoked');
       fetchRagers();
     } catch (err) {
-      const detail = err.response?.data?.detail || err.response?.data || err.message || 'unknown';
-      toast.error(`Revoke failed [${err.response?.status}]: ${typeof detail === 'object' ? JSON.stringify(detail) : detail}`);
+      toast.error(err.response?.data?.detail || 'Revoke failed');
     } finally {
       setRevoking(null);
     }

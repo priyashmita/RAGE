@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import {
-  LayoutDashboard, FileText, Users, Inbox, Zap, BarChart2, LogOut, ChevronDown, User, Menu, X
+  LayoutDashboard, FileText, Users, Inbox, Zap, BarChart2, LogOut, ChevronDown, User, Menu, X, BookUser
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -12,6 +12,7 @@ const NAV = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/admin/content', label: 'Content', icon: FileText },
   { to: '/admin/ragers', label: 'Ragers', icon: Users },
+  { to: '/admin/contacts', label: 'Contacts', icon: BookUser },
   { to: '/admin/enquiries', label: 'Enquiries', icon: Inbox },
   { to: '/admin/matching', label: 'Matching', icon: Zap },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart2 },

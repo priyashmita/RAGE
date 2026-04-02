@@ -106,6 +106,16 @@ def list_contacts(
     )
     for doc in docs:
         doc["display_role"] = _display_role(doc)
+        if doc.get("user_id"):
+            u = db.users.find_one(
+                {"id": doc["user_id"]},
+                {"_id": 0, "status": 1, "role": 1,
+                 "invite_sent_at": 1, "invite_token_expires": 1,
+                 "invite_attempt_count": 1, "last_email_status": 1, "last_email_error": 1},
+            )
+            doc["user"] = u or None
+        else:
+            doc["user"] = None
 
     return {
         "contacts": docs,
@@ -252,47 +262,66 @@ def invite_contact(
         raise HTTPException(status_code=404, detail="Contact not found")
 
     email = contact["email"]
-    now   = _now()
 
-    # Check if user already exists
     existing_user = db.users.find_one({"email": email}, {"_id": 0})
     if existing_user and existing_user.get("status") == "active":
         raise HTTPException(status_code=409, detail="This contact already has an active account")
 
-    # Gate: first-time invite requires explicit admin approval
     if not existing_user and contact.get("status") != "approved":
         raise HTTPException(
             status_code=403,
-            detail="Contact must be approved for login before sending an invite",
+            detail="Contact must be approved before sending an invite",
         )
 
-    plain_token = generate_secure_token()
-    token_hash  = hash_token(plain_token)
-    expires     = (datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)).isoformat()
-
-    # If role=rager, find linked rager profile (for cross-linking after user is created)
     rager_profile = None
     if payload.role == "rager":
         rager_profile = db.ragers.find_one(
             {"$or": [{"contact_id": contact_id}, {"email": email}]}, {"_id": 0}
         )
 
+    plain_token = generate_secure_token()
+    expires     = (datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)).isoformat()
+    setup_url   = f"{FRONTEND_URL}/setup-account?token={plain_token}"
+
+    # ── Send email FIRST — only write to DB if it succeeds ────────────────────
+    try:
+        send_email(
+            to_email=email,
+            to_name=contact["name"],
+            template="invite_setup",
+            subject="You've been invited to RAGE",
+            html_body=invite_email_html(contact["name"], setup_url, payload.role),
+            entity_type="contact",
+            entity_id=contact_id,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Email delivery failed — invite not created. Error: {str(exc)[:300]}",
+        )
+
+    # ── Email delivered — now commit to DB ────────────────────────────────────
+    now        = _now()
+    token_hash = hash_token(plain_token)
+
     if existing_user:
-        # Re-invite pending_setup user
-        user_id = existing_user["id"]
+        user_id       = existing_user["id"]
+        attempt_count = existing_user.get("invite_attempt_count", 0) + 1
         user_updates: dict = {
             "invite_token_hash":    token_hash,
             "invite_token_expires": expires,
             "invite_sent_at":       now,
             "role":                 payload.role,
+            "invite_attempt_count": attempt_count,
+            "last_email_status":    "sent",
+            "last_email_error":     None,
             "updated_at":           now,
         }
         if rager_profile and not existing_user.get("rager_id"):
             user_updates["rager_id"] = rager_profile["id"]
         db.users.update_one({"id": user_id}, {"$set": user_updates})
     else:
-        # Create new user record (no password yet)
-        user_id = str(uuid.uuid4())
+        user_id  = str(uuid.uuid4())
         new_user: dict = {
             "id":                    user_id,
             "contact_id":            contact_id,
@@ -304,6 +333,9 @@ def invite_contact(
             "invite_token_hash":     token_hash,
             "invite_token_expires":  expires,
             "invite_sent_at":        now,
+            "invite_attempt_count":  1,
+            "last_email_status":     "sent",
+            "last_email_error":      None,
             "reset_token_hash":      None,
             "reset_token_expires":   None,
             "failed_login_attempts": 0,
@@ -320,14 +352,12 @@ def invite_contact(
             {"$set": {"user_id": user_id, "updated_at": now}},
         )
 
-    # Cross-link: ensure rager profile has contact_id set
     if rager_profile and not rager_profile.get("contact_id"):
         db.ragers.update_one(
             {"id": rager_profile["id"]},
             {"$set": {"contact_id": contact_id}},
         )
 
-    # Update contact status
     db.contacts.update_one(
         {"id": contact_id},
         {"$set": {
@@ -335,17 +365,6 @@ def invite_contact(
             "last_contacted_at": now,
             "updated_at":        now,
         }},
-    )
-
-    setup_url = f"{FRONTEND_URL}/setup-account?token={plain_token}"
-    send_email(
-        to_email=email,
-        to_name=contact["name"],
-        template="invite_setup",
-        subject="You've been invited to RAGE",
-        html_body=invite_email_html(contact["name"], setup_url, payload.role),
-        entity_type="contact",
-        entity_id=contact_id,
     )
 
     write_audit(
@@ -380,33 +399,51 @@ def resend_invite(contact_id: str, admin = Depends(require_admin)):
             detail="No pending invite for this contact — use invite first",
         )
 
-    now             = _now()
-    prev_expires    = user.get("invite_token_expires")
-    plain_token     = generate_secure_token()
-    token_hash      = hash_token(plain_token)
-    new_expires     = (datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)).isoformat()
+    now           = _now()
+    prev_expires  = user.get("invite_token_expires")
+    plain_token   = generate_secure_token()
+    new_expires   = (datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)).isoformat()
+    attempt_count = user.get("invite_attempt_count", 0) + 1
+    setup_url     = f"{FRONTEND_URL}/setup-account?token={plain_token}"
 
+    # ── Send email FIRST — only update token in DB if it succeeds ─────────────
+    try:
+        send_email(
+            to_email=contact["email"],
+            to_name=contact["name"],
+            template="invite_setup",
+            subject="Your RAGE account setup link",
+            html_body=invite_email_html(contact["name"], setup_url, user.get("role", "founder")),
+            entity_type="contact",
+            entity_id=contact_id,
+        )
+    except Exception as exc:
+        # Record failure; keep existing token intact so previous link still works if valid
+        db.users.update_one({"id": user["id"]}, {"$set": {
+            "invite_attempt_count": attempt_count,
+            "last_email_status":    "failed",
+            "last_email_error":     str(exc)[:500],
+            "updated_at":           now,
+        }})
+        raise HTTPException(
+            status_code=502,
+            detail="Email delivery failed — previous link unchanged. Retry or check Resend dashboard.",
+        )
+
+    # ── Email delivered — update token ────────────────────────────────────────
     db.users.update_one({"id": user["id"]}, {"$set": {
-        "invite_token_hash":    token_hash,
+        "invite_token_hash":    hash_token(plain_token),
         "invite_token_expires": new_expires,
         "invite_sent_at":       now,
+        "invite_attempt_count": attempt_count,
+        "last_email_status":    "sent",
+        "last_email_error":     None,
         "updated_at":           now,
     }})
 
     db.contacts.update_one(
         {"id": contact_id},
         {"$set": {"last_contacted_at": now, "updated_at": now}},
-    )
-
-    setup_url = f"{FRONTEND_URL}/setup-account?token={plain_token}"
-    send_email(
-        to_email=contact["email"],
-        to_name=contact["name"],
-        template="invite_setup",
-        subject="Your RAGE account setup link",
-        html_body=invite_email_html(contact["name"], setup_url, user.get("role", "founder")),
-        entity_type="contact",
-        entity_id=contact_id,
     )
 
     write_audit(
@@ -421,3 +458,46 @@ def resend_invite(contact_id: str, admin = Depends(require_admin)):
     )
 
     return {"ok": True, "invite_expires_at": new_expires}
+
+
+# ── Revoke invite ─────────────────────────────────────────────────────────────
+
+@router.post("/admin/contacts/{contact_id}/revoke-invite")
+def revoke_invite(contact_id: str, admin = Depends(require_admin)):
+    contact = db.contacts.find_one({"id": contact_id, "is_deleted": False}, {"_id": 0})
+    if not contact:
+        raise HTTPException(status_code=404, detail="Contact not found")
+
+    user = db.users.find_one(
+        {"contact_id": contact_id, "status": "pending_setup"}, {"_id": 0}
+    )
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="No pending invite for this contact",
+        )
+
+    now = _now()
+
+    db.users.update_one({"id": user["id"]}, {"$set": {
+        "invite_token_hash":    None,
+        "invite_token_expires": None,
+        "invite_sent_at":       None,
+        "status":               "disabled",
+        "updated_at":           now,
+    }})
+
+    db.contacts.update_one(
+        {"id": contact_id},
+        {"$set": {"status": "approved", "updated_at": now}},
+    )
+
+    write_audit(
+        action="invite.revoked",
+        entity_type="user",
+        entity_id=user["id"],
+        metadata={"contact_id": contact_id},
+        actor=admin,
+    )
+
+    return {"ok": True}

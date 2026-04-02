@@ -21,6 +21,7 @@ import AdminRagersPage from '@/pages/admin/AdminRagersPage';
 import AdminAnalyticsPage from '@/pages/admin/AdminAnalyticsPage';
 import AdminEnquiriesPage from '@/pages/admin/AdminEnquiriesPage';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
+import AdminContactsPage from '@/pages/admin/AdminContactsPage';
 import AdminLayout from '@/components/AdminLayout';
 import EventsPage from '@/pages/EventsPage';
 import RagerLoginPage from '@/pages/RagerLoginPage';
@@ -136,6 +137,7 @@ function App() {
             <Route path="ragers" element={<AdminRagersPage />} />
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="enquiries" element={<AdminEnquiriesPage />} />
+            <Route path="contacts" element={<AdminContactsPage />} />
             <Route path="matching" element={<MatchingPanel />} />
           </Route>
 

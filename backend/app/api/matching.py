@@ -18,15 +18,15 @@ from app.core.auth import require_admin
 router = APIRouter()
 
 BACKEND_URL = os.getenv("BACKEND_URL", "https://rage-production.up.railway.app")
-FROM_EMAIL = "RAGE <hello@rageforgood.com>"
+FROM_EMAIL = "R.A.G.E. <noreply@rageforchange.com>"
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
 
 class RagerMatch(BaseModel):
     rager_id: str
-    cost_to_founder: int   # INR
-    payout_to_rager: int   # INR
+    cost_to_founder: int = 0   # INR — internal only, never shown to rager
+    payout_to_rager: int = 0   # INR — shown to rager as their advisory fee
 
 
 class MatchRequest(BaseModel):
@@ -127,6 +127,17 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
         decline_link = f"{BACKEND_URL}/api/respond/{anon_token}?r=decline"
         format_label = enq.get("format", "Advisory Session").replace("_", " ").title()
         challenge = enq.get("challenge") or enq.get("message", "Not specified")
+        categories = enq.get("categories", [])
+        cats_html = ""
+        if categories:
+            cats_html = f"""
+      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:16px 0 8px;">Areas of expertise needed</p>
+      <p style="font-size:14px;color:#1a1a1a;margin:0;">{', '.join(categories)}</p>"""
+        payout_html = ""
+        if rm.payout_to_rager:
+            payout_html = f"""
+      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:16px 0 8px;">Your advisory fee</p>
+      <p style="font-size:17px;font-weight:600;color:#dc143c;margin:0;">{_fmt_inr(rm.payout_to_rager)}</p>"""
 
         _send_email(
             to=[rager["email"]],
@@ -145,7 +156,7 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
       <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:0 0 8px;">Format</p>
       <p style="font-size:15px;color:#1a1a1a;margin:0 0 16px;">{format_label}</p>
       <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:0 0 8px;">What they need help with</p>
-      <p style="font-size:15px;color:#1a1a1a;margin:0;">{challenge}</p>
+      <p style="font-size:15px;color:#1a1a1a;margin:0;">{challenge}</p>{cats_html}{payout_html}
     </div>
 
     <p style="color:#52525b;font-size:13px;line-height:1.7;font-style:italic;">Under Chatham House Rule — the founder's identity will only be shared once both parties confirm.</p>

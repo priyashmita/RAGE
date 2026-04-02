@@ -4,6 +4,19 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Loader2, ChevronRight } from 'lucide-react';
 
+const CATEGORY_PAYOUTS = {
+  'Finance & Fundraising':   10000,
+  'Legal & Compliance':       8000,
+  'Marketing & Brand':        6500,
+  'Operations & Scale':       6500,
+  'Technology & Product':     8000,
+  'Strategy & Growth':       10000,
+  'People & Culture':         6000,
+  'Sales & Distribution':     6500,
+  'Media & Communications':   6000,
+  'International Expansion': 12000,
+};
+
 const ENQ_STATUS_COLORS = {
   new:              'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
   matching:         'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -22,6 +35,17 @@ const STATUS_COLORS = {
   confirmed:       'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   founder_declined:'bg-red-500/10 text-red-400 border-red-500/20',
 };
+
+function overlapCount(ragerCats, enquiryCats) {
+  if (!enquiryCats?.length) return 0;
+  return (ragerCats || []).filter(c => enquiryCats.includes(c)).length;
+}
+
+function defaultPayout(enquiryCats) {
+  if (!enquiryCats?.length) return '';
+  const payouts = enquiryCats.map(c => CATEGORY_PAYOUTS[c] || 0).filter(Boolean);
+  return payouts.length ? String(Math.max(...payouts)) : '';
+}
 
 export default function MatchingPanel() {
   const [searchParams] = useSearchParams();
@@ -44,7 +68,11 @@ export default function MatchingPanel() {
           api.get('/admin/ragers'),
         ]);
         setEnquiry(enqRes.data);
-        setRagers(ragersRes.data || []);
+        const enquiryCats = enqRes.data?.categories || [];
+        const sorted = [...(ragersRes.data || [])].sort(
+          (a, b) => overlapCount(b.categories, enquiryCats) - overlapCount(a.categories, enquiryCats)
+        );
+        setRagers(sorted);
       } else {
         const res = await api.get('/admin/enquiries');
         setAllEnquiries(res.data || []);
@@ -65,7 +93,8 @@ export default function MatchingPanel() {
         delete next[id];
         return next;
       }
-      return { ...prev, [id]: { cost: '', payout: '' } };
+      const enquiryCats = enquiry?.categories || [];
+      return { ...prev, [id]: { payout: defaultPayout(enquiryCats) } };
     });
   };
 
@@ -77,15 +106,11 @@ export default function MatchingPanel() {
     const entries = Object.entries(selected);
     if (!entries.length) return toast.error('Select at least one Rager');
 
-    for (const [id, vals] of entries) {
-      if (!vals.cost || !vals.payout) return toast.error('Enter cost and payout for all selected Ragers');
-    }
-
     const payload = {
       ragers: entries.map(([id, vals]) => ({
         rager_id: id,
-        cost_to_founder: parseInt(vals.cost, 10),
-        payout_to_rager: parseInt(vals.payout, 10),
+        cost_to_founder: 0,
+        payout_to_rager: parseInt(vals.payout || '0', 10),
       })),
     };
 
@@ -185,6 +210,9 @@ export default function MatchingPanel() {
                   )}
                 </div>
                 <p className="text-xs text-[#71717A] truncate">{enq.challenge || enq.message || enq.problem_statement || '—'}</p>
+                {enq.categories?.length > 0 && (
+                  <p className="text-[10px] text-[#52525B] mt-0.5">{enq.categories.join(' · ')}</p>
+                )}
               </div>
               <ChevronRight className="w-3.5 h-3.5 text-[#52525B] shrink-0 ml-4" />
             </button>
@@ -214,6 +242,7 @@ export default function MatchingPanel() {
   const canNotifyFounder = status === 'pending_rager' && allocations.some(a => a.status === 'rager_accepted');
   const canConfirm = status === 'pending_founder' && allocations.some(a => a.status === 'pending_founder');
   const isDone = ['confirmed', 'declined', 'closed'].includes(status);
+  const enquiryCats = enquiry.categories || [];
 
   return (
     <div>
@@ -224,7 +253,7 @@ export default function MatchingPanel() {
         </button>
         <p className="text-xs uppercase tracking-[0.2em] text-[#DC143C] mb-2 font-semibold">Matching</p>
         <h1 className="text-3xl font-light text-[#F5F5F0] tracking-tight">{enquiry.name}</h1>
-        <div className="flex items-center gap-3 mt-2">
+        <div className="flex items-center gap-3 mt-2 flex-wrap">
           <span className="text-xs text-[#71717A]">{enquiry.email}</span>
           {enquiry.company && <span className="text-xs text-[#71717A]">· {enquiry.company}</span>}
           <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 border rounded-sm bg-blue-500/10 text-blue-400 border-blue-500/20">
@@ -235,6 +264,13 @@ export default function MatchingPanel() {
           <p className="text-sm text-[#A1A1AA] mt-3 leading-relaxed max-w-2xl">
             {enquiry.challenge || enquiry.problem_statement || enquiry.message}
           </p>
+        )}
+        {enquiryCats.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-3">
+            {enquiryCats.map(cat => (
+              <span key={cat} className="text-[10px] px-2 py-0.5 bg-[#DC143C]/10 border border-[#DC143C]/30 text-[#DC143C]">{cat}</span>
+            ))}
+          </div>
         )}
       </div>
 
@@ -247,9 +283,9 @@ export default function MatchingPanel() {
               <div key={alloc.id} className="bg-[#111111] border border-white/8 p-4 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-[#F5F5F0]">{alloc.rager_name}</p>
-                  <p className="text-xs text-[#71717A] mt-0.5">
-                    Cost to founder: ₹{alloc.cost_to_founder?.toLocaleString()} · Payout: ₹{alloc.payout_to_rager?.toLocaleString()}
-                  </p>
+                  {alloc.payout_to_rager > 0 && (
+                    <p className="text-xs text-[#71717A] mt-0.5">Advisory fee: ₹{alloc.payout_to_rager?.toLocaleString()}</p>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border rounded-sm ${STATUS_COLORS[alloc.status] || 'text-[#71717A]'}`}>
@@ -299,7 +335,12 @@ export default function MatchingPanel() {
       {/* Rager selection for matching */}
       {canMatch && (
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[#52525B] mb-3">Select Ragers to approach</p>
+          <div className="flex items-baseline gap-3 mb-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#52525B]">Select Ragers to approach</p>
+            {enquiryCats.length > 0 && (
+              <p className="text-[10px] text-[#52525B]">Sorted by category match</p>
+            )}
+          </div>
           {ragers.length === 0 ? (
             <p className="text-sm text-[#52525B]">No Ragers in the system yet.</p>
           ) : (
@@ -307,8 +348,10 @@ export default function MatchingPanel() {
               <div className="space-y-2 mb-6">
                 {ragers.map(rager => {
                   const isSelected = !!selected[rager.id];
+                  const overlap = overlapCount(rager.categories, enquiryCats);
+                  const isMatch = overlap > 0;
                   return (
-                    <div key={rager.id} className={`bg-[#111111] border transition-colors ${isSelected ? 'border-[#DC143C]/40' : 'border-white/8'}`}>
+                    <div key={rager.id} className={`bg-[#111111] border transition-colors ${isSelected ? 'border-[#DC143C]/40' : isMatch ? 'border-[#DC143C]/15' : 'border-white/8'}`}>
                       <button
                         type="button"
                         onClick={() => toggleRager(rager.id)}
@@ -318,7 +361,14 @@ export default function MatchingPanel() {
                           {isSelected && <span className="text-white text-xs">✓</span>}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-[#F5F5F0]">{rager.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-[#F5F5F0]">{rager.name}</p>
+                            {isMatch && (
+                              <span className="text-[10px] text-[#DC143C] bg-[#DC143C]/10 border border-[#DC143C]/20 px-1.5 py-0.5">
+                                {overlap} match{overlap > 1 ? 'es' : ''}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-[#71717A]">{rager.title}{rager.company ? ` · ${rager.company}` : ''}</p>
                           {rager.categories?.length > 0 && (
                             <p className="text-[10px] text-[#52525B] mt-0.5">{rager.categories.join(', ')}</p>
@@ -326,27 +376,15 @@ export default function MatchingPanel() {
                         </div>
                       </button>
                       {isSelected && (
-                        <div className="px-4 pb-4 flex gap-4">
-                          <div className="flex-1">
-                            <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1">Cost to Founder (₹)</label>
-                            <input
-                              type="number"
-                              value={selected[rager.id].cost}
-                              onChange={e => setField(rager.id, 'cost', e.target.value)}
-                              placeholder="e.g. 7000"
-                              className="w-full bg-[#0A0A0A] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1">Payout to Rager (₹)</label>
-                            <input
-                              type="number"
-                              value={selected[rager.id].payout}
-                              onChange={e => setField(rager.id, 'payout', e.target.value)}
-                              placeholder="e.g. 5000"
-                              className="w-full bg-[#0A0A0A] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40"
-                            />
-                          </div>
+                        <div className="px-4 pb-4">
+                          <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1">Advisory fee to Rager (₹)</label>
+                          <input
+                            type="number"
+                            value={selected[rager.id].payout}
+                            onChange={e => setField(rager.id, 'payout', e.target.value)}
+                            placeholder="e.g. 8000"
+                            className="w-full max-w-xs bg-[#0A0A0A] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40"
+                          />
                         </div>
                       )}
                     </div>
