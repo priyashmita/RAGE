@@ -29,27 +29,36 @@ def send_email(
     error_msg = None
 
     if not RESEND_API_KEY:
-        # Dev / unconfigured — log and return without raising
         error_msg = "RESEND_API_KEY not configured — email not sent"
-        status    = "skipped"
+        status    = "failed"
+        print(f"[email] BLOCKED — {error_msg}")
     else:
         try:
             import resend
             resend.api_key = RESEND_API_KEY
+            req_payload = {
+                "from":    FROM_EMAIL,
+                "to":      to_email,
+                "subject": subject,
+            }
+            print(f"[email] Sending — payload: {req_payload}")
             resp = resend.Emails.send({
                 "from":    FROM_EMAIL,
                 "to":      to_email,
                 "subject": subject,
                 "html":    html_body,
             })
+            print(f"[email] Resend response: {resp!r}")
             resend_message_id = (
                 resp.get("id") if isinstance(resp, dict)
                 else getattr(resp, "id", None)
             )
             status = "sent"
+            print(f"[email] Sent OK — message_id={resend_message_id}")
         except Exception as exc:
             error_msg = str(exc)
             status    = "failed"
+            print(f"[email] FAILED — {error_msg}")
 
     db.email_logs.insert_one({
         "id":                str(uuid.uuid4()),
@@ -72,7 +81,7 @@ def send_email(
     if status == "failed":
         raise RuntimeError(f"Email send failed: {error_msg}")
 
-    return {"sent": status == "sent", "message_id": resend_message_id, "error": error_msg}
+    return {"email_sent": status == "sent", "message_id": resend_message_id, "email_error": error_msg}
 
 
 # ── Email HTML templates ──────────────────────────────────────────────────────

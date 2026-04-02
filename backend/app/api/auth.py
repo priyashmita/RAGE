@@ -120,7 +120,7 @@ def signup(payload: SignupRequest):
         "company":           None,
         "title":             None,
         "city":              None,
-        "tags":              [role] if role in ("founder", "rager") else [],
+        "tags":              ["founder"] if role == "founder" else [],
         "source":            "self_signup",
         "status":            "engaged",
         "user_id":           None,
@@ -302,15 +302,18 @@ def forgot_password(payload: ForgotPasswordRequest):
         }})
 
         reset_url = f"{FRONTEND_URL}/reset-password?token={plain_token}"
-        send_email(
-            to_email=email,
-            to_name=user.get("name", ""),
-            template="password_reset",
-            subject="Reset your RAGE password",
-            html_body=reset_email_html(user.get("name", "there"), reset_url),
-            entity_type="user",
-            entity_id=user["id"],
-        )
+        try:
+            send_email(
+                to_email=email,
+                to_name=user.get("name", ""),
+                template="password_reset",
+                subject="Reset your RAGE password",
+                html_body=reset_email_html(user.get("name", "there"), reset_url),
+                entity_type="user",
+                entity_id=user["id"],
+            )
+        except Exception:
+            pass  # Security: always return the same response regardless of email outcome
 
     return {"ok": True, "message": "If that email exists, we've sent a reset link"}
 

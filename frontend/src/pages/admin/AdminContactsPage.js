@@ -15,7 +15,7 @@ const STATUS_COLORS = {
   inactive:  'text-[#52525B] bg-[#0A0A0A] border-white/5',
 };
 
-const ALLOWED_TAGS = ['founder', 'rager', 'investor', 'operator', 'expert', 'mentor', 'sponsor', 'press'];
+const ALLOWED_TAGS = ['founder', 'investor', 'operator', 'expert', 'mentor', 'sponsor', 'press'];
 
 function TokenMeta({ user }) {
   if (!user?.invite_sent_at) return null;
@@ -177,33 +177,27 @@ function ContactRow({ contact, onAction, acting, onEdit }) {
 }
 
 function InviteModal({ contact, onClose, onInvite }) {
-  const [role, setRole] = useState('founder');
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
       <div className="bg-[#111111] border border-white/10 w-full max-w-sm p-6">
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-medium text-[#F5F5F0]">Invite {contact.name}</h3>
+          <h3 className="text-sm font-medium text-[#F5F5F0]">Grant Rager Access</h3>
           <button onClick={onClose} className="text-[#52525B] hover:text-[#A1A1AA] transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="mb-5">
-          <Label className="text-xs uppercase tracking-wider text-[#71717A] mb-2 block">Role</Label>
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            className="w-full bg-[#0A0A0A] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40"
-          >
-            <option value="founder">Founder</option>
-            <option value="rager">Rager</option>
-          </select>
+        <div className="mb-5 p-3 bg-[#0A0A0A] border border-white/5">
+          <p className="text-[10px] uppercase tracking-wider text-[#DC143C] mb-1">Login Enabled</p>
+          <p className="text-xs text-[#A1A1AA]">
+            This will create a <strong>Rager</strong> account for {contact.name}, granting them access to the Rager dashboard. Tags on their contact record describe who they are — this grants system access only.
+          </p>
         </div>
         <p className="text-xs text-[#71717A] mb-5">
-          An email will be sent to <strong className="text-[#A1A1AA]">{contact.email}</strong> with a setup link. Link expires in 72 hours.
+          A setup email will be sent to <strong className="text-[#A1A1AA]">{contact.email}</strong>. Link expires in 72 hours.
         </p>
         <div className="flex gap-3">
           <Button
-            onClick={() => onInvite(role)}
+            onClick={() => onInvite('rager')}
             className="flex-1 bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none text-xs uppercase tracking-wider"
           >
             <Mail className="w-3.5 h-3.5 mr-1.5" /> Send Invite

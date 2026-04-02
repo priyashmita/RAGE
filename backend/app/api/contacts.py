@@ -12,7 +12,7 @@ from app.core.email_utils import send_email, FRONTEND_URL, invite_email_html
 router = APIRouter()
 
 ALLOWED_TAGS = [
-    "founder", "rager", "investor", "operator",
+    "founder", "investor", "operator",
     "expert", "mentor", "sponsor", "press",
 ]
 
@@ -33,12 +33,13 @@ def _strip(doc: dict) -> dict:
 # ── display_role (derived, never stored) ─────────────────────────────────────
 
 def _display_role(contact: dict) -> str:
+    """Returns the contact's system role (if they have a user account) or their primary tag."""
     if contact.get("user_id"):
         user = db.users.find_one({"id": contact["user_id"]}, {"role": 1, "_id": 0})
         if user:
             return user["role"]
     tags = contact.get("tags", [])
-    for preferred in ("founder", "rager", "investor", "operator", "expert", "mentor", "sponsor", "press"):
+    for preferred in ("founder", "investor", "operator", "expert", "mentor", "sponsor", "press"):
         if preferred in tags:
             return preferred
     return tags[0] if tags else "unknown"
@@ -254,8 +255,8 @@ def invite_contact(
     payload: InviteRequest,
     admin = Depends(require_admin),
 ):
-    if payload.role not in ("founder", "rager", "admin"):
-        raise HTTPException(status_code=400, detail="role must be founder, rager, or admin")
+    if payload.role not in ("rager", "admin"):
+        raise HTTPException(status_code=400, detail="role must be rager (login-enabled) or admin")
 
     contact = db.contacts.find_one({"id": contact_id, "is_deleted": False}, {"_id": 0})
     if not contact:
