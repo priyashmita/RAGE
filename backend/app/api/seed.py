@@ -91,6 +91,17 @@ def test_email(payload: TestEmailRequest):
     return result
 
 
+@router.get("/debug/email-logs")
+def email_logs():
+    """Return last 10 email log entries to diagnose delivery."""
+    logs = list(
+        db.email_logs.find({}, {"_id": 0})
+        .sort("sent_at", -1)
+        .limit(10)
+    )
+    return {"logs": logs}
+
+
 @router.get("/seed")
 def seed():
     exists = db.enquiries.find_one({"id": "1"})

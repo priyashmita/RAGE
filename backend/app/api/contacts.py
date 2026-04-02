@@ -336,6 +336,8 @@ def invite_contact(
             "invite_token_expires": expires,
             "invite_sent_at":       now,
             "role":                 payload.role,
+            "status":               "pending_setup",   # reset if was disabled/revoked
+            "contact_id":           contact_id,        # re-link to current contact
             "invite_attempt_count": attempt_count,
             "last_email_status":    "sent",
             "last_email_error":     None,
@@ -344,6 +346,11 @@ def invite_contact(
         if rager_profile and not existing_user.get("rager_id"):
             user_updates["rager_id"] = rager_profile["id"]
         db.users.update_one({"id": user_id}, {"$set": user_updates})
+        # Link this contact to the (re-used) user record
+        db.contacts.update_one(
+            {"id": contact_id},
+            {"$set": {"user_id": user_id, "updated_at": now}},
+        )
     else:
         user_id  = str(uuid.uuid4())
         new_user: dict = {
