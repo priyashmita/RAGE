@@ -278,6 +278,29 @@ def invite_contact(
         rager_profile = db.ragers.find_one(
             {"$or": [{"contact_id": contact_id}, {"email": email}]}, {"_id": 0}
         )
+        if not rager_profile:
+            # Auto-create a minimal rager profile so this contact appears in the Ragers list
+            new_rager_id = str(uuid.uuid4())
+            rager_doc = {
+                "id":           new_rager_id,
+                "name":         contact["name"],
+                "email":        email,
+                "phone":        contact.get("phone") or "",
+                "photo_url":    "",
+                "title":        contact.get("title") or "",
+                "company":      contact.get("company") or "",
+                "bio":          "",
+                "expertise":    [],
+                "categories":   [],
+                "location":     contact.get("city") or "",
+                "linkedin":     "",
+                "is_public":    False,
+                "table_types":  [],
+                "availability": "available",
+                "contact_id":   contact_id,
+            }
+            db.ragers.insert_one(rager_doc)
+            rager_profile = {"id": new_rager_id, "contact_id": contact_id}
 
     plain_token = generate_secure_token()
     expires     = (datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRY_HOURS)).isoformat()

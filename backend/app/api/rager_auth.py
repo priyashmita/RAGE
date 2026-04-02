@@ -6,11 +6,13 @@ Authentication runs against the users collection (role=rager).
 JWT issued with sub=user.id and rager_id claim.
 """
 from datetime import datetime, timezone
+from typing import Optional, List
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.core.db import db
 from app.core.auth import (
-    verify_password, create_rager_token, require_rager, MAX_LOGIN_ATTEMPTS,
+    verify_password, hash_password, validate_password_strength,
+    create_rager_token, require_rager, MAX_LOGIN_ATTEMPTS,
 )
 
 router = APIRouter()
@@ -20,6 +22,22 @@ class RagerLoginRequest(BaseModel):
     email:       str
     password:    str
     remember_me: bool = False
+
+class RagerProfileUpdate(BaseModel):
+    title:        Optional[str]       = None
+    company:      Optional[str]       = None
+    bio:          Optional[str]       = None
+    location:     Optional[str]       = None
+    linkedin:     Optional[str]       = None
+    photo_url:    Optional[str]       = None
+    expertise:    Optional[List[str]] = None
+    table_types:  Optional[List[str]] = None
+    availability: Optional[str]       = None
+
+class RagerChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password:     str
+    confirm_password: str
 
 
 @router.post("/rager/login")
@@ -95,6 +113,48 @@ def rager_allocations(rager: dict = Depends(require_rager)):
         })
     result.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return result
+
+
+@router.put("/rager/profile")
+def update_rager_profile(payload: RagerProfileUpdate, rager: dict = Depends(require_rager)):
+    updates: dict = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if payload.title        is not None: updates["title"]        = payload.title
+    if payload.company      is not None: updates["company"]      = payload.company
+    if payload.bio          is not None: updates["bio"]          = payload.bio
+    if payload.location     is not None: updates["location"]     = payload.location
+    if payload.linkedin     is not None: updates["linkedin"]     = payload.linkedin
+    if payload.photo_url    is not None: updates["photo_url"]    = payload.photo_url
+    if payload.expertise    is not None: updates["expertise"]    = payload.expertise
+    if payload.table_types  is not None: updates["table_types"]  = payload.table_types
+    if payload.availability is not None: updates["availability"] = payload.availability
+
+    db.ragers.update_one({"id": rager["id"]}, {"$set": updates})
+    updated = db.ragers.find_one({"id": rager["id"]}, {"_id": 0})
+    return {k: v for k, v in updated.items() if k not in ("password_hash", "phone")}
+
+
+@router.post("/rager/change-password")
+def rager_change_password(payload: RagerChangePasswordRequest, rager: dict = Depends(require_rager)):
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    err = validate_password_strength(payload.new_password)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+
+    user = db.users.find_one({"rager_id": rager["id"], "role": "rager"}, {"_id": 0})
+    if not user or not user.get("password_hash"):
+        raise HTTPException(status_code=400, detail="User account not found")
+
+    if not verify_password(payload.current_password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    db.users.update_one({"id": user["id"]}, {"$set": {
+        "password_hash": hash_password(payload.new_password),
+        "updated_at":    datetime.now(timezone.utc).isoformat(),
+    }})
+
+    return {"ok": True}
 
 
 @router.post("/rager/allocations/{allocation_id}/respond")

@@ -6,16 +6,19 @@ from app.core.auth import hash_password
 
 router = APIRouter()
 
+ADMIN_EMAIL    = "forchangerage@gmail.com"
+ADMIN_PASSWORD = "R@ge2025!"
+
 @router.post("/seed/admin")
 def seed_admin():
-    email = "admin@rage.com"
-    # Delete and recreate cleanly every time
-    db.users.delete_many({"email": email})
+    # Delete old admin@rage.com if present (migration)
+    db.users.delete_many({"email": "admin@rage.com"})
+    db.users.delete_many({"email": ADMIN_EMAIL})
     db.users.insert_one({
         "id": str(uuid.uuid4()),
-        "email": email,
+        "email": ADMIN_EMAIL,
         "name": "RAGE Admin",
-        "password_hash": hash_password("admin123"),
+        "password_hash": hash_password(ADMIN_PASSWORD),
         "role": "admin",
         "status": "active"
     })
@@ -23,14 +26,13 @@ def seed_admin():
 
 @router.get("/debug/auth")
 def debug_auth():
-    email = "admin@rage.com"
-    user = db.users.find_one({"email": email}, {"_id": 0})
+    user = db.users.find_one({"email": ADMIN_EMAIL}, {"_id": 0})
     if not user:
         return {"found": False}
 
     stored_hash = user.get("password_hash", "")
     try:
-        verified = _bcrypt.checkpw(b"admin123", stored_hash.encode("utf-8"))
+        verified = _bcrypt.checkpw(ADMIN_PASSWORD.encode("utf-8"), stored_hash.encode("utf-8"))
     except Exception as e:
         verified = f"ERROR: {str(e)}"
 

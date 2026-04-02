@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Loader2, LogOut, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, LogOut, CheckCircle, XCircle, User, KeyRound, ChevronDown, ChevronUp } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 
 const LOGO_URL = '/logo.png';
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
@@ -19,6 +22,184 @@ const STATUS_LABELS = {
 function authHeader() {
   const token = localStorage.getItem('rage_rager_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function ProfileSection({ rager, onUpdated }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({
+    title:        rager.title        || '',
+    company:      rager.company      || '',
+    bio:          rager.bio          || '',
+    location:     rager.location     || '',
+    linkedin:     rager.linkedin     || '',
+    photo_url:    rager.photo_url    || '',
+    availability: rager.availability || 'available',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await axios.put(`${BACKEND}/api/rager/profile`, form, { headers: authHeader() });
+      toast.success('Profile updated');
+      onUpdated(res.data);
+      setOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update profile');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#111111] border border-white/8 mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <User className="w-4 h-4 text-[#52525B]" />
+          <span className="text-sm text-[#A1A1AA]">My Profile</span>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-[#52525B]" /> : <ChevronDown className="w-4 h-4 text-[#52525B]" />}
+      </button>
+
+      {open && (
+        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4 border-t border-white/8 pt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Title</Label>
+              <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Company</Label>
+              <Input value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+            </div>
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Bio</Label>
+            <textarea
+              value={form.bio}
+              onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
+              rows={3}
+              className="w-full bg-[#0A0A0A] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40 resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Location</Label>
+              <Input value={form.location} onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Availability</Label>
+              <select
+                value={form.availability}
+                onChange={e => setForm(f => ({ ...f, availability: e.target.value }))}
+                className="w-full bg-[#0A0A0A] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 h-9 focus:outline-none focus:border-[#DC143C]/40"
+              >
+                <option value="available">Available</option>
+                <option value="limited">Limited</option>
+                <option value="unavailable">Unavailable</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">LinkedIn URL</Label>
+            <Input value={form.linkedin} onChange={e => setForm(f => ({ ...f, linkedin: e.target.value }))}
+              placeholder="https://linkedin.com/in/..."
+              className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Photo URL</Label>
+            <Input value={form.photo_url} onChange={e => setForm(f => ({ ...f, photo_url: e.target.value }))}
+              placeholder="Paste image URL"
+              className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+          </div>
+          <Button
+            type="submit"
+            disabled={saving}
+            className="w-full h-9 bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none text-xs uppercase tracking-wider"
+          >
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Profile'}
+          </Button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function ChangePasswordSection() {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ current_password: '', new_password: '', confirm_password: '' });
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (form.new_password !== form.confirm_password) {
+      toast.error('New passwords do not match');
+      return;
+    }
+    setSaving(true);
+    try {
+      await axios.post(`${BACKEND}/api/rager/change-password`, form, { headers: authHeader() });
+      toast.success('Password changed');
+      setForm({ current_password: '', new_password: '', confirm_password: '' });
+      setOpen(false);
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to change password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#111111] border border-white/8 mb-8">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <KeyRound className="w-4 h-4 text-[#52525B]" />
+          <span className="text-sm text-[#A1A1AA]">Change Password</span>
+        </div>
+        {open ? <ChevronUp className="w-4 h-4 text-[#52525B]" /> : <ChevronDown className="w-4 h-4 text-[#52525B]" />}
+      </button>
+
+      {open && (
+        <form onSubmit={handleSubmit} className="px-5 pb-5 space-y-4 border-t border-white/8 pt-4">
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Current Password</Label>
+            <Input type="password" value={form.current_password}
+              onChange={e => setForm(f => ({ ...f, current_password: e.target.value }))}
+              required autoComplete="current-password"
+              className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">New Password</Label>
+            <Input type="password" value={form.new_password}
+              onChange={e => setForm(f => ({ ...f, new_password: e.target.value }))}
+              required autoComplete="new-password"
+              className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+          </div>
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Confirm New Password</Label>
+            <Input type="password" value={form.confirm_password}
+              onChange={e => setForm(f => ({ ...f, confirm_password: e.target.value }))}
+              required autoComplete="new-password"
+              className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+          </div>
+          <Button type="submit" disabled={saving}
+            className="w-full h-9 bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none text-xs uppercase tracking-wider">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Update Password'}
+          </Button>
+        </form>
+      )}
+    </div>
+  );
 }
 
 export default function RagerDashboard() {
@@ -100,6 +281,14 @@ export default function RagerDashboard() {
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-12">
+        {/* Profile + password */}
+        {rager && (
+          <>
+            <ProfileSection rager={rager} onUpdated={setRager} />
+            <ChangePasswordSection />
+          </>
+        )}
+
         <div className="mb-8">
           <p className="text-xs uppercase tracking-[0.2em] text-[#DC143C] mb-2 font-semibold">Rager Portal</p>
           <h1 className="text-3xl font-light text-[#F5F5F0]">My Requests</h1>

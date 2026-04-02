@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import {
-  LayoutDashboard, FileText, Users, Inbox, Zap, BarChart2, LogOut, ChevronDown, User, Menu, X, BookUser
+  LayoutDashboard, FileText, Users, Inbox, Zap, BarChart2, LogOut, ChevronDown, User, Menu, X, BookUser, Settings
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/admin/enquiries', label: 'Enquiries', icon: Inbox },
   { to: '/admin/matching', label: 'Matching', icon: Zap },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function AdminLayout() {

@@ -92,6 +92,12 @@ export default function AdminLoginPage() {
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sign In'}
           </Button>
         </form>
+
+        <div className="mt-5 text-center">
+          <a href="/forgot-password" className="text-xs text-[#3F3F46] hover:text-[#71717A] transition-colors">
+            Forgot password?
+          </a>
+        </div>
       </div>
     </div>
   );

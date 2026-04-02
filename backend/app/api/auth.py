@@ -41,6 +41,11 @@ class ResetPasswordRequest(BaseModel):
     password:         str
     confirm_password: str
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password:     str
+    confirm_password: str
+
 ALLOWED_SELF_SIGNUP_ROLES = {"founder"}
 
 # ── Login ─────────────────────────────────────────────────────────────────────
@@ -164,6 +169,39 @@ def me(user: dict = Depends(get_current_user)):
 
 @router.post("/auth/logout")
 def logout():
+    return {"ok": True}
+
+
+# ── Change password (authenticated) ──────────────────────────────────────────
+
+@router.post("/auth/change-password")
+def change_password(payload: ChangePasswordRequest, current_user: dict = Depends(get_current_user)):
+    if payload.new_password != payload.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    err = validate_password_strength(payload.new_password)
+    if err:
+        raise HTTPException(status_code=400, detail=err)
+
+    user = db.users.find_one({"id": current_user["id"]}, {"_id": 0})
+    if not user or not user.get("password_hash"):
+        raise HTTPException(status_code=400, detail="Account has no password set — use setup link")
+
+    if not verify_password(payload.current_password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    db.users.update_one({"id": user["id"]}, {"$set": {
+        "password_hash": hash_password(payload.new_password),
+        "updated_at":    datetime.now(timezone.utc).isoformat(),
+    }})
+
+    write_audit(
+        action="password.changed",
+        entity_type="user",
+        entity_id=user["id"],
+        metadata={"changed_at": datetime.now(timezone.utc).isoformat()},
+    )
+
     return {"ok": True}
 
 

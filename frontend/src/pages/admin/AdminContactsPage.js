@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Loader2, Plus, Search, Mail, RotateCw, Ban, UserCheck, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Loader2, Plus, Search, Mail, RotateCw, Ban, UserCheck, ChevronLeft, ChevronRight, X, Edit2, Archive } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -46,7 +46,7 @@ function TokenMeta({ user }) {
   );
 }
 
-function ContactRow({ contact, onAction, acting }) {
+function ContactRow({ contact, onAction, acting, onEdit }) {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const statusColor    = STATUS_COLORS[contact.status] || STATUS_COLORS.cold;
   const userStatus     = contact.user?.status;
@@ -142,6 +142,25 @@ function ContactRow({ contact, onAction, acting }) {
                 <Ban className="w-3 h-3" /> Revoke
               </button>
             </>
+          )}
+
+          <button
+            onClick={() => onEdit(contact)}
+            title="Edit contact"
+            className="p-1.5 text-[#52525B] hover:text-[#F5F5F0] transition-colors"
+          >
+            <Edit2 className="w-3.5 h-3.5" />
+          </button>
+
+          {!hasActiveUser && (
+            <button
+              onClick={() => onAction('archive', contact.id)}
+              disabled={isActing}
+              title="Archive contact"
+              className="p-1.5 text-[#52525B] hover:text-red-500 transition-colors disabled:opacity-40"
+            >
+              <Archive className="w-3.5 h-3.5" />
+            </button>
           )}
         </div>
       </div>
@@ -344,6 +363,130 @@ function AddContactModal({ onClose, onCreated }) {
   );
 }
 
+function EditContactModal({ contact, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    name:    contact.name    || '',
+    phone:   contact.phone   || '',
+    company: contact.company || '',
+    title:   contact.title   || '',
+    city:    contact.city    || '',
+    tags:    contact.tags    || [],
+    notes:   contact.notes   || '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  const toggle = (tag) => {
+    setForm(f => ({
+      ...f,
+      tags: f.tags.includes(tag) ? f.tags.filter(t => t !== tag) : [...f.tags, tag],
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await api.put(`/admin/contacts/${contact.id}`, form);
+      toast.success('Contact updated');
+      onSaved();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update contact');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 overflow-y-auto py-8">
+      <div className="bg-[#111111] border border-white/10 w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-sm font-medium text-[#F5F5F0]">Edit — {contact.name}</h3>
+          <button onClick={onClose} className="text-[#52525B] hover:text-[#A1A1AA] transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Name *</Label>
+              <Input
+                value={form.name}
+                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                required
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Company</Label>
+              <Input value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Title</Label>
+              <Input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Phone</Label>
+              <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">City</Label>
+              <Input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))}
+                className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-2 block">Tags</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {ALLOWED_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggle(tag)}
+                  className={`text-[10px] uppercase tracking-wider px-2 py-1 border transition-colors ${
+                    form.tags.includes(tag)
+                      ? 'bg-[#DC143C]/10 border-[#DC143C]/40 text-[#DC143C]'
+                      : 'border-white/10 text-[#52525B] hover:text-[#A1A1AA] hover:border-white/20'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Notes</Label>
+            <textarea
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              rows={2}
+              className="w-full bg-[#0A0A0A] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40 resize-none"
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="flex-1 bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none text-xs uppercase tracking-wider"
+            >
+              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Changes'}
+            </Button>
+            <Button type="button" onClick={onClose} variant="outline"
+              className="flex-1 bg-transparent border-white/10 text-[#71717A] hover:text-[#F5F5F0] rounded-none text-xs uppercase tracking-wider">
+              Cancel
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminContactsPage() {
   const [contacts, setContacts] = useState([]);
   const [total, setTotal] = useState(0);
@@ -354,6 +497,7 @@ export default function AdminContactsPage() {
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [editContact, setEditContact] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -389,6 +533,10 @@ export default function AdminContactsPage() {
       } else if (action === 'revoke') {
         await api.post(`/admin/contacts/${contactId}/revoke-invite`);
         toast.success('Invite revoked');
+      } else if (action === 'archive') {
+        if (!window.confirm('Archive this contact? They will be hidden from the list.')) return;
+        await api.delete(`/admin/contacts/${contactId}`);
+        toast.success('Contact archived');
       }
       load();
     } catch (err) {
@@ -462,6 +610,7 @@ export default function AdminContactsPage() {
               contact={contact}
               onAction={handleAction}
               acting={acting}
+              onEdit={setEditContact}
             />
           ))}
         </div>
@@ -494,6 +643,14 @@ export default function AdminContactsPage() {
         <AddContactModal
           onClose={() => setShowAdd(false)}
           onCreated={() => { setShowAdd(false); load(); }}
+        />
+      )}
+
+      {editContact && (
+        <EditContactModal
+          contact={editContact}
+          onClose={() => setEditContact(null)}
+          onSaved={() => { setEditContact(null); load(); }}
         />
       )}
     </div>
