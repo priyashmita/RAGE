@@ -63,3 +63,4 @@ def get_founder_enquiries(user: dict = Depends(get_current_user)):
         enq.pop("allocations", None)
 
     return enquiries
+
