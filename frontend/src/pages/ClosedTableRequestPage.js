@@ -92,14 +92,14 @@ export default function ClosedTableRequestPage() {
             You will hear from us at <span className="text-gray-900 font-mono">{form.email}</span>
           </p>
           <div className="flex flex-wrap justify-center gap-4">
+            <Link to={`/login?next=/dashboard`}>
+              <Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none h-10 px-6 text-xs uppercase tracking-wider" data-testid="track-request-btn">
+                Track My Request <ArrowRight className="w-3.5 h-3.5 ml-2" />
+              </Button>
+            </Link>
             <Link to="/closed-table">
               <Button variant="outline" className="border-white/20 text-gray-900 hover:bg-white/5 rounded-none h-10 px-6 text-xs uppercase tracking-wider" data-testid="back-to-closed-table">
                 <ArrowLeft className="w-3.5 h-3.5 mr-2" /> Back to Closed Table
-              </Button>
-            </Link>
-            <Link to="/">
-              <Button variant="outline" className="border-white/20 text-gray-600 hover:bg-white/5 rounded-none h-10 px-6 text-xs uppercase tracking-wider">
-                Explore RAGE
               </Button>
             </Link>
           </div>
