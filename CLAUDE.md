@@ -141,3 +141,11 @@ frontend/src/
 7. ⬜ Enquiry form → founder flow
 8. ⬜ Payment flow via Razorpay
 9. ⬜ SEO (meta tags, Open Graph, sitemap)
+
+
+Deployment Rules
+After every change:
+
+Confirm the GitHub push succeeded
+Check Railway deployment logs — wait for "Deploy successful" before confirming any fix is done
+Check Vercel deployment — wait for build to complete before confirming frontend changes Never tell me a fix is done until both platforms show successful deployment.
