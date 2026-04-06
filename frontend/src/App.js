@@ -31,7 +31,6 @@ import SetupAccountPage from '@/pages/SetupAccountPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import RespondPage from '@/pages/RespondPage';
-import LoginPage from '@/pages/LoginPage';
 import '@/App.css';
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -46,7 +45,7 @@ function ProtectedRoute({ children, adminOnly = false }) {
   }
 
   if (!user) {
-    return <Navigate to={adminOnly ? '/admin-login' : '/login'} replace />;
+    return <Navigate to={adminOnly ? '/admin-login' : '/rager-login'} replace />;
   }
 
   if (adminOnly && user.role !== 'admin') {
@@ -108,7 +107,6 @@ function App() {
           </Route>
 
           <Route path="/admin-login" element={<AdminLoginPage />} />
-          <Route path="/login" element={<LoginPage />} />
           <Route path="/rager-login" element={<RagerLoginPage />} />
           <Route path="/rager-dashboard" element={<RagerDashboard />} />
           <Route path="/setup-account" element={<SetupAccountPage />} />
