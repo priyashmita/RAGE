@@ -1,11 +1,26 @@
 import uuid
 from datetime import datetime
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from jose import jwt, JWTError
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.db import db
+from app.core.auth import JWT_SECRET, JWT_ALGORITHM
 
 router = APIRouter()
+
+
+def _extract_user_id(request: Request) -> Optional[str]:
+    """Pull user id from JWT if present — never raises."""
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("Bearer "):
+        return None
+    try:
+        payload = jwt.decode(auth[7:], JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("sub")
+    except JWTError:
+        return None
+
 
 class EnquiryRequest(BaseModel):
     name: str
@@ -19,10 +34,13 @@ class EnquiryRequest(BaseModel):
     budget: Optional[str] = ""        # e.g. "₹5,000–₹10,000"
     categories: Optional[List[str]] = []  # expertise areas needed
 
+
 @router.post("/enquiries")
-def submit_enquiry(data: EnquiryRequest):
+def submit_enquiry(data: EnquiryRequest, request: Request):
+    user_id = _extract_user_id(request)
     doc = {
         "id": str(uuid.uuid4()),
+        "user_id": user_id,
         "name": data.name,
         "email": data.email,
         "company": data.company or "",
@@ -39,14 +57,17 @@ def submit_enquiry(data: EnquiryRequest):
     doc.pop("_id", None)
     return {"status": "submitted", "id": doc["id"]}
 
+
 @router.post("/closed-table-requests")
-def submit_closed_table_request(data: dict):
+def submit_closed_table_request(data: dict, request: Request):
+    user_id = _extract_user_id(request)
     doc = {
         "id": str(uuid.uuid4()),
         "format": "closed_table",
         "status": "new",
+        "user_id": user_id,
         "created_at": datetime.utcnow().isoformat(),
-        **{k: v for k, v in data.items() if k not in ("id", "status", "created_at", "format")},
+        **{k: v for k, v in data.items() if k not in ("id", "status", "created_at", "format", "user_id")},
     }
     db.enquiries.insert_one(doc)
     doc.pop("_id", None)

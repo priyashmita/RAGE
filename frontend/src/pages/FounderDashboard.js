@@ -1,232 +1,148 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, Send, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Loader2, ArrowRight, CheckCircle, Clock, XCircle, Mail } from 'lucide-react';
 
-const CATEGORIES = ['technology', 'marketing', 'finance', 'operations', 'strategy', 'product', 'design', 'sales', 'hr', 'legal', 'fundraising', 'growth'];
+const STATUS_CONFIG = {
+  Received:          { color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',  icon: Clock },
+  'Under Review':    { color: 'bg-blue-500/10 text-blue-400 border-blue-500/20',        icon: Clock },
+  'Finding Advisors':{ color: 'bg-purple-500/10 text-purple-400 border-purple-500/20', icon: Clock },
+  'Advisors Ready':  { color: 'bg-orange-500/10 text-orange-400 border-orange-500/20',  icon: Mail },
+  Confirmed:         { color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20', icon: CheckCircle },
+  'No Match Found':  { color: 'bg-red-500/10 text-red-400 border-red-500/20',           icon: XCircle },
+  Closed:            { color: 'bg-gray-500/10 text-gray-400 border-gray-500/20',         icon: XCircle },
+};
+
+const NEXT_STEP = {
+  Received:          'Our team is reviewing your request.',
+  'Under Review':    'We are curating the right advisors for your challenge.',
+  'Finding Advisors':'We have reached out to potential advisors and are awaiting their responses.',
+  'Advisors Ready':  'Check your email — advisors are ready. Click the button in the email to confirm your choice.',
+  Confirmed:         'Your session is confirmed. Your advisor will be in touch shortly.',
+  'No Match Found':  'We were unable to find the right match at this time. We will reach out if a suitable advisor becomes available.',
+  Closed:            'This request has been closed.',
+};
 
 export default function FounderDashboard() {
   const { user } = useAuth();
-  const [requests, setRequests] = useState([]);
-  const [matches, setMatches] = useState([]);
-  const [sessions, setSessions] = useState([]);
+  const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', categories: [], urgency: 'normal', budget_range: '' });
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [reqRes, matchRes, sessRes] = await Promise.all([
-        api.get('/founders/requests'),
-        api.get('/founders/matches'),
-        api.get('/founders/sessions')
-      ]);
-      setRequests(reqRes.data);
-      setMatches(matchRes.data);
-      setSessions(sessRes.data);
-    } catch (err) {
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    api.get('/founders/enquiries')
+      .then(r => setEnquiries(r.data || []))
+      .catch(() => toast.error('Failed to load your requests'))
+      .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      await api.post('/founders/requests', form);
-      toast.success('Request submitted');
-      setDialogOpen(false);
-      setForm({ title: '', description: '', categories: [], urgency: 'normal', budget_range: '' });
-      fetchData();
-    } catch (err) {
-      toast.error(err.response?.data?.detail || 'Failed to submit request');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const toggleCategory = (cat) => {
-    setForm(prev => ({
-      ...prev,
-      categories: prev.categories.includes(cat) ? prev.categories.filter(c => c !== cat) : [...prev.categories, cat]
-    }));
-  };
-
-  const statusIcon = (s) => {
-    if (s === 'completed' || s === 'accepted') return <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />;
-    if (s === 'declined' || s === 'failed') return <XCircle className="w-3.5 h-3.5 text-red-500" />;
-    return <Clock className="w-3.5 h-3.5 text-amber-500" />;
-  };
-
-  if (loading) return <div className="flex items-center justify-center h-64 text-[#A1A1AA]"><Loader2 className="w-5 h-5 animate-spin" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="w-5 h-5 animate-spin text-[#A1A1AA]" />
+    </div>
+  );
 
   return (
-    <div data-testid="founder-dashboard">
+    <div>
       {/* Header */}
       <div className="flex items-start justify-between mb-10">
         <div>
-          <p className="rage-overline mb-2">Founder Dashboard</p>
-          <h1 className="text-4xl md:text-5xl font-light tracking-tighter text-[#F5F5F0]">
-            Welcome, {user?.name}
+          <p className="text-xs uppercase tracking-[0.2em] text-[#DC143C] mb-2 font-semibold">Dashboard</p>
+          <h1 className="text-3xl font-light text-[#F5F5F0] tracking-tight">
+            {user?.name || 'Your Requests'}
           </h1>
+          <p className="text-sm text-[#52525B] mt-1">{user?.email}</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow" data-testid="new-request-btn">
-              <Plus className="w-4 h-4 mr-2" /> New Request
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-[#111111] border-white/10 rounded-none max-w-lg" data-testid="new-request-dialog">
-            <DialogHeader>
-              <DialogTitle className="text-[#F5F5F0] text-xl">Submit Advisory Request</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-5 mt-4">
-              <div>
-                <Label className="text-xs uppercase tracking-wider text-[#71717A]">Title</Label>
-                <Input value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] rounded-none mt-1" placeholder="What do you need help with?" required data-testid="request-title-input" />
-              </div>
-              <div>
-                <Label className="text-xs uppercase tracking-wider text-[#71717A]">Description</Label>
-                <Textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] rounded-none mt-1 min-h-[100px]" placeholder="Describe your challenge in detail" required data-testid="request-desc-input" />
-              </div>
-              <div>
-                <Label className="text-xs uppercase tracking-wider text-[#71717A] mb-2 block">Categories</Label>
-                <div className="flex flex-wrap gap-2">
-                  {CATEGORIES.map(cat => (
-                    <button key={cat} type="button" onClick={() => toggleCategory(cat)}
-                      className={`px-3 py-1.5 text-xs uppercase tracking-wider border transition-colors ${form.categories.includes(cat) ? 'bg-[#DC143C]/20 border-[#DC143C] text-[#DC143C]' : 'bg-transparent border-white/15 text-[#A1A1AA] hover:border-white/30'}`}
-                      data-testid={`category-${cat}`}
-                    >{cat}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-[#71717A]">Urgency</Label>
-                  <Select value={form.urgency} onValueChange={v => setForm({...form, urgency: v})}>
-                    <SelectTrigger className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] rounded-none mt-1" data-testid="urgency-select"><SelectValue /></SelectTrigger>
-                    <SelectContent className="bg-[#111111] border-white/10 rounded-none">
-                      <SelectItem value="low" className="text-[#F5F5F0] rounded-none">Low</SelectItem>
-                      <SelectItem value="normal" className="text-[#F5F5F0] rounded-none">Normal</SelectItem>
-                      <SelectItem value="high" className="text-[#F5F5F0] rounded-none">High</SelectItem>
-                      <SelectItem value="critical" className="text-[#F5F5F0] rounded-none">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-xs uppercase tracking-wider text-[#71717A]">Budget Range</Label>
-                  <Input value={form.budget_range} onChange={e => setForm({...form, budget_range: e.target.value})} className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] rounded-none mt-1" placeholder="e.g. $500-$2000" data-testid="budget-input" />
-                </div>
-              </div>
-              <Button type="submit" disabled={submitting} className="w-full bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow" data-testid="submit-request-btn">
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Send className="w-4 h-4 mr-2" /> Submit Request</>}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Link
+          to="/closed-table/request"
+          className="flex items-center gap-2 text-xs uppercase tracking-wider px-5 py-2.5 bg-[#DC143C] hover:bg-[#B01030] text-white transition-colors"
+        >
+          New Request <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
-        {[
-          { label: 'Active Requests', value: requests.filter(r => r.status !== 'completed').length },
-          { label: 'Expert Matches', value: matches.length },
-          { label: 'Sessions', value: sessions.length },
-        ].map(s => (
-          <div key={s.label} className="rage-stat">
-            <p className="text-xs uppercase tracking-widest text-[#71717A] mb-1">{s.label}</p>
-            <p className="text-3xl font-light text-[#F5F5F0] font-mono">{s.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Requests */}
-      <div className="mb-10">
-        <h3 className="text-2xl font-normal text-[#F5F5F0] mb-4">My Requests</h3>
-        {requests.length === 0 ? (
-          <div className="border border-white/5 bg-[#0A0A0A] p-8 text-center text-[#71717A]">No requests yet. Submit your first advisory request.</div>
-        ) : (
-          <div className="space-y-3">
-            {requests.map(req => (
-              <Card key={req.id} className="bg-[#111111] border-white/8 rounded-none" data-testid={`request-${req.id}`}>
-                <CardContent className="p-5 flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h4 className="text-base font-medium text-[#F5F5F0]" style={{ fontFamily: 'Manrope' }}>{req.title}</h4>
-                      <span className={`rage-badge status-${req.status}`}>{req.status}</span>
-                    </div>
-                    <p className="text-sm text-[#A1A1AA] line-clamp-2 mb-2">{req.description}</p>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {req.categories?.map(c => <Badge key={c} variant="outline" className="rounded-none text-[10px] text-[#71717A] border-white/10">{c}</Badge>)}
-                    </div>
-                  </div>
-                  <span className="text-xs text-[#71717A] font-mono shrink-0 ml-4">{new Date(req.created_at).toLocaleDateString()}</span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Matches */}
-      {matches.length > 0 && (
-        <div className="mb-10">
-          <h3 className="text-2xl font-normal text-[#F5F5F0] mb-4">Expert Matches</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {matches.map(m => (
-              <Card key={m.id} className="bg-[#111111] border-white/8 rounded-none" data-testid={`match-${m.id}`}>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-base font-medium text-[#F5F5F0]" style={{ fontFamily: 'Manrope' }}>{m.expert_name}</h4>
-                    <div className="flex items-center gap-2">
-                      {statusIcon(m.status)}
-                      <span className={`rage-badge status-${m.status}`}>{m.status}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-1 flex-wrap">
-                      {m.matched_tags?.map(t => <Badge key={t} variant="outline" className="rounded-none text-[10px] text-[#DC143C] border-[#DC143C]/30">{t}</Badge>)}
-                    </div>
-                    <span className="font-mono text-sm text-[#F5F5F0]">{m.score}%</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      {/* Enquiry list */}
+      {enquiries.length === 0 ? (
+        <div className="border border-white/5 bg-[#0A0A0A] p-12 text-center">
+          <p className="text-[#52525B] text-sm mb-4">No requests yet.</p>
+          <Link
+            to="/closed-table/request"
+            className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-[#DC143C] hover:underline"
+          >
+            Submit your first request <ArrowRight className="w-3 h-3" />
+          </Link>
         </div>
-      )}
+      ) : (
+        <div className="space-y-4">
+          {enquiries.map(enq => {
+            const founderStatus = enq.founder_status || 'Received';
+            const cfg = STATUS_CONFIG[founderStatus] || STATUS_CONFIG['Received'];
+            const StatusIcon = cfg.icon;
+            const confirmedAdvisor = enq.advisors?.find(a => a.status === 'confirmed');
 
-      {/* Sessions */}
-      {sessions.length > 0 && (
-        <div>
-          <h3 className="text-2xl font-normal text-[#F5F5F0] mb-4">Sessions</h3>
-          <div className="space-y-3">
-            {sessions.map(s => (
-              <Card key={s.id} className="bg-[#111111] border-white/8 rounded-none">
-                <CardContent className="p-5 flex items-center justify-between">
-                  <div>
-                    <h4 className="text-base text-[#F5F5F0]" style={{ fontFamily: 'Manrope' }}>{s.expert_name}</h4>
-                    <p className="text-xs text-[#71717A]">{s.duration_minutes} min | {new Date(s.scheduled_at).toLocaleDateString()}</p>
+            return (
+              <div key={enq.id} className="bg-[#111111] border border-white/8 p-6">
+                {/* Row 1: title + status */}
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#F5F5F0] mb-1">
+                      {enq.problem_statement || enq.challenge || enq.message || 'Request'}
+                    </p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {enq.company && <span className="text-xs text-[#71717A]">{enq.company}</span>}
+                      {(enq.format || enq.interest) && (
+                        <span className="text-[10px] text-[#52525B] uppercase tracking-wider">
+                          {(enq.format || enq.interest).replace(/_/g, ' ')}
+                        </span>
+                      )}
+                      {enq.decision_type && (
+                        <span className="text-[10px] text-[#52525B] uppercase tracking-wider">
+                          {enq.decision_type.replace(/_/g, ' ')}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className={`rage-badge status-${s.status}`}>{s.status}</span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <div className="shrink-0">
+                    <span className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-wider px-2.5 py-1 border rounded-sm ${cfg.color}`}>
+                      <StatusIcon className="w-3 h-3" />
+                      {founderStatus}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Next step callout */}
+                <div className="bg-[#0A0A0A] border border-white/5 px-4 py-3 mb-4">
+                  <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1">What happens next</p>
+                  <p className="text-xs text-[#A1A1AA] leading-relaxed">{NEXT_STEP[founderStatus]}</p>
+                </div>
+
+                {/* Confirmed advisor card */}
+                {confirmedAdvisor && (
+                  <div className="border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-400 mb-2">Your Confirmed Advisor</p>
+                    <p className="text-sm font-medium text-[#F5F5F0]">{confirmedAdvisor.name}</p>
+                    {(confirmedAdvisor.title || confirmedAdvisor.company) && (
+                      <p className="text-xs text-[#DC143C] mt-0.5">
+                        {confirmedAdvisor.title}{confirmedAdvisor.company ? ` · ${confirmedAdvisor.company}` : ''}
+                      </p>
+                    )}
+                    {confirmedAdvisor.email && (
+                      <p className="text-xs text-[#A1A1AA] mt-1">{confirmedAdvisor.email}</p>
+                    )}
+                    {confirmedAdvisor.categories?.length > 0 && (
+                      <p className="text-[10px] text-[#52525B] mt-2">{confirmedAdvisor.categories.join(' · ')}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer: date */}
+                <p className="text-[10px] text-[#52525B] font-mono mt-4">
+                  Submitted {enq.created_at?.slice(0, 10) || '—'}
+                </p>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

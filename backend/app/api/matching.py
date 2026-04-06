@@ -245,11 +245,28 @@ def notify_founder(enquiry_id: str, admin=Depends(require_admin)):
     if not accepted:
         raise HTTPException(status_code=400, detail="No ragers have accepted yet")
 
-    # Build profile cards for email (no contact details)
-    profiles_html = ""
+    # Assign a confirm_token to each accepted allocation and mark as pending_founder
+    alloc_data = []
     for alloc in accepted:
+        confirm_token = str(uuid.uuid4())
+        db.allocations.update_one(
+            {"id": alloc["id"]},
+            {"$set": {"status": "pending_founder", "confirm_token": confirm_token}}
+        )
         rager = db.ragers.find_one({"id": alloc["rager_id"]}, {"_id": 0, "email": 0, "phone": 0}) or {}
-        name = rager.get("name", alloc["rager_name"])
+        alloc_data.append({
+            "alloc": alloc,
+            "rager": rager,
+            "confirm_token": confirm_token,
+        })
+
+    # Build profile cards for email — each has a "Choose this advisor" button
+    profiles_html = ""
+    for item in alloc_data:
+        rager = item["rager"]
+        token = item["confirm_token"]
+        confirm_link = f"{BACKEND_URL}/api/founder-confirm/{token}"
+        name = rager.get("name", item["alloc"]["rager_name"])
         title = rager.get("title", "")
         company = rager.get("company", "")
         bio = rager.get("bio", "")
@@ -259,7 +276,8 @@ def notify_founder(enquiry_id: str, admin=Depends(require_admin)):
   <p style="font-size:16px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{name}</p>
   <p style="font-size:12px;color:#dc143c;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">{title}{' · ' + company if company else ''}</p>
   {f'<p style="font-size:13px;color:#52525b;line-height:1.6;margin:0 0 10px;">{bio}</p>' if bio else ''}
-  {f'<p style="font-size:11px;color:#a1a1aa;">{cats}</p>' if cats else ''}
+  {f'<p style="font-size:11px;color:#a1a1aa;margin:0 0 14px;">{cats}</p>' if cats else ''}
+  <a href="{confirm_link}" style="display:inline-block;background:#dc143c;color:#fff;padding:10px 20px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;font-weight:600;">Choose {name.split()[0]}</a>
 </div>"""
 
     _send_email(
@@ -274,13 +292,13 @@ def notify_founder(enquiry_id: str, admin=Depends(require_admin)):
   <div style="padding:32px 40px;">
     <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {enq['name'].split()[0]},</p>
     <p style="color:#52525b;font-size:14px;line-height:1.7;">
-      {len(accepted)} advisor{'s have' if len(accepted) > 1 else ' has'} confirmed availability for your request.
-      Please review the profiles below and reply to this email with your preferred choice.
+      {len(alloc_data)} advisor{'s have' if len(alloc_data) > 1 else ' has'} confirmed availability for your request.
+      Review the profiles below and click the button next to your preferred choice.
     </p>
     {profiles_html}
     <p style="color:#52525b;font-size:13px;line-height:1.7;margin-top:24px;">
       Once you confirm, we'll share full contact details and session logistics with both parties.
-      If none of the profiles feel like the right fit, let us know — we'll keep looking.
+      If none of the profiles feel like the right fit, reply to this email — we'll keep looking.
     </p>
   </div>
   <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
@@ -289,13 +307,118 @@ def notify_founder(enquiry_id: str, admin=Depends(require_admin)):
 </div>""",
     )
 
-    # Mark accepted allocations as pending_founder
-    db.allocations.update_many(
-        {"enquiry_id": enquiry_id, "status": "rager_accepted"},
-        {"$set": {"status": "pending_founder"}}
-    )
     db.enquiries.update_one({"id": enquiry_id}, {"$set": {"status": "pending_founder"}})
-    return {"status": "founder_notified", "advisors_shown": len(accepted)}
+    return {"status": "founder_notified", "advisors_shown": len(alloc_data)}
+
+
+# ── Public: Founder clicks "Choose advisor" link in email ─────────────────────
+
+@router.get("/founder-confirm/{confirm_token}", response_class=HTMLResponse)
+def founder_confirm_choice(confirm_token: str):
+    alloc = db.allocations.find_one({"confirm_token": confirm_token}, {"_id": 0})
+    if not alloc:
+        return HTMLResponse(_response_page("Invalid link", "This link is not valid or has expired."), status_code=404)
+
+    if alloc["status"] == "confirmed":
+        rager_name = alloc.get("rager_name", "your advisor")
+        return HTMLResponse(_response_page(
+            "Already confirmed",
+            f"You have already confirmed {rager_name} as your advisor. Check your email for session details."
+        ))
+
+    if alloc["status"] not in ("pending_founder",):
+        return HTMLResponse(_response_page(
+            "Link no longer valid",
+            "This confirmation link is no longer active. Please contact RAGE if you need assistance."
+        ), status_code=400)
+
+    enquiry_id = alloc["enquiry_id"]
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        return HTMLResponse(_response_page("Error", "Request not found."), status_code=404)
+
+    rager = db.ragers.find_one({"id": alloc["rager_id"]}, {"_id": 0}) or {}
+
+    # Confirm this allocation, decline others for the same enquiry
+    db.allocations.update_one(
+        {"id": alloc["id"]},
+        {"$set": {"status": "confirmed", "founder_responded_at": _now()}}
+    )
+    db.allocations.update_many(
+        {"enquiry_id": enquiry_id, "id": {"$ne": alloc["id"]}, "status": "pending_founder"},
+        {"$set": {"status": "founder_declined"}}
+    )
+    db.enquiries.update_one({"id": enquiry_id}, {"$set": {"status": "confirmed", "confirmed_at": _now()}})
+
+    payout = _fmt_inr(alloc.get("payout_to_rager", 0))
+    cost = _fmt_inr(alloc.get("cost_to_founder", 0))
+    format_label = enq.get("format", "Advisory Session").replace("_", " ").title()
+    rager_name = rager.get("name", alloc["rager_name"])
+    rager_email = rager.get("email") or alloc.get("rager_email", "")
+
+    # Confirmation email to founder
+    _send_email(
+        to=[enq["email"]],
+        subject="RAGE: Session Confirmed",
+        html=f"""
+<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
+  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
+    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
+    <h1 style="font-size:22px;font-weight:400;margin:0;">Your session is confirmed</h1>
+  </div>
+  <div style="padding:32px 40px;">
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {enq['name'].split()[0]},</p>
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">Your {format_label} has been confirmed. Here are the details:</p>
+    <div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:20px 24px;margin:24px 0;">
+      <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 12px;">Your Advisor</p>
+      <p style="font-size:17px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{rager_name}</p>
+      <p style="font-size:13px;color:#dc143c;margin:0 0 4px;">{rager.get('title', '')}{' · ' + rager.get('company', '') if rager.get('company') else ''}</p>
+      <p style="font-size:13px;color:#52525b;margin:0 0 12px;">{rager_email}</p>
+      {f'<p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 8px;">Session Fee</p><p style="font-size:17px;color:#1a1a1a;margin:0;">{cost}</p>' if alloc.get('cost_to_founder') else ''}
+    </div>
+    <p style="color:#52525b;font-size:13px;line-height:1.7;">Please reach out directly to your advisor to schedule the session. After the session, you'll receive a written summary within 24 hours.</p>
+  </div>
+  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
+    <p style="font-size:11px;color:#a1a1aa;margin:0;">© {datetime.now().year} R.A.G.E. — Under Chatham House Rule</p>
+  </div>
+</div>""",
+    )
+
+    # Confirmation email to rager
+    if rager_email:
+        _send_email(
+            to=[rager_email],
+            subject="RAGE: Session Confirmed",
+            html=f"""
+<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
+  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
+    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
+    <h1 style="font-size:22px;font-weight:400;margin:0;">Session confirmed</h1>
+  </div>
+  <div style="padding:32px 40px;">
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {rager_name.split()[0]},</p>
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">The founder has confirmed. Here are the full details:</p>
+    <div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:20px 24px;margin:24px 0;">
+      <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 12px;">Founder</p>
+      <p style="font-size:17px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{enq['name']}</p>
+      <p style="font-size:13px;color:#52525b;margin:0 0 4px;">{enq.get('company', '')}</p>
+      <p style="font-size:13px;color:#52525b;margin:0 0 12px;">{enq['email']}</p>
+      {f'<p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 8px;">Your Payout</p><p style="font-size:17px;color:#1a1a1a;margin:0 0 16px;">{payout}</p>' if alloc.get('payout_to_rager') else ''}
+      <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 8px;">Format</p>
+      <p style="font-size:15px;color:#1a1a1a;margin:0;">{format_label}</p>
+    </div>
+    <p style="color:#52525b;font-size:13px;line-height:1.7;">The founder will reach out to schedule. Please confirm receipt by replying to RAGE.</p>
+  </div>
+  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
+    <p style="font-size:11px;color:#a1a1aa;margin:0;">© {datetime.now().year} R.A.G.E. — Under Chatham House Rule</p>
+  </div>
+</div>""",
+        )
+
+    return HTMLResponse(_response_page(
+        "Session Confirmed",
+        f"You've chosen {rager_name} as your advisor. Both parties have been notified. Check your email for full session details."
+    ))
 
 
 # ── Admin: step 3 — founder accepted a Rager, send full details ───────────────

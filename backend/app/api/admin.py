@@ -54,6 +54,19 @@ def create_allocation(data: AllocationCreateRequest, admin=Depends(require_admin
     return {"status": "created"}
 
 
+@router.get("/admin/stats")
+def get_stats(admin=Depends(require_admin)):
+    return {
+        "ragers":              db.ragers.count_documents({}),
+        "public_ragers":       db.ragers.count_documents({"is_public": True}),
+        "enquiries":           db.enquiries.count_documents({}),
+        "pending_allocations": db.allocations.count_documents({
+            "status": {"$in": ["pending_rager", "rager_accepted", "pending_founder"]}
+        }),
+        "users": db.users.count_documents({"role": {"$ne": "admin"}}),
+    }
+
+
 @router.get("/admin/analytics")
 def get_analytics(admin=Depends(require_admin)):
     enquiries = list(db.enquiries.find({}, {"_id": 0}))
