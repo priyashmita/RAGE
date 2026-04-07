@@ -13,6 +13,7 @@ from app.api.rager_auth import router as rager_auth_router
 from app.api.contacts import router as contacts_router
 from app.api.users import router as users_router
 from app.api.founder import router as founder_router
+from app.api.public_outreach import router as public_outreach_router
 from app.core.db import db
 
 app = FastAPI()
@@ -85,4 +86,5 @@ app.include_router(matching_router,  prefix="/api")
 app.include_router(rager_auth_router, prefix="/api")
 app.include_router(contacts_router,  prefix="/api")
 app.include_router(users_router,     prefix="/api")
-app.include_router(founder_router,   prefix="/api")
+app.include_router(founder_router,        prefix="/api")
+app.include_router(public_outreach_router, prefix="/api")

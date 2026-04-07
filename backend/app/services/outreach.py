@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 
 from app.core.db import db
 from app.services.anonymisation import generate_anonymised_brief
+from app.services.tokens import create_outreach_tokens
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+BACKEND_URL    = os.getenv("BACKEND_URL", "https://rage-production.up.railway.app")
 FROM_EMAIL     = "R.A.G.E. <noreply@rageforchange.com>"
 
 FORMAT_LABEL = {
@@ -19,78 +21,181 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _brief_email_html(brief: dict) -> str:
+def _brief_email_html(brief: dict, tokens: dict) -> str:
+    accept_url      = f"{BACKEND_URL}/api/public/outreach/respond?token={tokens['accept']}"
+    decline_url     = f"{BACKEND_URL}/api/public/outreach/respond?token={tokens['decline']}"
+    need_context_url = f"{BACKEND_URL}/api/public/outreach/respond?token={tokens['need_context']}"
+
     help_items_html = ""
     if brief.get("help_needed"):
         items = "".join(
-            f'<li style="color:#52525b;font-size:13px;margin-bottom:4px;">{h}</li>'
+            f'<li style="color:#52525b;font-size:14px;line-height:1.8;margin-bottom:2px;">{h}</li>'
             for h in brief["help_needed"]
         )
         help_items_html = f"""
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
-                color:#71717a;margin:16px 0 6px;">Support needed</p>
-      <ul style="margin:0;padding-left:18px;">{items}</ul>"""
+        <tr><td colspan="2" style="padding-top:14px;">
+          <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                    color:#9ca3af;margin:0 0 6px;">Support areas</p>
+          <ul style="margin:0;padding-left:18px;">{items}</ul>
+        </td></tr>"""
 
     fmt = FORMAT_LABEL.get(brief.get("preferred_format", "not_sure"), "Open to recommendation")
 
-    return f"""
-<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
-  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
-    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;
-              color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
-    <h1 style="font-size:22px;font-weight:400;margin:0;">New Advisory Opportunity</h1>
-  </div>
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RAGE: New Advisory Opportunity</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f0;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4f4f0;padding:40px 16px;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" border="0"
+           style="background:#ffffff;max-width:600px;width:100%;">
 
-  <div style="padding:32px 40px;">
-    <p style="color:#52525b;font-size:14px;line-height:1.7;margin:0 0 24px;">
-      A founder in the RAGE network has requested an advisory session.
-      Details are shared under Chatham House Rule — no identifying information is included.
-    </p>
+      <!-- Header -->
+      <tr>
+        <td style="border-bottom:3px solid #dc143c;padding:32px 40px 24px;">
+          <p style="font-size:10px;letter-spacing:0.25em;text-transform:uppercase;
+                    color:#dc143c;margin:0 0 10px;">R.A.G.E.</p>
+          <h1 style="font-size:24px;font-weight:400;color:#111827;margin:0;line-height:1.3;">
+            New Advisory Opportunity
+          </h1>
+        </td>
+      </tr>
 
-    <div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:20px 24px;margin:0 0 24px;">
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
-                color:#71717a;margin:0 0 6px;">Focus area</p>
-      <p style="font-size:15px;color:#1a1a1a;margin:0 0 16px;">{brief["industry"]}</p>
+      <!-- Intro -->
+      <tr>
+        <td style="padding:28px 40px 0;">
+          <p style="font-size:14px;color:#4b5563;line-height:1.75;margin:0;">
+            A founder in the RAGE network has requested an advisory session.
+            We think you may be a strong match.
+          </p>
+          <p style="font-size:12px;color:#9ca3af;font-style:italic;margin:10px 0 0;">
+            Under Chatham House Rule — no identifying information is included below.
+            Full founder details are shared only after both parties confirm.
+          </p>
+        </td>
+      </tr>
 
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
-                color:#71717a;margin:0 0 6px;">Business stage</p>
-      <p style="font-size:15px;color:#1a1a1a;margin:0 0 16px;">
-        {brief["stage"]} &nbsp;&middot;&nbsp; {brief["revenue_band"]}
-      </p>
+      <!-- Brief card -->
+      <tr>
+        <td style="padding:24px 40px;">
+          <table width="100%" cellpadding="0" cellspacing="0" border="0"
+                 style="background:#fafaf8;border-left:3px solid #dc143c;padding:20px 24px;">
+            <tr>
+              <td style="width:50%;padding-right:16px;vertical-align:top;">
+                <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                          color:#9ca3af;margin:0 0 4px;">Focus area</p>
+                <p style="font-size:15px;color:#111827;margin:0 0 16px;font-weight:500;">
+                  {brief["industry"]}
+                </p>
+                <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                          color:#9ca3af;margin:0 0 4px;">Stage</p>
+                <p style="font-size:15px;color:#111827;margin:0 0 16px;">
+                  {brief["stage"]}
+                </p>
+                <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                          color:#9ca3af;margin:0 0 4px;">Revenue band</p>
+                <p style="font-size:15px;color:#111827;margin:0;">
+                  {brief["revenue_band"]}
+                </p>
+              </td>
+              <td style="width:50%;padding-left:16px;vertical-align:top;
+                         border-left:1px solid #e5e7eb;">
+                <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                          color:#9ca3af;margin:0 0 4px;">Region</p>
+                <p style="font-size:15px;color:#111827;margin:0 0 16px;">
+                  {brief["region"]}
+                </p>
+                <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                          color:#9ca3af;margin:0 0 4px;">Urgency</p>
+                <p style="font-size:15px;color:#111827;margin:0 0 16px;">
+                  {brief["urgency"]}
+                </p>
+                <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                          color:#9ca3af;margin:0 0 4px;">Format</p>
+                <p style="font-size:15px;color:#111827;margin:0;">
+                  {fmt}
+                </p>
+              </td>
+            </tr>
+            {help_items_html}
+            <tr>
+              <td colspan="2" style="padding-top:20px;border-top:1px solid #e5e7eb;margin-top:16px;">
+                <p style="font-size:10px;letter-spacing:0.15em;text-transform:uppercase;
+                          color:#9ca3af;margin:0 0 8px;">What they're working through</p>
+                <p style="font-size:14px;color:#374151;line-height:1.75;margin:0;">
+                  {brief["problem_summary"]}
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
 
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
-                color:#71717a;margin:0 0 6px;">Urgency</p>
-      <p style="font-size:15px;color:#1a1a1a;margin:0 0 16px;">{brief["urgency"]}</p>
+      <!-- CTA -->
+      <tr>
+        <td style="padding:8px 40px 32px;">
+          <p style="font-size:15px;font-weight:600;color:#111827;margin:0 0 6px;">
+            Are you available for this session?
+          </p>
+          <p style="font-size:13px;color:#6b7280;margin:0 0 24px;">
+            Click one of the options below — no login required.
+          </p>
 
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
-                color:#71717a;margin:0 0 6px;">What they're working through</p>
-      <p style="font-size:15px;color:#1a1a1a;line-height:1.6;margin:0;">{brief["problem_summary"]}</p>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td style="padding-right:8px;width:33%;">
+                <a href="{accept_url}"
+                   style="display:block;background:#dc143c;color:#ffffff;text-align:center;
+                          padding:14px 8px;font-size:11px;letter-spacing:0.12em;
+                          text-transform:uppercase;text-decoration:none;font-weight:700;">
+                  I'm Interested
+                </a>
+              </td>
+              <td style="padding:0 4px;width:33%;">
+                <a href="{need_context_url}"
+                   style="display:block;background:#ffffff;color:#111827;text-align:center;
+                          padding:14px 8px;font-size:11px;letter-spacing:0.12em;
+                          text-transform:uppercase;text-decoration:none;font-weight:600;
+                          border:1px solid #d1d5db;">
+                  Need More Context
+                </a>
+              </td>
+              <td style="padding-left:8px;width:33%;">
+                <a href="{decline_url}"
+                   style="display:block;background:#ffffff;color:#9ca3af;text-align:center;
+                          padding:14px 8px;font-size:11px;letter-spacing:0.12em;
+                          text-transform:uppercase;text-decoration:none;font-weight:500;
+                          border:1px solid #e5e7eb;">
+                  Not for Me
+                </a>
+              </td>
+            </tr>
+          </table>
 
-      {help_items_html}
+          <p style="font-size:12px;color:#9ca3af;margin:20px 0 0;">
+            Links expire in 7 days. If you have questions, reply to this email.
+          </p>
+        </td>
+      </tr>
 
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
-                color:#71717a;margin:16px 0 6px;">Preferred format</p>
-      <p style="font-size:15px;color:#1a1a1a;margin:0;">{fmt}</p>
-    </div>
+      <!-- Footer -->
+      <tr>
+        <td style="background:#f9f9f7;padding:16px 40px;border-top:1px solid #e5e7eb;">
+          <p style="font-size:11px;color:#9ca3af;margin:0;">
+            &copy; {datetime.now().year} R.A.G.E. &mdash; Radical Alliance for Gender Equity
+          </p>
+        </td>
+      </tr>
 
-    <p style="color:#1a1a1a;font-size:15px;font-weight:600;margin:0 0 8px;">
-      Interested in this opportunity?
-    </p>
-    <p style="color:#52525b;font-size:14px;line-height:1.7;margin:0 0 24px;">
-      Reply to this email and we will send you the full brief with founder details.
-    </p>
-
-    <p style="color:#a1a1aa;font-size:12px;margin:0;font-style:italic;">
-      Under Chatham House Rule — founder identity is shared only after both parties confirm.
-    </p>
-  </div>
-
-  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
-    <p style="font-size:11px;color:#a1a1aa;margin:0;">
-      © {datetime.now().year} R.A.G.E. — Radical Alliance for Gender Equity
-    </p>
-  </div>
-</div>"""
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>"""
 
 
 def send_anonymised_outreach(enquiry_id: str, rager_ids: list) -> dict:
@@ -112,7 +217,6 @@ def send_anonymised_outreach(enquiry_id: str, rager_ids: list) -> dict:
         raise ValueError("No matching ragers found for given rager_ids")
 
     subject = "RAGE: New Advisory Opportunity"
-    html    = _brief_email_html(brief)
     results = []
 
     for rager in ragers:
@@ -121,6 +225,9 @@ def send_anonymised_outreach(enquiry_id: str, rager_ids: list) -> dict:
         if not email:
             results.append({"rager_id": rager["id"], "status": "skipped", "reason": "no email"})
             continue
+
+        tokens = create_outreach_tokens(enquiry_id, rager["id"], brief["brief_id"])
+        html   = _brief_email_html(brief, tokens)
 
         if not RESEND_API_KEY:
             results.append({"rager_id": rager["id"], "status": "skipped", "reason": "RESEND_API_KEY not set"})
@@ -141,10 +248,7 @@ def send_anonymised_outreach(enquiry_id: str, rager_ids: list) -> dict:
                 },
                 timeout=15,
             )
-            if resp.status_code in (200, 201):
-                status, error = "sent", None
-            else:
-                status, error = "failed", resp.text[:300]
+            status, error = ("sent", None) if resp.status_code in (200, 201) else ("failed", resp.text[:300])
         except Exception as exc:
             status, error = "failed", str(exc)[:300]
 
