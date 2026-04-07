@@ -11,7 +11,7 @@ export default function AdminLoginPage() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, logout, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   if (authLoading) return (
@@ -28,6 +28,7 @@ export default function AdminLoginPage() {
     try {
       const res = await login(form.email, form.password, remember);
       if (res.user.role !== 'admin') {
+        logout();
         toast.error('Admin access only');
         return;
       }

@@ -19,6 +19,11 @@ class AllocationCreateRequest(BaseModel):
     status: str = "pending"
 
 
+class AnonymisedOutreachRequest(BaseModel):
+    enquiry_id: str
+    rager_ids: List[str]
+
+
 class ReportIn(BaseModel):
     title: str
     period: Optional[str] = ""
@@ -280,3 +285,15 @@ def public_reports():
             {"_id": 0, "notes": 0, "created_by": 0}
         ).sort("created_at", -1)
     )
+
+
+# ── Anonymised outreach (test endpoint) ──────────────────────────────────────
+
+@router.post("/admin/test-anonymised-outreach")
+def test_anonymised_outreach(data: AnonymisedOutreachRequest, admin=Depends(require_admin)):
+    from app.services.outreach import send_anonymised_outreach
+    try:
+        result = send_anonymised_outreach(data.enquiry_id, data.rager_ids)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
