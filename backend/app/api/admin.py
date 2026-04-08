@@ -296,7 +296,7 @@ def test_anonymised_outreach(data: AnonymisedOutreachRequest, admin=Depends(requ
         result = send_anonymised_outreach(data.enquiry_id, data.rager_ids)
         return result
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── Rager responses for an enquiry ───────────────────────────────────────────
