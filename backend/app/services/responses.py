@@ -8,9 +8,38 @@ RESPONSE_TYPE_MAP = {
     "need_context": "needs_context",
 }
 
+# Maps rager_responses.response_type → allocations.status
+ALLOC_STATUS_MAP = {
+    "accepted":      "rager_accepted",
+    "declined":      "rager_declined",
+    "needs_context": "rager_accepted",   # rager is interested — treat as available for shortlisting
+}
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _sync_allocation(enquiry_id: str, rager_id: str, response_type: str, now: str) -> None:
+    """Sync the rager response back to the allocations collection."""
+    new_status = ALLOC_STATUS_MAP.get(response_type)
+    if not new_status:
+        return
+
+    db.allocations.update_one(
+        {"enquiry_id": enquiry_id, "rager_id": rager_id, "status": "pending_rager"},
+        {"$set": {"status": new_status, "rager_responded_at": now}},
+    )
+
+    # If no allocations are still pending_rager, advance enquiry to pending_founder
+    remaining = db.allocations.count_documents(
+        {"enquiry_id": enquiry_id, "status": "pending_rager"}
+    )
+    if remaining == 0:
+        db.enquiries.update_one(
+            {"id": enquiry_id, "status": "pending_rager"},
+            {"$set": {"status": "pending_founder"}},
+        )
 
 
 def record_response(token_doc: dict, message: str = "") -> tuple[dict, bool]:
@@ -48,6 +77,7 @@ def record_response(token_doc: dict, message: str = "") -> tuple[dict, bool]:
         updated = db.rager_responses.find_one(
             {"enquiry_id": enquiry_id, "rager_id": rager_id}, {"_id": 0}
         )
+        _sync_allocation(enquiry_id, rager_id, response_type, now)
         return updated, False
 
     doc = {
@@ -63,4 +93,5 @@ def record_response(token_doc: dict, message: str = "") -> tuple[dict, bool]:
         "updated_at":    now,
     }
     db.rager_responses.insert_one(doc)
+    _sync_allocation(enquiry_id, rager_id, response_type, now)
     return doc, False

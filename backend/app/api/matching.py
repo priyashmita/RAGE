@@ -100,11 +100,21 @@ def get_enquiry(enquiry_id: str, admin=Depends(require_admin)):
 
 @router.post("/admin/enquiries/{enquiry_id}/match")
 def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_admin)):
+    from app.services.anonymisation import generate_anonymised_brief
+    from app.services.tokens import create_outreach_tokens
+    from app.services.outreach import _brief_email_html
+
     enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
     if not enq:
         raise HTTPException(status_code=404, detail="Enquiry not found")
     if enq.get("status") not in ("new", "matching"):
         raise HTTPException(status_code=400, detail=f"Cannot match enquiry with status '{enq['status']}'")
+
+    # Generate anonymised brief — fail fast if no problem text
+    try:
+        brief = generate_anonymised_brief(enq)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     created = []
     for rm in data.ragers:
@@ -112,7 +122,6 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
         if not rager:
             raise HTTPException(status_code=404, detail=f"Rager {rm.rager_id} not found")
 
-        anon_token = str(uuid.uuid4())
         allocation = {
             "id": str(uuid.uuid4()),
             "enquiry_id": enquiry_id,
@@ -122,7 +131,7 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
             "cost_to_founder": rm.cost_to_founder,
             "payout_to_rager": rm.payout_to_rager,
             "status": "pending_rager",
-            "anon_token": anon_token,
+            "brief_id": brief["brief_id"],
             "created_at": _now(),
             "rager_responded_at": None,
             "founder_responded_at": None,
@@ -131,64 +140,26 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
         allocation.pop("_id", None)
         created.append(allocation)
 
-        # Send anonymised email to Rager
-        accept_link = f"{BACKEND_URL}/api/respond/{anon_token}?r=accept"
-        decline_link = f"{BACKEND_URL}/api/respond/{anon_token}?r=decline"
-        format_label = enq.get("format", "Advisory Session").replace("_", " ").title()
-        challenge = enq.get("challenge") or enq.get("message", "Not specified")
-        categories = enq.get("categories", [])
-        cats_html = ""
-        if categories:
-            cats_html = f"""
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:16px 0 8px;">Areas of expertise needed</p>
-      <p style="font-size:14px;color:#1a1a1a;margin:0;">{', '.join(categories)}</p>"""
-        payout_html = ""
+        email = rager.get("email", "")
+        if not email:
+            continue
+
+        # Create 3-way response tokens (accept / decline / need_context)
+        tokens = create_outreach_tokens(enquiry_id, rm.rager_id, brief["brief_id"])
+        first_name = rager["name"].split()[0]
+
+        # Add payout note to brief if set (internal — append to what_they_need)
+        email_brief = dict(brief)
         if rm.payout_to_rager:
-            payout_html = f"""
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:16px 0 8px;">Your advisory fee</p>
-      <p style="font-size:17px;font-weight:600;color:#dc143c;margin:0;">{_fmt_inr(rm.payout_to_rager)}</p>"""
+            email_brief["what_they_need"] = (
+                email_brief["what_they_need"]
+                + f"\n\nYour advisory fee for this session: {_fmt_inr(rm.payout_to_rager)}"
+            )
 
         _send_email(
-            to=[rager["email"]],
-            subject=f"RAGE: Advisory Request — {format_label}",
-            html=f"""
-<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
-  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
-    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
-    <h1 style="font-size:22px;font-weight:400;margin:0;">Advisory Request</h1>
-  </div>
-  <div style="padding:32px 40px;">
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {rager['name'].split()[0]},</p>
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">A founder in the RAGE network has submitted an advisory request and we think you'd be a strong match.</p>
-
-    <div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:16px 20px;margin:24px 0;">
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:0 0 8px;">Format</p>
-      <p style="font-size:15px;color:#1a1a1a;margin:0 0 16px;">{format_label}</p>
-      <p style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:#71717a;margin:0 0 8px;">What they need help with</p>
-      <p style="font-size:15px;color:#1a1a1a;margin:0;">{challenge}</p>{cats_html}{payout_html}
-    </div>
-
-    <p style="color:#52525b;font-size:13px;line-height:1.7;font-style:italic;">Under Chatham House Rule — the founder's identity will only be shared once both parties confirm.</p>
-
-    <p style="color:#1a1a1a;font-size:15px;margin:28px 0 16px;font-weight:600;">Are you available for this session?</p>
-
-    <table style="border-collapse:collapse;width:100%;">
-      <tr>
-        <td style="padding:0 8px 0 0;width:50%;">
-          <a href="{accept_link}" style="display:block;background:#dc143c;color:#fff;text-align:center;padding:14px;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;font-weight:600;">Yes, I'm available</a>
-        </td>
-        <td style="padding:0 0 0 8px;width:50%;">
-          <a href="{decline_link}" style="display:block;background:#fff;color:#1a1a1a;text-align:center;padding:14px;font-size:12px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;font-weight:600;border:1px solid #e5e5e5;">Not this time</a>
-        </td>
-      </tr>
-    </table>
-
-    <p style="color:#a1a1aa;font-size:12px;margin-top:24px;">If you've already responded or have questions, reply to this email.</p>
-  </div>
-  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
-    <p style="font-size:11px;color:#a1a1aa;margin:0;">© {datetime.now().year} R.A.G.E. — Radical Alliance for Gender Equity</p>
-  </div>
-</div>""",
+            to=[email],
+            subject=f"RAGE: Advisory Request — {brief['decision_label']}",
+            html=_brief_email_html(email_brief, first_name, tokens),
         )
 
     db.enquiries.update_one(
