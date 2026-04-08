@@ -20,6 +20,7 @@ import AdminLoginPage from '@/pages/admin/AdminLoginPage';
 import AdminRagersPage from '@/pages/admin/AdminRagersPage';
 import AdminAnalyticsPage from '@/pages/admin/AdminAnalyticsPage';
 import AdminEnquiriesPage from '@/pages/admin/AdminEnquiriesPage';
+import AdminResponsesPage from '@/pages/admin/AdminResponsesPage';
 import MatchingPanel from '@/pages/admin/MatchingPanel';
 import AdminContactsPage from '@/pages/admin/AdminContactsPage';
 import AdminSettingsPage from '@/pages/admin/AdminSettingsPage';
@@ -139,6 +140,7 @@ function App() {
             <Route path="analytics" element={<AdminAnalyticsPage />} />
             <Route path="enquiries" element={<AdminEnquiriesPage />} />
             <Route path="contacts" element={<AdminContactsPage />} />
+            <Route path="responses" element={<AdminResponsesPage />} />
             <Route path="matching" element={<MatchingPanel />} />
             <Route path="settings" element={<AdminSettingsPage />} />
           </Route>

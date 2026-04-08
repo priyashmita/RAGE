@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from app.core.db import db
 from app.core.auth import require_admin
 
@@ -35,6 +35,15 @@ class MatchRequest(BaseModel):
 
 class ConfirmRequest(BaseModel):
     allocation_id: str
+
+
+class ShortlistRequest(BaseModel):
+    shortlist_status: Optional[str] = None  # "shortlisted" | "rejected" | null
+
+
+class ScheduleRequest(BaseModel):
+    scheduled_at: Optional[str] = None
+    session_notes: Optional[str] = ""
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -564,3 +573,133 @@ def decline_enquiry(enquiry_id: str, admin=Depends(require_admin)):
 </div>""",
     )
     return {"status": "declined"}
+
+
+# ── Admin: shortlist a rager response ─────────────────────────────────────────
+
+@router.patch("/admin/allocations/{alloc_id}/shortlist")
+def update_shortlist(alloc_id: str, data: ShortlistRequest, admin=Depends(require_admin)):
+    alloc = db.allocations.find_one({"id": alloc_id}, {"_id": 0})
+    if not alloc:
+        raise HTTPException(status_code=404, detail="Allocation not found")
+    update = {"shortlist_status": data.shortlist_status}
+    if data.shortlist_status:
+        update["shortlisted_at"] = _now()
+    db.allocations.update_one({"id": alloc_id}, {"$set": update})
+    return {"status": "updated", "shortlist_status": data.shortlist_status}
+
+
+# ── Admin: send shortlisted ragers to founder ─────────────────────────────────
+
+@router.post("/admin/enquiries/{enquiry_id}/send-shortlist")
+def send_shortlist(enquiry_id: str, admin=Depends(require_admin)):
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+
+    shortlisted = list(db.allocations.find(
+        {"enquiry_id": enquiry_id, "shortlist_status": "shortlisted", "status": "rager_accepted"},
+        {"_id": 0}
+    ))
+    if not shortlisted:
+        raise HTTPException(status_code=400, detail="No shortlisted ragers with accepted status found")
+
+    alloc_data = []
+    for alloc in shortlisted:
+        confirm_token = str(uuid.uuid4())
+        db.allocations.update_one(
+            {"id": alloc["id"]},
+            {"$set": {"status": "pending_founder", "confirm_token": confirm_token}}
+        )
+        rager = db.ragers.find_one({"id": alloc["rager_id"]}, {"_id": 0, "email": 0, "phone": 0}) or {}
+        alloc_data.append({"alloc": alloc, "rager": rager, "confirm_token": confirm_token})
+
+    profiles_html = ""
+    for item in alloc_data:
+        rager = item["rager"]
+        token = item["confirm_token"]
+        confirm_link = f"{BACKEND_URL}/api/founder-confirm/{token}"
+        name = rager.get("name", item["alloc"]["rager_name"])
+        title = rager.get("title", "")
+        company = rager.get("company", "")
+        bio = rager.get("bio", "")
+        cats = ", ".join(rager.get("categories", []))
+        profiles_html += f"""
+<div style="border:1px solid #e5e5e5;padding:20px;margin-bottom:16px;">
+  <p style="font-size:16px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{name}</p>
+  <p style="font-size:12px;color:#dc143c;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">{title}{' · ' + company if company else ''}</p>
+  {f'<p style="font-size:13px;color:#52525b;line-height:1.6;margin:0 0 10px;">{bio}</p>' if bio else ''}
+  {f'<p style="font-size:11px;color:#a1a1aa;margin:0 0 14px;">{cats}</p>' if cats else ''}
+  <a href="{confirm_link}" style="display:inline-block;background:#dc143c;color:#fff;padding:10px 20px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;font-weight:600;">Choose {name.split()[0]}</a>
+</div>"""
+
+    _send_email(
+        to=[enq["email"]],
+        subject="RAGE: Your advisors are ready",
+        html=f"""
+<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
+  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
+    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
+    <h1 style="font-size:22px;font-weight:400;margin:0;">Your advisors are ready</h1>
+  </div>
+  <div style="padding:32px 40px;">
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {enq['name'].split()[0]},</p>
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">
+      {len(alloc_data)} advisor{'s have' if len(alloc_data) > 1 else ' has'} confirmed availability for your request.
+      Review the profiles below and click the button next to your preferred choice.
+    </p>
+    {profiles_html}
+    <p style="color:#52525b;font-size:13px;line-height:1.7;margin-top:24px;">
+      Once you confirm, we'll share full contact details and session logistics with both parties.
+      If none of the profiles feel like the right fit, reply to this email.
+    </p>
+  </div>
+  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
+    <p style="font-size:11px;color:#a1a1aa;margin:0;">© {datetime.now().year} R.A.G.E. — Radical Alliance for Gender Equity</p>
+  </div>
+</div>""",
+    )
+
+    db.enquiries.update_one({"id": enquiry_id}, {"$set": {"status": "pending_founder"}})
+    return {"status": "shortlist_sent", "advisors_shown": len(alloc_data)}
+
+
+# ── Admin: get responses for an enquiry (with rager details) ──────────────────
+
+@router.get("/admin/enquiries/{enquiry_id}/responses")
+def get_enquiry_responses(enquiry_id: str, admin=Depends(require_admin)):
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+
+    allocations = list(db.allocations.find({"enquiry_id": enquiry_id}, {"_id": 0}))
+
+    # Enrich with rager details
+    enriched = []
+    for alloc in allocations:
+        rager = db.ragers.find_one({"id": alloc["rager_id"]}, {"_id": 0}) or {}
+        enriched.append({
+            **alloc,
+            "rager_title": rager.get("title", ""),
+            "rager_company": rager.get("company", ""),
+            "rager_bio": rager.get("bio", ""),
+            "rager_categories": rager.get("categories", []),
+        })
+
+    return {"enquiry": enq, "allocations": enriched}
+
+
+# ── Admin: schedule a confirmed session ───────────────────────────────────────
+
+@router.patch("/admin/enquiries/{enquiry_id}/session")
+def update_session(enquiry_id: str, data: ScheduleRequest, admin=Depends(require_admin)):
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    if enq.get("status") != "confirmed":
+        raise HTTPException(status_code=400, detail="Session scheduling only available for confirmed enquiries")
+    db.enquiries.update_one(
+        {"id": enquiry_id},
+        {"$set": {"scheduled_at": data.scheduled_at, "session_notes": data.session_notes}}
+    )
+    return {"status": "updated"}
