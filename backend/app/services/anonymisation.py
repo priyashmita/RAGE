@@ -124,14 +124,29 @@ Return ONLY valid JSON with exactly these two keys:
     return None
 
 
-def _fallback_structure(problem_text: str, decision_label: str, help_items: list) -> dict:
-    """Deterministic fallback when Gemini is unavailable."""
-    situation = problem_text
+def _fallback_structure(
+    decision_label: str,
+    stage_label: str,
+    urgency_label: str,
+    help_items: list,
+) -> dict:
+    """
+    Deterministic fallback when Gemini is unavailable.
+    Built entirely from structured form fields — never touches the raw problem text.
+    """
+    situation = (
+        f"A {stage_label.lower()} founder is navigating a challenge in the area of "
+        f"{decision_label.lower()}. "
+        f"The timing is: {urgency_label.lower()}."
+    )
 
     if help_items:
-        what_they_need = f"Advisory support in the area of {decision_label.lower()}, specifically: {'; '.join(h.lower() for h in help_items)}."
+        what_they_need = (
+            f"Advisory input on {decision_label.lower()}, specifically: "
+            f"{'; '.join(h.lower() for h in help_items)}."
+        )
     else:
-        what_they_need = f"Advisory support in the area of {decision_label.lower()}."
+        what_they_need = f"Advisory input on {decision_label.lower()}."
 
     return {"situation": situation, "what_they_need": what_they_need}
 
@@ -171,7 +186,7 @@ def generate_anonymised_brief(enquiry: dict) -> dict:
     # --- Structured summary ---
     structured = _ai_structure(clean_problem, decision_label, stage_label, help_items)
     if not structured:
-        structured = _fallback_structure(clean_problem, decision_label, help_items)
+        structured = _fallback_structure(decision_label, stage_label, urgency_label, help_items)
 
     return {
         "brief_id":       str(uuid.uuid4()),
