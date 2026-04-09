@@ -299,27 +299,3 @@ def test_anonymised_outreach(data: AnonymisedOutreachRequest, admin=Depends(requ
         raise HTTPException(status_code=400, detail=str(exc))
 
 
-# ── Rager responses for an enquiry ───────────────────────────────────────────
-
-@router.get("/admin/enquiries/{enquiry_id}/responses")
-def get_enquiry_responses(enquiry_id: str, admin=Depends(require_admin)):
-    responses = list(db.rager_responses.find({"enquiry_id": enquiry_id}, {"_id": 0}))
-
-    enriched = []
-    for r in responses:
-        rager = db.ragers.find_one({"id": r["rager_id"]}, {"_id": 0}) or {}
-        enriched.append({
-            "rager_id":      r["rager_id"],
-            "rager_name":    rager.get("name", ""),
-            "rager_email":   rager.get("email", ""),
-            "response_type": r["response_type"],
-            "message":       r.get("message", ""),
-            "responded_at":  r["responded_at"],
-            "brief_id":      r["brief_id"],
-        })
-
-    return {
-        "enquiry_id": enquiry_id,
-        "total":      len(enriched),
-        "responses":  enriched,
-    }
