@@ -1,25 +1,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-import { Loader2, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Calendar } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Calendar, Mail } from 'lucide-react';
 
 const ENQ_STATUS_COLORS = {
-  new:             'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  matching:        'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  pending_rager:   'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  pending_founder: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  confirmed:       'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  declined:        'bg-red-500/10 text-red-400 border-red-500/20',
-  closed:          'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  new:                   'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  matching:              'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  pending_rager:         'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  pending_founder:       'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  pending_founder_offer: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  confirmed:             'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_accepted:      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_rejected:      'bg-red-500/10 text-red-400 border-red-500/20',
+  declined:              'bg-red-500/10 text-red-400 border-red-500/20',
+  closed:                'bg-gray-500/10 text-gray-400 border-gray-500/20',
 };
 
 const ALLOC_STATUS_LABELS = {
   pending_rager:    { label: 'Awaiting response', color: 'text-[#71717A]' },
-  rager_accepted:   { label: 'Accepted', color: 'text-emerald-400' },
-  rager_declined:   { label: 'Declined', color: 'text-red-400' },
-  pending_founder:  { label: 'Sent to founder', color: 'text-orange-400' },
-  confirmed:        { label: 'Confirmed', color: 'text-emerald-400' },
-  founder_declined: { label: 'Not chosen', color: 'text-[#52525B]' },
+  rager_accepted:   { label: 'Accepted',          color: 'text-emerald-400' },
+  rager_declined:   { label: 'Declined',          color: 'text-red-400' },
+  pending_founder:  { label: 'Sent to founder',   color: 'text-orange-400' },
+  confirmed:        { label: 'Confirmed',         color: 'text-emerald-400' },
+  founder_declined: { label: 'Not chosen',        color: 'text-[#52525B]' },
 };
 
 const SHORTLIST_COLORS = {
@@ -27,14 +30,37 @@ const SHORTLIST_COLORS = {
   rejected:    'bg-red-500/10 text-red-400 border-red-500/20',
 };
 
+const EMPTY_OFFER = {
+  budget_text: '', format_type: '', venue: '',
+  duration_text: '', optional_dates: '', cost_notes: '', intro_message: '',
+};
+
+function OfferField({ label, children }) {
+  return (
+    <div>
+      <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1">{label}</label>
+      {children}
+    </div>
+  );
+}
+
 function EnquiryRow({ enq }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [acting, setActing] = useState(false);
+
+  // Schedule state
   const [scheduleMode, setScheduleMode] = useState(false);
   const [scheduledAt, setScheduledAt] = useState(enq.scheduled_at || '');
   const [sessionNotes, setSessionNotes] = useState(enq.session_notes || '');
+
+  // Founder offer state
+  const [offerMode, setOfferMode] = useState(false);
+  const [offerForm, setOfferForm] = useState(EMPTY_OFFER);
+  const [savedOffer, setSavedOffer] = useState(null);    // doc from DB (null = not loaded yet)
+  const [offerLoaded, setOfferLoaded] = useState(false); // whether we've tried to fetch
+  const [offerSaving, setOfferSaving] = useState(false);
 
   const loadDetail = useCallback(async () => {
     if (detail) return;
@@ -56,12 +82,39 @@ function EnquiryRow({ enq }) {
     setOpen(v => !v);
   };
 
+  const loadOffer = useCallback(async () => {
+    if (offerLoaded) return;
+    setOfferLoaded(true);
+    try {
+      const res = await api.get(`/admin/enquiries/${enq.id}/founder-offer`);
+      setSavedOffer(res.data);
+      const d = res.data;
+      setOfferForm({
+        budget_text:    d.budget_text    || '',
+        format_type:    d.format_type    || '',
+        venue:          d.venue          || '',
+        duration_text:  d.duration_text  || '',
+        optional_dates: d.optional_dates || '',
+        cost_notes:     d.cost_notes     || '',
+        intro_message:  d.intro_message  || '',
+      });
+    } catch {
+      // 404 = no offer yet — that's fine
+      setSavedOffer(null);
+    }
+  }, [enq.id, offerLoaded]);
+
+  const openOfferMode = () => {
+    setOfferMode(true);
+    loadOffer();
+  };
+
   const shortlist = async (allocId, status) => {
     setActing(true);
     try {
       await api.patch(`/admin/allocations/${allocId}/shortlist`, { shortlist_status: status });
       toast.success(status ? `Marked as ${status}` : 'Reset');
-      setDetail(null); // force reload
+      setDetail(null);
       loadDetail();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed');
@@ -79,6 +132,38 @@ function EnquiryRow({ enq }) {
       loadDetail();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed to send shortlist');
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const saveOffer = async () => {
+    setOfferSaving(true);
+    try {
+      const res = await api.post(`/admin/enquiries/${enq.id}/founder-offer`, offerForm);
+      setSavedOffer(res.data);
+      toast.success('Draft saved');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to save draft');
+    } finally {
+      setOfferSaving(false);
+    }
+  };
+
+  const sendOffer = async () => {
+    setActing(true);
+    try {
+      // Save latest edits first
+      await api.post(`/admin/enquiries/${enq.id}/founder-offer`, offerForm);
+      await api.post(`/admin/enquiries/${enq.id}/send-founder-offer`);
+      toast.success('Proposal sent to founder');
+      setOfferMode(false);
+      setSavedOffer(null);
+      setOfferLoaded(false);
+      setDetail(null);
+      loadDetail();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to send proposal');
     } finally {
       setActing(false);
     }
@@ -102,9 +187,16 @@ function EnquiryRow({ enq }) {
     }
   };
 
+  const setOffer = (field, val) => setOfferForm(prev => ({ ...prev, [field]: val }));
+
   const allocations = detail?.allocations || [];
   const shortlistedCount = allocations.filter(a => a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted').length;
   const canSendShortlist = shortlistedCount > 0 && ['pending_rager', 'matching', 'new'].includes(enq.status);
+  const canPrepareOffer  = shortlistedCount > 0 && !['founder_accepted', 'founder_rejected', 'confirmed', 'declined', 'closed'].includes(enq.status);
+  const canSchedule      = ['confirmed', 'founder_accepted'].includes(enq.status);
+
+  const inputCls = "w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B]";
+  const textareaCls = `${inputCls} resize-none leading-relaxed`;
 
   return (
     <div className="bg-[#111111] border border-white/8">
@@ -156,8 +248,7 @@ function EnquiryRow({ enq }) {
                     <tbody className="divide-y divide-white/5">
                       {allocations.map(alloc => {
                         const s = ALLOC_STATUS_LABELS[alloc.status] || { label: alloc.status, color: 'text-[#A1A1AA]' };
-                        const isAccepted = alloc.status === 'rager_accepted';
-                        const canShortlist = isAccepted;
+                        const canShortlist = alloc.status === 'rager_accepted';
                         return (
                           <tr key={alloc.id} className="hover:bg-white/[0.01]">
                             <td className="py-2.5 pr-4">
@@ -244,10 +335,25 @@ function EnquiryRow({ enq }) {
                   </button>
                 )}
 
-                {enq.status === 'confirmed' && (
+                {canPrepareOffer && (
                   <button
                     type="button"
-                    onClick={() => setScheduleMode(v => !v)}
+                    onClick={() => { setScheduleMode(false); setOfferMode(v => { if (!v) openOfferMode(); return !v; }); }}
+                    className={`flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider transition-colors border ${
+                      offerMode
+                        ? 'bg-[#DC143C]/10 text-[#DC143C] border-[#DC143C]/30'
+                        : 'bg-white/5 hover:bg-white/10 text-[#A1A1AA] border-white/10'
+                    }`}
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    {offerMode ? 'Close' : 'Prepare Founder Mail'}
+                  </button>
+                )}
+
+                {canSchedule && (
+                  <button
+                    type="button"
+                    onClick={() => { setOfferMode(false); setScheduleMode(v => !v); }}
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-[#A1A1AA] text-xs uppercase tracking-wider transition-colors border border-white/10"
                   >
                     <Calendar className="w-3.5 h-3.5" />
@@ -261,10 +367,144 @@ function EnquiryRow({ enq }) {
                     Awaiting founder selection
                   </p>
                 )}
+
+                {enq.status === 'pending_founder_offer' && (
+                  <p className="text-xs text-amber-400">
+                    <Clock className="w-3 h-3 inline mr-1" />
+                    Proposal sent — awaiting founder response
+                  </p>
+                )}
+
+                {enq.status === 'founder_accepted' && (
+                  <p className="text-xs text-emerald-400">
+                    <CheckCircle className="w-3 h-3 inline mr-1" />
+                    Founder accepted proposal
+                  </p>
+                )}
+
+                {enq.status === 'founder_rejected' && (
+                  <p className="text-xs text-red-400">
+                    <XCircle className="w-3 h-3 inline mr-1" />
+                    Founder declined proposal
+                  </p>
+                )}
               </div>
 
+              {/* ── Founder offer form ── */}
+              {offerMode && canPrepareOffer && (
+                <div className="mt-4 p-4 bg-[#0A0A0A] border border-white/5 space-y-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] uppercase tracking-wider text-[#52525B] font-medium">
+                      Prepare Founder Mail
+                    </p>
+                    {savedOffer?.status === 'sent' && (
+                      <span className="text-[10px] text-amber-400 uppercase tracking-wider">Already sent · {savedOffer.sent_at?.slice(0, 10)}</span>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] text-[#3f3f46]">
+                    All fields are optional. Included ragers: {shortlistedCount} shortlisted.
+                  </p>
+
+                  <OfferField label="Intro message">
+                    <textarea
+                      rows={3}
+                      value={offerForm.intro_message}
+                      onChange={e => setOffer('intro_message', e.target.value)}
+                      placeholder="Personal note to the founder (shown at top of email)"
+                      className={textareaCls}
+                    />
+                  </OfferField>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <OfferField label="Format">
+                      <select
+                        value={offerForm.format_type}
+                        onChange={e => setOffer('format_type', e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">— not specified —</option>
+                        <option value="online">Online</option>
+                        <option value="offline">In-person</option>
+                        <option value="hybrid">Hybrid</option>
+                      </select>
+                    </OfferField>
+
+                    <OfferField label="Duration">
+                      <input
+                        type="text"
+                        value={offerForm.duration_text}
+                        onChange={e => setOffer('duration_text', e.target.value)}
+                        placeholder="e.g. 60 minutes"
+                        className={inputCls}
+                      />
+                    </OfferField>
+
+                    <OfferField label="Venue / Link">
+                      <input
+                        type="text"
+                        value={offerForm.venue}
+                        onChange={e => setOffer('venue', e.target.value)}
+                        placeholder="e.g. Zoom / office address"
+                        className={inputCls}
+                      />
+                    </OfferField>
+
+                    <OfferField label="Proposed Dates">
+                      <input
+                        type="text"
+                        value={offerForm.optional_dates}
+                        onChange={e => setOffer('optional_dates', e.target.value)}
+                        placeholder="e.g. Any weekday in May"
+                        className={inputCls}
+                      />
+                    </OfferField>
+
+                    <OfferField label="Investment / Budget">
+                      <input
+                        type="text"
+                        value={offerForm.budget_text}
+                        onChange={e => setOffer('budget_text', e.target.value)}
+                        placeholder="e.g. ₹8,000 + GST"
+                        className={inputCls}
+                      />
+                    </OfferField>
+
+                    <OfferField label="Cost Notes">
+                      <input
+                        type="text"
+                        value={offerForm.cost_notes}
+                        onChange={e => setOffer('cost_notes', e.target.value)}
+                        placeholder="e.g. Invoice after session"
+                        className={inputCls}
+                      />
+                    </OfferField>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      disabled={acting}
+                      onClick={sendOffer}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-[#DC143C] hover:bg-[#B01030] text-white text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                    >
+                      {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                      Send to Founder
+                    </button>
+                    <button
+                      type="button"
+                      disabled={offerSaving || acting}
+                      onClick={saveOffer}
+                      className="px-4 py-2.5 border border-white/10 text-[#71717A] hover:text-[#F5F5F0] hover:border-white/20 text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                    >
+                      {offerSaving ? 'Saving…' : 'Save Draft'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Schedule form */}
-              {scheduleMode && enq.status === 'confirmed' && (
+              {scheduleMode && canSchedule && (
                 <div className="mt-4 p-4 bg-[#0A0A0A] border border-white/5 space-y-3">
                   <p className="text-[10px] uppercase tracking-wider text-[#52525B] font-medium">Session Details</p>
                   <div className="grid grid-cols-2 gap-3">
@@ -296,8 +536,6 @@ function EnquiryRow({ enq }) {
                   >
                     {acting ? 'Saving...' : 'Save'}
                   </button>
-
-                  {/* Show current schedule if set */}
                   {detail?.enquiry?.scheduled_at && (
                     <p className="text-xs text-[#71717A]">
                       Currently scheduled: {new Date(detail.enquiry.scheduled_at).toLocaleString()}
@@ -317,7 +555,7 @@ function EnquiryRow({ enq }) {
 export default function AdminResponsesPage() {
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('active'); // 'active' | 'confirmed' | 'all'
+  const [filter, setFilter] = useState('active');
 
   useEffect(() => {
     api.get('/admin/enquiries')
@@ -334,15 +572,15 @@ export default function AdminResponsesPage() {
 
   const sorted = [...enquiries].reverse();
   const filtered = sorted.filter(e => {
-    if (filter === 'active') return !['new', 'declined', 'closed'].includes(e.status);
-    if (filter === 'confirmed') return e.status === 'confirmed';
+    if (filter === 'active') return !['new', 'declined', 'closed', 'founder_rejected'].includes(e.status);
+    if (filter === 'confirmed') return ['confirmed', 'founder_accepted'].includes(e.status);
     return true;
   });
 
   const FILTERS = [
-    { key: 'active', label: 'In Progress' },
+    { key: 'active',    label: 'In Progress' },
     { key: 'confirmed', label: 'Confirmed' },
-    { key: 'all', label: 'All' },
+    { key: 'all',       label: 'All' },
   ];
 
   return (
@@ -353,7 +591,6 @@ export default function AdminResponsesPage() {
         <p className="text-sm text-[#52525B] mt-1">Rager responses, shortlisting, and session management</p>
       </div>
 
-      {/* Filter tabs */}
       <div className="flex gap-1 mb-6">
         {FILTERS.map(f => (
           <button
