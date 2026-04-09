@@ -90,11 +90,24 @@ def _ai_structure(problem_text: str, decision_label: str, stage_label: str, help
 
         prompt = f"""You are writing an anonymised advisory brief for a curated expert matching platform called RAGE (Radical Alliance for Gender Equity) in India.
 
-A founder has submitted the following request. Rewrite it as a professional brief that:
-- Removes all company names, founder names, locations, or other identifying details
-- Replaces them with "[the company]" or "[the founder]" if needed
-- Is concise and reads naturally — like a real brief a senior advisor would receive
-- Maintains the real substance of the problem
+A founder has submitted the following request. Rewrite it as a professional brief following these rules exactly:
+
+KEEP (these preserve signal for the expert):
+- Business model: B2B, B2C, marketplace, SaaS, services, manufacturing, fintech, logistics, healthtech, etc.
+- Industry / sector: e.g. logistics workflow automation, consumer fintech, D2C beauty, agri supply chain
+- Core challenge type: e.g. GTM stall, ICP confusion, pricing structure, runway pressure, org design, regulatory block
+- Stage of the specific problem: e.g. pre-PMF, post-PMF scaling, Series A prep, profitability push
+
+REMOVE or REPLACE:
+- Company name → "[the company]"
+- Founder name → "[the founder]"
+- Specific revenue figures → omit or say "early revenue" / "scaling revenue"
+- Specific investor names → "[the investor]" or "[a VC fund]"
+- Specific product names → "[their product]"
+- City / state names → "Indian market" or omit
+
+DO NOT flatten everything into generic labels like "general advisory" or "operational scaling".
+The brief should read like it was written by a neutral analyst who knows the business well.
 
 Submitted problem: {problem_text}
 Category: {decision_label}
@@ -102,8 +115,8 @@ Stage: {stage_label}{help_line}
 
 Return ONLY valid JSON with exactly these two keys:
 {{
-  "situation": "2–3 sentences. The business context and the core challenge they are navigating. No identifying details.",
-  "what_they_need": "1–2 sentences. The specific kind of advisory input that would be most valuable right now."
+  "situation": "2–3 sentences. Business model, industry, stage, and core challenge — specific but anonymised.",
+  "what_they_need": "1–2 sentences. The precise advisory input that would move things forward right now."
 }}"""
 
         response = model.generate_content(prompt)

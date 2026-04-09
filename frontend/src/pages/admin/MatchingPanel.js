@@ -17,6 +17,18 @@ const CATEGORY_PAYOUTS = {
   'International Expansion': 12000,
 };
 
+const DECISION_LABELS = [
+  'Fundraising & Capital',
+  'Talent & Organisation',
+  'Go-to-Market & Growth',
+  'Strategy & Pivots',
+  'Partnerships & M&A',
+  'Financial Structuring',
+  'Policy & Regulatory',
+  'Product & Technology',
+  'General Advisory',
+];
+
 const ENQ_STATUS_COLORS = {
   new:              'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
   matching:         'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -58,6 +70,16 @@ export default function MatchingPanel() {
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
   const [selected, setSelected] = useState({});
+
+  // Brief review state
+  const [briefStep, setBriefStep] = useState('select'); // 'select' | 'review'
+  const [draftBrief, setDraftBrief] = useState(null);   // doc from DB
+  const [editSituation, setEditSituation] = useState('');
+  const [editNeed, setEditNeed] = useState('');
+  const [editHelpItems, setEditHelpItems] = useState('');
+  const [editDecisionLabel, setEditDecisionLabel] = useState('');
+  const [savingEdits, setSavingEdits] = useState(false);
+  const [editsSaved, setEditsSaved] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -102,26 +124,75 @@ export default function MatchingPanel() {
     setSelected(prev => ({ ...prev, [id]: { ...prev[id], [field]: val } }));
   };
 
-  const handleMatch = async () => {
+  // Step 1: generate draft brief, move to review step
+  const handleGenerateDraft = async () => {
     const entries = Object.entries(selected);
     if (!entries.length) return toast.error('Select at least one Rager');
+    setActing(true);
+    try {
+      const res = await api.post(`/admin/enquiries/${enquiryId}/draft-brief`);
+      const doc = res.data;
+      setDraftBrief(doc);
+      const bd = doc.brief_data;
+      setEditSituation(bd.situation || '');
+      setEditNeed(bd.what_they_need || '');
+      setEditHelpItems((bd.help_items || []).join(', '));
+      setEditDecisionLabel(bd.decision_label || '');
+      setEditsSaved(false);
+      setBriefStep('review');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to generate brief');
+    } finally {
+      setActing(false);
+    }
+  };
 
+  // Save edits to DB (auto-save feel: called on blur or explicit button)
+  const handleSaveEdits = async () => {
+    if (!draftBrief) return;
+    setSavingEdits(true);
+    try {
+      const res = await api.put(`/admin/anonymised-briefs/${draftBrief.brief_id}`, {
+        situation:      editSituation,
+        what_they_need: editNeed,
+        help_items:     editHelpItems.split(',').map(s => s.trim()).filter(Boolean),
+        decision_label: editDecisionLabel,
+      });
+      setDraftBrief(res.data);
+      setEditsSaved(true);
+    } catch (e) {
+      toast.error('Failed to save edits');
+    } finally {
+      setSavingEdits(false);
+    }
+  };
+
+  // Step 2: send — uses brief_id from saved draft
+  const handleSend = async () => {
+    if (!draftBrief) return;
+    // Auto-save any unsaved edits first
+    if (!editsSaved) {
+      await handleSaveEdits();
+    }
+    const entries = Object.entries(selected);
     const payload = {
+      brief_id: draftBrief.brief_id,
       ragers: entries.map(([id, vals]) => ({
         rager_id: id,
         cost_to_founder: 0,
         payout_to_rager: parseInt(vals.payout || '0', 10),
       })),
     };
-
     setActing(true);
     try {
       await api.post(`/admin/enquiries/${enquiryId}/match`, payload);
       toast.success('Anon emails sent to selected Ragers');
       setSelected({});
+      setBriefStep('select');
+      setDraftBrief(null);
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Match failed');
+      toast.error(e.response?.data?.detail || 'Send failed');
     } finally {
       setActing(false);
     }
@@ -222,7 +293,6 @@ export default function MatchingPanel() {
     </div>
   );
 
-  // Enquiry selected but failed to load
   if (!enquiry) return (
     <div>
       <div className="mb-8">
@@ -243,6 +313,7 @@ export default function MatchingPanel() {
   const canConfirm = status === 'pending_founder' && allocations.some(a => a.status === 'pending_founder');
   const isDone = ['confirmed', 'declined', 'closed'].includes(status);
   const enquiryCats = enquiry.categories || [];
+  const selectedCount = Object.keys(selected).length;
 
   return (
     <div>
@@ -332,8 +403,8 @@ export default function MatchingPanel() {
         )}
       </div>
 
-      {/* Rager selection for matching */}
-      {canMatch && (
+      {/* ── Rager selection step ── */}
+      {canMatch && briefStep === 'select' && (
         <div>
           <div className="flex items-baseline gap-3 mb-3">
             <p className="text-xs uppercase tracking-[0.2em] text-[#52525B]">Select Ragers to approach</p>
@@ -393,14 +464,149 @@ export default function MatchingPanel() {
               </div>
               <button
                 type="button"
-                disabled={acting || Object.keys(selected).length === 0}
-                onClick={handleMatch}
-                className="text-xs uppercase tracking-wider px-6 py-3 bg-[#DC143C] hover:bg-[#B01030] text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={acting || selectedCount === 0}
+                onClick={handleGenerateDraft}
+                className="text-xs uppercase tracking-wider px-6 py-3 bg-[#DC143C] hover:bg-[#B01030] text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Send Anon Email to ${Object.keys(selected).length || 0} Rager(s)`}
+                {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Generate Draft Brief for ${selectedCount || 0} Rager(s) →`}
               </button>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Brief review + edit step ── */}
+      {canMatch && briefStep === 'review' && draftBrief && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#52525B]">Review Draft Brief</p>
+            <button
+              type="button"
+              onClick={() => setBriefStep('select')}
+              className="text-xs text-[#52525B] hover:text-[#A1A1AA] transition-colors"
+            >
+              ← Back to rager selection
+            </button>
+          </div>
+
+          <div className="bg-[#0A0A0A] border border-white/8 p-6 mb-6 space-y-5">
+
+            {/* Read-only metadata */}
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs border-b border-white/5 pb-4">
+              {draftBrief.brief_data?.stage_label && (
+                <div>
+                  <span className="text-[#52525B] uppercase tracking-wider text-[10px]">Stage</span>
+                  <p className="text-[#A1A1AA] mt-0.5">{draftBrief.brief_data.stage_label}</p>
+                </div>
+              )}
+              {draftBrief.brief_data?.urgency_label && (
+                <div>
+                  <span className="text-[#52525B] uppercase tracking-wider text-[10px]">Urgency</span>
+                  <p className="text-[#A1A1AA] mt-0.5">{draftBrief.brief_data.urgency_label}</p>
+                </div>
+              )}
+              {draftBrief.brief_data?.format_label && (
+                <div>
+                  <span className="text-[#52525B] uppercase tracking-wider text-[10px]">Format</span>
+                  <p className="text-[#A1A1AA] mt-0.5">{draftBrief.brief_data.format_label}</p>
+                </div>
+              )}
+              {draftBrief.brief_data?.revenue_band && (
+                <div>
+                  <span className="text-[#52525B] uppercase tracking-wider text-[10px]">Revenue</span>
+                  <p className="text-[#A1A1AA] mt-0.5">{draftBrief.brief_data.revenue_band}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Editable: decision label */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1.5">Category</label>
+              <select
+                value={editDecisionLabel}
+                onChange={e => { setEditDecisionLabel(e.target.value); setEditsSaved(false); }}
+                className="w-full max-w-xs bg-[#111111] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40"
+              >
+                {DECISION_LABELS.map(l => (
+                  <option key={l} value={l}>{l}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Editable: situation */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1.5">Situation</label>
+              <textarea
+                rows={4}
+                value={editSituation}
+                onChange={e => { setEditSituation(e.target.value); setEditsSaved(false); }}
+                onBlur={handleSaveEdits}
+                className="w-full bg-[#111111] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40 resize-none leading-relaxed"
+              />
+            </div>
+
+            {/* Editable: what they need */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1.5">What they need</label>
+              <textarea
+                rows={3}
+                value={editNeed}
+                onChange={e => { setEditNeed(e.target.value); setEditsSaved(false); }}
+                onBlur={handleSaveEdits}
+                className="w-full bg-[#111111] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40 resize-none leading-relaxed"
+              />
+            </div>
+
+            {/* Editable: help items */}
+            <div>
+              <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1.5">Help items <span className="normal-case text-[#3f3f46]">(comma-separated)</span></label>
+              <input
+                type="text"
+                value={editHelpItems}
+                onChange={e => { setEditHelpItems(e.target.value); setEditsSaved(false); }}
+                onBlur={handleSaveEdits}
+                placeholder="e.g. Capital access & investor conversations, High-stakes decision support"
+                className="w-full bg-[#111111] border border-white/10 text-[#F5F5F0] text-sm px-3 py-2 focus:outline-none focus:border-[#DC143C]/40"
+              />
+              {editHelpItems && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {editHelpItems.split(',').map(s => s.trim()).filter(Boolean).map(tag => (
+                    <span key={tag} className="text-[10px] px-2 py-0.5 bg-[#DC143C]/10 border border-[#DC143C]/20 text-[#DC143C]">{tag}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Save status */}
+            <div className="flex items-center gap-2 text-[11px]">
+              {savingEdits && <span className="text-[#52525B]">Saving…</span>}
+              {!savingEdits && editsSaved && <span className="text-emerald-500">Saved</span>}
+              {!savingEdits && !editsSaved && <span className="text-[#52525B]">Edits auto-save on blur</span>}
+            </div>
+          </div>
+
+          <p className="text-[10px] text-[#3f3f46] mb-4">
+            Original AI-generated version is stored. Only the version above will be sent to ragers.
+          </p>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              disabled={acting}
+              onClick={handleSend}
+              className="text-xs uppercase tracking-wider px-6 py-3 bg-[#DC143C] hover:bg-[#B01030] text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Send to ${selectedCount} Rager(s)`}
+            </button>
+            <button
+              type="button"
+              disabled={savingEdits || acting}
+              onClick={handleSaveEdits}
+              className="text-xs uppercase tracking-wider px-4 py-3 border border-white/10 text-[#71717A] hover:text-[#F5F5F0] hover:border-white/20 transition-colors disabled:opacity-50"
+            >
+              Save Edits
+            </button>
+          </div>
         </div>
       )}
 

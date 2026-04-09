@@ -30,7 +30,15 @@ class RagerMatch(BaseModel):
 
 
 class MatchRequest(BaseModel):
+    brief_id: str
     ragers: List[RagerMatch]
+
+
+class BriefEditRequest(BaseModel):
+    situation: str
+    what_they_need: str
+    help_items: List[str] = []
+    decision_label: str = ""
 
 
 class ConfirmRequest(BaseModel):
@@ -96,11 +104,88 @@ def get_enquiry(enquiry_id: str, admin=Depends(require_admin)):
     return {**enq, "allocations": allocations}
 
 
+# ── Admin: generate draft brief (preview before sending) ──────────────────────
+
+@router.post("/admin/enquiries/{enquiry_id}/draft-brief")
+def generate_draft_brief(enquiry_id: str, admin=Depends(require_admin)):
+    from app.services.anonymisation import generate_anonymised_brief
+
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+
+    try:
+        brief = generate_anonymised_brief(enq)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    original_snapshot = {
+        "situation":      brief["situation"],
+        "what_they_need": brief["what_they_need"],
+        "help_items":     brief["help_items"],
+        "decision_label": brief["decision_label"],
+    }
+
+    doc = {
+        "brief_id":           brief["brief_id"],
+        "enquiry_id":         enquiry_id,
+        "brief_data":         brief,
+        "status":             "draft",
+        "original_generated": original_snapshot,
+        "final_sent":         None,
+        "edited_by":          None,
+        "edited_at":          None,
+        "rager_ids":          [],
+        "sent_at":            None,
+        "created_at":         _now(),
+    }
+
+    # Replace any existing draft for this enquiry
+    db.anonymised_briefs.delete_many({"enquiry_id": enquiry_id, "status": "draft"})
+    db.anonymised_briefs.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/admin/enquiries/{enquiry_id}/draft-brief")
+def get_draft_brief(enquiry_id: str, admin=Depends(require_admin)):
+    doc = db.anonymised_briefs.find_one(
+        {"enquiry_id": enquiry_id, "status": "draft"},
+        {"_id": 0}
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="No draft brief found for this enquiry")
+    return doc
+
+
+@router.put("/admin/anonymised-briefs/{brief_id}")
+def edit_brief(brief_id: str, data: BriefEditRequest, admin=Depends(require_admin)):
+    doc = db.anonymised_briefs.find_one({"brief_id": brief_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Brief not found")
+    if doc["status"] == "sent":
+        raise HTTPException(status_code=400, detail="Cannot edit a brief that has already been sent")
+
+    # Patch the editable fields inside brief_data
+    db.anonymised_briefs.update_one(
+        {"brief_id": brief_id},
+        {"$set": {
+            "brief_data.situation":      data.situation,
+            "brief_data.what_they_need": data.what_they_need,
+            "brief_data.help_items":     data.help_items,
+            "brief_data.decision_label": data.decision_label or doc["brief_data"].get("decision_label", ""),
+            "edited_by":                 admin.get("email", "admin"),
+            "edited_at":                 _now(),
+        }}
+    )
+    updated = db.anonymised_briefs.find_one({"brief_id": brief_id}, {"_id": 0})
+    return updated
+
+
 # ── Admin: step 1 — send anon emails to selected Ragers ───────────────────────
 
 @router.post("/admin/enquiries/{enquiry_id}/match")
 def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_admin)):
-    from app.services.anonymisation import generate_anonymised_brief
     from app.services.tokens import create_outreach_tokens
     from app.services.outreach import _brief_email_html
 
@@ -110,11 +195,14 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
     if enq.get("status") not in ("new", "matching"):
         raise HTTPException(status_code=400, detail=f"Cannot match enquiry with status '{enq['status']}'")
 
-    # Generate anonymised brief — fail fast if no problem text
-    try:
-        brief = generate_anonymised_brief(enq)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    # Load the admin-reviewed draft brief — never re-generate at send time
+    brief_doc = db.anonymised_briefs.find_one(
+        {"brief_id": data.brief_id, "enquiry_id": enquiry_id, "status": "draft"},
+        {"_id": 0}
+    )
+    if not brief_doc:
+        raise HTTPException(status_code=400, detail="Draft brief not found. Generate and review a brief before sending.")
+    brief = brief_doc["brief_data"]
 
     created = []
     for rm in data.ragers:
@@ -166,6 +254,24 @@ def match_enquiry(enquiry_id: str, data: MatchRequest, admin=Depends(require_adm
         {"id": enquiry_id},
         {"$set": {"status": "pending_rager", "matched_at": _now()}}
     )
+
+    # Mark brief as sent and snapshot the final version that went out
+    final_snapshot = {
+        "situation":      brief["situation"],
+        "what_they_need": brief["what_they_need"],
+        "help_items":     brief.get("help_items", []),
+        "decision_label": brief.get("decision_label", ""),
+    }
+    db.anonymised_briefs.update_one(
+        {"brief_id": data.brief_id},
+        {"$set": {
+            "status":     "sent",
+            "final_sent": final_snapshot,
+            "rager_ids":  [rm.rager_id for rm in data.ragers],
+            "sent_at":    _now(),
+        }}
+    )
+
     return {"status": "emails_sent", "allocations_created": len(created)}
 
 
