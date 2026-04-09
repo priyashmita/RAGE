@@ -182,8 +182,11 @@ function EnquiryRow({ enq }) {
 
   const allocations = detail?.allocations || [];
   const shortlistedCount = allocations.filter(a => a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted').length;
+  // Ragers available for a founder offer: explicitly shortlisted, OR already in pending_founder (old send-shortlist flow)
+  const offerableCount   = allocations.filter(a => (a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted') || a.status === 'pending_founder').length;
+  const TERMINAL = ['founder_accepted', 'founder_rejected', 'confirmed', 'declined', 'closed'];
   const canSendShortlist = shortlistedCount > 0 && ['pending_rager', 'matching', 'new', 'pending_founder'].includes(enq.status);
-  const canPrepareOffer  = shortlistedCount > 0 && !['founder_accepted', 'founder_rejected', 'confirmed', 'declined', 'closed'].includes(enq.status);
+  const canPrepareOffer  = offerableCount > 0 && !TERMINAL.includes(enq.status);
   const canSchedule      = ['confirmed', 'founder_accepted'].includes(enq.status);
 
   const inputCls = "w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B]";
@@ -382,7 +385,7 @@ function EnquiryRow({ enq }) {
               </div>
 
               {/* ── Founder offer form ── */}
-              {offerMode && canPrepareOffer && (
+              {offerMode && offerableCount > 0 && (
                 <div className="mt-4 p-4 bg-[#0A0A0A] border border-white/5 space-y-4">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[10px] uppercase tracking-wider text-[#52525B] font-medium">
@@ -394,7 +397,7 @@ function EnquiryRow({ enq }) {
                   </div>
 
                   <p className="text-[10px] text-[#3f3f46]">
-                    All fields are optional. Included ragers: {shortlistedCount} shortlisted.
+                    All fields are optional. Included ragers: {offerableCount}.
                   </p>
 
                   <OfferField label="Intro message">

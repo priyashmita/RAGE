@@ -800,12 +800,17 @@ def save_founder_offer(enquiry_id: str, data: FounderOfferRequest, admin=Depends
     if not enq:
         raise HTTPException(status_code=404, detail="Enquiry not found")
 
+    # Accept: explicitly shortlisted rager_accepted OR any pending_founder (old send-shortlist flow)
     shortlisted = list(db.allocations.find(
-        {"enquiry_id": enquiry_id, "shortlist_status": "shortlisted", "status": "rager_accepted"},
+        {"enquiry_id": enquiry_id,
+         "$or": [
+             {"shortlist_status": "shortlisted", "status": "rager_accepted"},
+             {"status": "pending_founder"},
+         ]},
         {"_id": 0}
     ))
     if not shortlisted:
-        raise HTTPException(status_code=400, detail="No shortlisted ragers found. Shortlist at least one rager first.")
+        raise HTTPException(status_code=400, detail="No accepted ragers found for this enquiry.")
 
     allocation_ids = [a["id"] for a in shortlisted]
     now = _now()
