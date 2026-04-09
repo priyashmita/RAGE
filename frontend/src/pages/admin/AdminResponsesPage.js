@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 import { Loader2, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Calendar, Mail } from 'lucide-react';
@@ -62,25 +62,21 @@ function EnquiryRow({ enq }) {
   const [offerLoaded, setOfferLoaded] = useState(false); // whether we've tried to fetch
   const [offerSaving, setOfferSaving] = useState(false);
 
-  const loadDetail = useCallback(async () => {
-    if (detail) return;
+  // Auto-fetch whenever the row is open and detail is null (covers first open + after any action)
+  useEffect(() => {
+    if (!open || detail !== null) return;
     setLoadingDetail(true);
-    try {
-      const res = await api.get(`/admin/enquiries/${enq.id}/responses`);
-      setDetail(res.data);
-      setScheduledAt(res.data.enquiry?.scheduled_at || '');
-      setSessionNotes(res.data.enquiry?.session_notes || '');
-    } catch {
-      toast.error('Failed to load responses');
-    } finally {
-      setLoadingDetail(false);
-    }
-  }, [enq.id, detail]);
+    api.get(`/admin/enquiries/${enq.id}/responses`)
+      .then(res => {
+        setDetail(res.data);
+        setScheduledAt(res.data.enquiry?.scheduled_at || '');
+        setSessionNotes(res.data.enquiry?.session_notes || '');
+      })
+      .catch(() => toast.error('Failed to load responses'))
+      .finally(() => setLoadingDetail(false));
+  }, [open, detail, enq.id]); // eslint-disable-line
 
-  const toggle = () => {
-    if (!open) loadDetail();
-    setOpen(v => !v);
-  };
+  const toggle = () => setOpen(v => !v);
 
   const loadOffer = useCallback(async () => {
     if (offerLoaded) return;
@@ -114,8 +110,7 @@ function EnquiryRow({ enq }) {
     try {
       await api.patch(`/admin/allocations/${allocId}/shortlist`, { shortlist_status: status });
       toast.success(status ? `Marked as ${status}` : 'Reset');
-      setDetail(null);
-      loadDetail();
+      setDetail(null); // triggers useEffect to re-fetch
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed');
     } finally {
@@ -129,7 +124,6 @@ function EnquiryRow({ enq }) {
       const res = await api.post(`/admin/enquiries/${enq.id}/send-shortlist`);
       toast.success(`Shortlist sent to founder — ${res.data.advisors_shown} advisor(s)`);
       setDetail(null);
-      loadDetail();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed to send shortlist');
     } finally {
@@ -153,7 +147,6 @@ function EnquiryRow({ enq }) {
   const sendOffer = async () => {
     setActing(true);
     try {
-      // Save latest edits first
       await api.post(`/admin/enquiries/${enq.id}/founder-offer`, offerForm);
       await api.post(`/admin/enquiries/${enq.id}/send-founder-offer`);
       toast.success('Proposal sent to founder');
@@ -161,7 +154,6 @@ function EnquiryRow({ enq }) {
       setSavedOffer(null);
       setOfferLoaded(false);
       setDetail(null);
-      loadDetail();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed to send proposal');
     } finally {
@@ -179,7 +171,6 @@ function EnquiryRow({ enq }) {
       toast.success('Session updated');
       setScheduleMode(false);
       setDetail(null);
-      loadDetail();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Failed to update session');
     } finally {
@@ -191,7 +182,7 @@ function EnquiryRow({ enq }) {
 
   const allocations = detail?.allocations || [];
   const shortlistedCount = allocations.filter(a => a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted').length;
-  const canSendShortlist = shortlistedCount > 0 && ['pending_rager', 'matching', 'new'].includes(enq.status);
+  const canSendShortlist = shortlistedCount > 0 && ['pending_rager', 'matching', 'new', 'pending_founder'].includes(enq.status);
   const canPrepareOffer  = shortlistedCount > 0 && !['founder_accepted', 'founder_rejected', 'confirmed', 'declined', 'closed'].includes(enq.status);
   const canSchedule      = ['confirmed', 'founder_accepted'].includes(enq.status);
 
