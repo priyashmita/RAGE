@@ -18,8 +18,9 @@ from app.core.auth import require_admin
 
 router = APIRouter()
 
-BACKEND_URL = os.getenv("BACKEND_URL", "https://rage-production.up.railway.app")
-FROM_EMAIL = "R.A.G.E. <noreply@rageforchange.com>"
+BACKEND_URL  = os.getenv("BACKEND_URL",  "https://rage-production.up.railway.app")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://rage-v5xv.vercel.app")
+FROM_EMAIL   = "R.A.G.E. <noreply@rageforchange.com>"
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────────
@@ -74,6 +75,11 @@ class ManualRagerRequest(BaseModel):
     categories: List[str] = []
     cost_to_founder: int = 0
     payout_to_rager: int = 0
+
+
+class FounderShortlistResponse(BaseModel):
+    response_type: str          # "selection" | "more_options" | "reject_all"
+    selected_alloc_ids: List[str] = []
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -1068,6 +1074,7 @@ def save_founder_offer(enquiry_id: str, data: FounderOfferRequest, admin=Depends
             "cost_notes":      data.cost_notes,
             "intro_message":   data.intro_message,
             "status":          "draft",
+            "shortlist_token": None,
             "accept_token":    str(uuid.uuid4()),
             "reject_token":    str(uuid.uuid4()),
             "created_by":      admin.get("email", "admin"),
@@ -1525,86 +1532,32 @@ def resend_founder_offer(enquiry_id: str, admin=Depends(require_admin)):
             status_code=400,
             detail="No sent offer found. Use 'Send to Founder' to send the initial offer first.",
         )
-    if offer.get("founder_response"):
+    if offer.get("founder_response_type") and offer.get("founder_response_type") != "selection":
         raise HTTPException(
             status_code=400,
             detail="Founder has already responded to this offer. Cannot resend.",
         )
 
-    # Rebuild and resend the same email using the existing tokens
-    profiles_html = ""
+    shortlist_token = offer.get("shortlist_token")
+    if not shortlist_token:
+        # Generate a new shortlist_token if old offer predates this feature
+        shortlist_token = secrets.token_urlsafe(32)
+        db.founder_offers.update_one(
+            {"id": offer["id"]},
+            {"$set": {"shortlist_token": shortlist_token}},
+        )
+
+    alloc_data = []
     for alloc_id in offer["allocation_ids"]:
         alloc = db.allocations.find_one({"id": alloc_id}, {"_id": 0}) or {}
-        rager = db.ragers.find_one({"id": alloc.get("rager_id", "")}, {"_id": 0}) or {}
-        name    = rager.get("name", alloc.get("rager_name", ""))
-        title   = rager.get("title", "")
-        company = rager.get("company", "")
-        bio     = rager.get("bio", "")
-        cats    = ", ".join(rager.get("categories", []))
-        profiles_html += f"""
-<div style="border:1px solid #e5e5e5;padding:20px;margin-bottom:12px;">
-  <p style="font-size:16px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{name}</p>
-  <p style="font-size:12px;color:#dc143c;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">{title}{(" · " + company) if company else ""}</p>
-  {f'<p style="font-size:13px;color:#52525b;line-height:1.6;margin:0 0 8px;">{bio}</p>' if bio else ""}
-  {f'<p style="font-size:11px;color:#a1a1aa;margin:0;">{cats}</p>' if cats else ""}
-</div>"""
+        rager = db.ragers.find_one({"id": alloc.get("rager_id", "")}, {"_id": 0, "email": 0, "phone": 0}) or {}
+        alloc_data.append({"alloc": alloc, "rager": rager})
 
-    detail_rows = [
-        ("Format",         (offer.get("format_type") or "").capitalize()),
-        ("Duration",       offer.get("duration_text", "")),
-        ("Venue",          offer.get("venue", "")),
-        ("Proposed Dates", offer.get("optional_dates", "")),
-        ("Investment",     offer.get("budget_text", "")),
-        ("Notes",          offer.get("cost_notes", "")),
-    ]
-    rows_html = "".join(
-        f'<tr><td style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#71717a;padding:7px 20px 7px 0;vertical-align:top;white-space:nowrap;">{k}</td>'
-        f'<td style="font-size:13px;color:#1a1a1a;padding:7px 0;">{v}</td></tr>'
-        for k, v in detail_rows if v
-    )
-    details_html = f"""
-<div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:20px 24px;margin:24px 0;">
-  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 14px;">Session Proposal</p>
-  <table style="border-collapse:collapse;width:100%;">{rows_html}</table>
-</div>""" if rows_html else ""
-
-    accept_link = f"{BACKEND_URL}/api/founder-offer-respond/{offer['accept_token']}?r=accept"
-    reject_link = f"{BACKEND_URL}/api/founder-offer-respond/{offer['reject_token']}?r=reject"
-    intro       = (offer.get("intro_message") or "").strip()
-    first_name  = enq["name"].split()[0]
-    plural      = len(offer["allocation_ids"]) > 1
-
+    shortlist_url = f"{FRONTEND_URL}/founder-select/{shortlist_token}"
     _send_email(
         to=[enq["email"]],
-        subject="RAGE: Your Session Proposal (Reminder)",
-        html=f"""
-<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
-  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
-    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
-    <h1 style="font-size:22px;font-weight:400;margin:0;">Your Session Proposal</h1>
-  </div>
-  <div style="padding:32px 40px;">
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {first_name},</p>
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">
-      {intro if intro else "A reminder about your pending session proposal — please let us know whether you&#8217;d like to proceed."}
-    </p>
-    <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:24px 0 12px;">
-      Your Advisor{"s" if plural else ""}
-    </p>
-    {profiles_html}
-    {details_html}
-    <div style="margin-top:24px;">
-      <a href="{accept_link}" style="display:inline-block;background:#dc143c;color:#fff;padding:12px 28px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;font-weight:600;margin-right:12px;">Accept Proposal</a>
-      <a href="{reject_link}" style="display:inline-block;background:#f5f5f0;color:#52525b;border:1px solid #d4d4d4;padding:12px 24px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;">Decline</a>
-    </div>
-    <p style="color:#a1a1aa;font-size:12px;line-height:1.6;margin-top:24px;">
-      Questions? Reply to this email and we&#8217;ll be in touch.
-    </p>
-  </div>
-  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
-    <p style="font-size:11px;color:#a1a1aa;margin:0;">&#169; {datetime.now().year} R.A.G.E. &#8212; Radical Alliance for Gender Equity</p>
-  </div>
-</div>""",
+        subject="RAGE: Your Advisor Shortlist (Reminder)",
+        html=_founder_shortlist_html(enq, offer, alloc_data, shortlist_url),
     )
 
     db.founder_offers.update_one({"id": offer["id"]}, {"$set": {"resent_at": _now()}})
@@ -1615,16 +1568,15 @@ def resend_founder_offer(enquiry_id: str, admin=Depends(require_admin)):
 # FOUNDER SELECTION FLOW — shortlist with individual per-rager selection tokens
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _founder_shortlist_html(enq: dict, offer: dict, alloc_data: list,
-                             more_options_link: str, reject_all_link: str) -> str:
+def _founder_shortlist_html(enq: dict, offer: dict, alloc_data: list, shortlist_url: str) -> str:
     """
     Founder receives a shortlist of candidates.
-    Each profile card has an individual 'Select [Name]' button.
-    Founder can select 1 or more, request more options, or reject all.
-    Founder identity is NOT revealed here (Chatham House still in effect).
+    A single CTA links to the FounderSelectPage where they can multi-select advisors,
+    request more options, or decline. Founder identity NOT revealed here (Chatham House).
     """
     first_name = enq.get("name", "there").split()[0]
     intro = (offer.get("intro_message") or "").strip()
+    count = len(alloc_data)
 
     detail_rows = [
         ("Format",         (offer.get("format_type") or "").capitalize()),
@@ -1646,28 +1598,21 @@ def _founder_shortlist_html(enq: dict, offer: dict, alloc_data: list,
   <table style="border-collapse:collapse;width:100%;">{rows_html}</table>
 </div>""" if rows_html else ""
 
+    # Preview cards — display only, no buttons
     profiles_html = ""
     for item in alloc_data:
-        rager = item["rager"]
-        select_link = item["select_link"]
+        rager   = item["rager"]
         name    = rager.get("name", item["alloc"].get("rager_name", ""))
-        first   = name.split()[0] if name else "Advisor"
         title   = rager.get("title", "")
         company = rager.get("company", "")
         bio     = rager.get("bio", "")
         cats    = ", ".join(rager.get("categories", []))
         profiles_html += f"""
-<div style="border:1px solid #e5e5e5;padding:20px;margin-bottom:16px;">
+<div style="border:1px solid #e5e5e5;padding:20px;margin-bottom:12px;">
   <p style="font-size:16px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{name}</p>
   <p style="font-size:12px;color:#dc143c;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">{title}{(" · " + company) if company else ""}</p>
   {f'<p style="font-size:13px;color:#52525b;line-height:1.6;margin:0 0 8px;">{bio}</p>' if bio else ""}
-  {f'<p style="font-size:11px;color:#a1a1aa;margin:0 0 14px;">{cats}</p>' if cats else ""}
-  <a href="{select_link}"
-     style="display:inline-block;background:#dc143c;color:#fff;padding:10px 20px;
-            font-size:11px;letter-spacing:0.15em;text-transform:uppercase;
-            text-decoration:none;font-weight:600;">
-    Select {first}
-  </a>
+  {f'<p style="font-size:11px;color:#a1a1aa;margin:0;">{cats}</p>' if cats else ""}
 </div>"""
 
     year = datetime.now().year
@@ -1680,28 +1625,26 @@ def _founder_shortlist_html(enq: dict, offer: dict, alloc_data: list,
   <div style="padding:32px 40px;">
     <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {first_name},</p>
     <p style="color:#52525b;font-size:14px;line-height:1.7;">
-      {intro if intro else f"We&#8217;ve shortlisted {len(alloc_data)} advisor{'s' if len(alloc_data) > 1 else ''} for your request. Review the profiles below and click &#8220;Select&#8221; next to your preferred choice(s). You may select more than one."}
+      {intro if intro else f"We&#8217;ve shortlisted {count} advisor{'s' if count != 1 else ''} for your request. Review their profiles and select the one(s) you&#8217;d like to proceed with."}
     </p>
     {details_html}
     <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:24px 0 12px;">
-      Your Shortlist
+      Preview — {count} Advisor{'s' if count != 1 else ''}
     </p>
     {profiles_html}
-    <div style="margin-top:24px;padding-top:20px;border-top:1px solid #e5e5e5;">
-      <p style="color:#71717a;font-size:13px;margin:0 0 14px;">Not the right fit?</p>
-      <a href="{more_options_link}"
-         style="display:inline-block;background:#fff;color:#52525b;border:1px solid #d4d4d4;
-                padding:10px 20px;font-size:11px;letter-spacing:0.12em;text-transform:uppercase;
-                text-decoration:none;margin-right:12px;">
-        Request more advisors
+    <div style="margin-top:28px;text-align:center;">
+      <a href="{shortlist_url}"
+         style="display:inline-block;background:#dc143c;color:#fff;padding:14px 32px;
+                font-size:12px;letter-spacing:0.15em;text-transform:uppercase;
+                text-decoration:none;font-weight:700;">
+        Review &amp; Select Advisors &#8594;
       </a>
-      <a href="{reject_all_link}"
-         style="display:inline-block;color:#a1a1aa;font-size:12px;text-decoration:underline;vertical-align:middle;">
-        None of these
-      </a>
+      <p style="color:#a1a1aa;font-size:12px;line-height:1.6;margin-top:16px;">
+        You can select one or more, request alternatives, or let us know none are the right fit.
+      </p>
     </div>
     <p style="color:#a1a1aa;font-size:12px;line-height:1.6;margin-top:20px;">
-      Questions or adjustments? Reply to this email and we&#8217;ll be in touch.
+      Questions? Reply to this email and the RAGE team will be in touch.
     </p>
   </div>
   <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
@@ -1810,36 +1753,20 @@ def send_shortlist_to_founder(enquiry_id: str, admin=Depends(require_admin)):
             detail="No reconfirmed ragers in this offer. Send reconfirmation emails first.",
         )
 
-    now = _now()
-    selection_tokens = {}
-    alloc_data = []
+    now             = _now()
+    shortlist_token = secrets.token_urlsafe(32)
+    alloc_data      = []
 
     for alloc in eligible:
-        tok = secrets.token_urlsafe(32)
-        selection_tokens[alloc["id"]] = tok
         db.allocations.update_one(
             {"id": alloc["id"]},
-            {"$set": {
-                "founder_select_token": tok,
-                "status":               "offer_sent_to_founder",
-                "offer_sent_at":        now,
-            }},
+            {"$set": {"status": "offer_sent_to_founder", "offer_sent_at": now}},
         )
         rager = db.ragers.find_one({"id": alloc.get("rager_id", "")}, {"_id": 0, "email": 0, "phone": 0}) or {}
-        alloc_data.append({
-            "alloc":       alloc,
-            "rager":       rager,
-            "select_link": f"{BACKEND_URL}/api/founder-select/{tok}",
-        })
+        alloc_data.append({"alloc": alloc, "rager": rager})
 
-    more_options_token = secrets.token_urlsafe(32)
-    reject_all_token   = secrets.token_urlsafe(32)
-
-    html = _founder_shortlist_html(
-        enq, offer, alloc_data,
-        more_options_link=f"{BACKEND_URL}/api/founder-more-options/{more_options_token}",
-        reject_all_link=f"{BACKEND_URL}/api/founder-reject-all/{reject_all_token}",
-    )
+    shortlist_url = f"{FRONTEND_URL}/founder-select/{shortlist_token}"
+    html = _founder_shortlist_html(enq, offer, alloc_data, shortlist_url)
     _send_email(
         to=[enq["email"]],
         subject="RAGE: Your Advisor Shortlist",
@@ -1851,9 +1778,7 @@ def send_shortlist_to_founder(enquiry_id: str, admin=Depends(require_admin)):
         {"$set": {
             "status":                "sent",
             "sent_at":               now,
-            "selection_tokens":      selection_tokens,
-            "more_options_token":    more_options_token,
-            "reject_all_token":      reject_all_token,
+            "shortlist_token":       shortlist_token,
             "founder_response_type": None,
             "selected_alloc_ids":    [],
         }},
@@ -1865,124 +1790,191 @@ def send_shortlist_to_founder(enquiry_id: str, admin=Depends(require_admin)):
     return {"status": "sent", "advisors_shown": len(alloc_data), "offer_id": offer["id"]}
 
 
-# ── Public: founder selects a specific rager from shortlist ───────────────────
+# ── DEPRECATED: old per-advisor selection endpoints ──────────────────────────
+# Replaced by /public/shortlist/{token} + FounderSelectPage (multi-select)
 
 @router.get("/founder-select/{token}", response_class=HTMLResponse)
-def founder_select_rager(token: str):
-    alloc = db.allocations.find_one({"founder_select_token": token}, {"_id": 0})
-    if not alloc:
-        return HTMLResponse(_response_page("Invalid link", "This link is invalid or has expired."), status_code=404)
-
-    if alloc["status"] == "selected_by_founder":
-        name = alloc.get("rager_name", "this advisor")
-        return HTMLResponse(_response_page(
-            "Already selected",
-            f"You&#8217;ve already selected {name}. We&#8217;ll be in touch with next steps."
-        ))
-
-    if alloc["status"] not in ("offer_sent_to_founder",):
-        return HTMLResponse(_response_page(
-            "Link no longer valid",
-            "This selection link is no longer active. Please contact RAGE if you need assistance."
-        ), status_code=400)
-
-    now        = _now()
-    enquiry_id = alloc["enquiry_id"]
-
-    db.allocations.update_one(
-        {"id": alloc["id"]},
-        {"$set": {"status": "selected_by_founder", "founder_selected_at": now}},
+def founder_select_rager_deprecated(token: str):
+    return HTMLResponse(
+        _response_page("Link expired", "This link is no longer valid. Please use the selection page sent in your most recent email from RAGE."),
+        status_code=410,
     )
-
-    # Update offer doc: push to selected_alloc_ids
-    offer = db.founder_offers.find_one(
-        {"enquiry_id": enquiry_id, "status": "sent"},
-        {"_id": 0}, sort=[("sent_at", -1)],
-    )
-    if offer:
-        existing = offer.get("selected_alloc_ids", [])
-        if alloc["id"] not in existing:
-            db.founder_offers.update_one(
-                {"id": offer["id"]},
-                {"$push": {"selected_alloc_ids": alloc["id"]},
-                 "$set":  {"founder_response_type": "selection", "founder_responded_at": now}},
-            )
-
-    db.enquiries.update_one(
-        {"id": enquiry_id,
-         "status": {"$nin": ["confirmed_ready_to_schedule", "awaiting_final_confirmation"]}},
-        {"$set": {"status": "founder_selected"}},
-    )
-
-    rager = db.ragers.find_one({"id": alloc.get("rager_id", "")}, {"_id": 0}) or {}
-    name  = rager.get("name", alloc.get("rager_name", "this advisor"))
-    return HTMLResponse(_response_page(
-        "Selection noted",
-        f"You&#8217;ve selected {name}. "
-        "We&#8217;ll confirm their availability and be in touch shortly."
-    ))
-
-
-# ── Public: founder requests more advisor options ─────────────────────────────
 
 @router.get("/founder-more-options/{token}", response_class=HTMLResponse)
-def founder_more_options(token: str):
-    offer = db.founder_offers.find_one({"more_options_token": token}, {"_id": 0})
-    if not offer:
-        return HTMLResponse(_response_page("Invalid link", "This link is invalid or has expired."), status_code=404)
-
-    if offer.get("founder_response_type") == "more_options":
-        return HTMLResponse(_response_page(
-            "Already noted",
-            "We&#8217;ve registered your request for more advisors. The RAGE team will be in touch."
-        ))
-
-    now = _now()
-    db.founder_offers.update_one(
-        {"id": offer["id"]},
-        {"$set": {"founder_response_type": "more_options", "founder_responded_at": now}},
+def founder_more_options_deprecated(token: str):
+    return HTMLResponse(
+        _response_page("Link expired", "This link is no longer valid. Please use the selection page sent in your most recent email from RAGE."),
+        status_code=410,
     )
-    db.enquiries.update_one(
-        {"id": offer["enquiry_id"]},
-        {"$set": {"status": "needs_more_candidates"}},
-    )
-    return HTMLResponse(_response_page(
-        "Noted",
-        "We&#8217;ll find additional advisors for your request. Expect to hear from us soon."
-    ))
-
-
-# ── Public: founder rejects all candidates ────────────────────────────────────
 
 @router.get("/founder-reject-all/{token}", response_class=HTMLResponse)
-def founder_reject_all(token: str):
-    offer = db.founder_offers.find_one({"reject_all_token": token}, {"_id": 0})
+def founder_reject_all_deprecated(token: str):
+    return HTMLResponse(
+        _response_page("Link expired", "This link is no longer valid. Please use the selection page sent in your most recent email from RAGE."),
+        status_code=410,
+    )
+
+
+# ── Public: founder shortlist selection page (API) ────────────────────────────
+
+@router.get("/public/shortlist/{token}")
+def get_shortlist(token: str):
+    """
+    Called by FounderSelectPage on load.
+    Returns offer details + enriched advisor profiles.
+    No auth required — token IS the credential.
+    """
+    offer = db.founder_offers.find_one({"shortlist_token": token}, {"_id": 0})
     if not offer:
-        return HTMLResponse(_response_page("Invalid link", "This link is invalid or has expired."), status_code=404)
+        raise HTTPException(status_code=404, detail="Shortlist not found or link expired.")
 
-    if offer.get("founder_response_type") in ("reject_all", "more_options"):
-        return HTMLResponse(_response_page(
-            "Already noted",
-            "We&#8217;ve registered your feedback. The RAGE team will be in touch."
-        ))
+    if offer.get("status") not in ("sent", "responded"):
+        raise HTTPException(status_code=410, detail="This shortlist is no longer active.")
 
-    now = _now()
-    db.founder_offers.update_one(
-        {"id": offer["id"]},
-        {"$set": {"founder_response_type": "reject_all", "founder_responded_at": now}},
-    )
-    db.allocations.update_many(
-        {"id": {"$in": offer["allocation_ids"]}},
-        {"$set": {"status": "not_selected_by_founder", "founder_responded_at": now}},
-    )
-    db.enquiries.update_one(
-        {"id": offer["enquiry_id"]},
-        {"$set": {"status": "needs_more_candidates"}},
-    )
-    return HTMLResponse(_response_page(
-        "Noted",
-        "Thank you for letting us know. We&#8217;ll review and suggest alternative advisors for your request."
-    ))
+    enquiry_id = offer["enquiry_id"]
+    enq = db.founder_offers.find_one({"id": offer["id"]}, {"_id": 0})  # unused — get enquiry
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0}) or {}
+
+    allocs = [
+        db.allocations.find_one({"id": aid}, {"_id": 0}) or {}
+        for aid in offer["allocation_ids"]
+    ]
+    active_allocs = [a for a in allocs if a.get("status") in (
+        "offer_sent_to_founder", "reconfirmed_for_offer", "rager_accepted", "pending_founder",
+    )]
+
+    advisors = []
+    for alloc in active_allocs:
+        rager = db.ragers.find_one(
+            {"id": alloc.get("rager_id", "")},
+            {"_id": 0, "email": 0, "phone": 0},
+        ) or {}
+        advisors.append({
+            "alloc_id":   alloc["id"],
+            "name":       rager.get("name", alloc.get("rager_name", "")),
+            "title":      rager.get("title", ""),
+            "company":    rager.get("company", ""),
+            "bio":        rager.get("bio", ""),
+            "photo_url":  rager.get("photo_url", ""),
+            "categories": rager.get("categories", []),
+            "linkedin":   rager.get("linkedin", ""),
+        })
+
+    already_responded = offer.get("founder_response_type") is not None
+
+    return {
+        "offer_id":          offer["id"],
+        "already_responded": already_responded,
+        "response_type":     offer.get("founder_response_type"),
+        "selected_alloc_ids": offer.get("selected_alloc_ids", []),
+        "session": {
+            "format_type":     offer.get("format_type", ""),
+            "duration_text":   offer.get("duration_text", ""),
+            "venue":           offer.get("venue", ""),
+            "optional_dates":  offer.get("optional_dates", ""),
+            "budget_text":     offer.get("budget_text", ""),
+            "intro_message":   offer.get("intro_message", ""),
+        },
+        "advisors": advisors,
+    }
+
+
+@router.post("/public/shortlist/{token}/respond")
+def respond_to_shortlist(token: str, data: FounderShortlistResponse):
+    """
+    Founder submits their selection from the FounderSelectPage.
+    response_type: "selection" | "more_options" | "reject_all"
+    selected_alloc_ids: list of alloc IDs they chose (for "selection" only)
+    """
+    if data.response_type not in ("selection", "more_options", "reject_all"):
+        raise HTTPException(status_code=400, detail="Invalid response_type.")
+
+    offer = db.founder_offers.find_one({"shortlist_token": token}, {"_id": 0})
+    if not offer:
+        raise HTTPException(status_code=404, detail="Shortlist not found or link expired.")
+    if offer.get("status") not in ("sent", "responded"):
+        raise HTTPException(status_code=410, detail="This shortlist is no longer active.")
+
+    # Idempotency: if already responded with same type, return current state
+    if offer.get("founder_response_type") == data.response_type:
+        return {"status": "already_recorded", "response_type": data.response_type}
+
+    enquiry_id = offer["enquiry_id"]
+    now        = _now()
+
+    if data.response_type == "selection":
+        if not data.selected_alloc_ids:
+            raise HTTPException(status_code=400, detail="selected_alloc_ids required for selection.")
+
+        # Validate all provided alloc IDs belong to this offer
+        valid_ids = set(offer["allocation_ids"])
+        bad = [aid for aid in data.selected_alloc_ids if aid not in valid_ids]
+        if bad:
+            raise HTTPException(status_code=400, detail=f"Unknown alloc IDs: {bad}")
+
+        selected_set  = set(data.selected_alloc_ids)
+        not_selected  = [aid for aid in offer["allocation_ids"] if aid not in selected_set]
+
+        # Mark selected
+        db.allocations.update_many(
+            {"id": {"$in": list(selected_set)}},
+            {"$set": {"status": "selected_by_founder", "founder_selected_at": now}},
+        )
+        # Mark not-selected
+        if not_selected:
+            db.allocations.update_many(
+                {"id": {"$in": not_selected}},
+                {"$set": {"status": "not_selected_by_founder", "founder_responded_at": now}},
+            )
+
+        db.founder_offers.update_one(
+            {"id": offer["id"]},
+            {"$set": {
+                "status":                "responded",
+                "founder_response_type": "selection",
+                "selected_alloc_ids":    list(selected_set),
+                "founder_responded_at":  now,
+            }},
+        )
+        db.enquiries.update_one(
+            {"id": enquiry_id},
+            {"$set": {"status": "founder_selection_received"}},
+        )
+        return {"status": "recorded", "response_type": "selection", "selected": len(selected_set)}
+
+    elif data.response_type == "more_options":
+        db.founder_offers.update_one(
+            {"id": offer["id"]},
+            {"$set": {
+                "status":                "responded",
+                "founder_response_type": "more_options",
+                "founder_responded_at":  now,
+            }},
+        )
+        db.enquiries.update_one(
+            {"id": enquiry_id},
+            {"$set": {"status": "needs_more_candidates"}},
+        )
+        return {"status": "recorded", "response_type": "more_options"}
+
+    else:  # reject_all
+        db.founder_offers.update_one(
+            {"id": offer["id"]},
+            {"$set": {
+                "status":                "responded",
+                "founder_response_type": "reject_all",
+                "founder_responded_at":  now,
+            }},
+        )
+        db.allocations.update_many(
+            {"id": {"$in": offer["allocation_ids"]}},
+            {"$set": {"status": "not_selected_by_founder", "founder_responded_at": now}},
+        )
+        db.enquiries.update_one(
+            {"id": enquiry_id},
+            {"$set": {"status": "needs_more_candidates"}},
+        )
+        return {"status": "recorded", "response_type": "reject_all"}
 
 
 # ── Admin: send final disclosure email to founder-selected rager(s) ──────────
@@ -2127,38 +2119,67 @@ def rager_final_disclosure_respond(token: str, r: str):
             {"id": alloc["id"]},
             {"$set": {"status": "rager_final_confirmed", "rager_final_responded_at": now}},
         )
-        # Check if all selected ragers have now confirmed
-        still_pending = db.allocations.count_documents({
-            "enquiry_id": enquiry_id,
-            "status":     {"$in": ["selected_by_founder", "final_disclosure_sent"]},
-        })
-        if still_pending == 0:
-            enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0}) or {}
-            db.enquiries.update_one(
-                {"id": enquiry_id},
-                {"$set": {"status": "confirmed_ready_to_schedule", "confirmed_at": now}},
-            )
-            # Confirmation email to founder (use first confirmed alloc)
-            confirmed_allocs = list(db.allocations.find(
-                {"enquiry_id": enquiry_id, "status": "rager_final_confirmed"}, {"_id": 0}
-            ))
-            if confirmed_allocs and enq.get("email"):
-                first_alloc = confirmed_allocs[0]
-                first_rager = db.ragers.find_one({"id": first_alloc.get("rager_id", "")}, {"_id": 0}) or {}
-                _send_email(
-                    to=[enq["email"]],
-                    subject="RAGE: Session Confirmed",
-                    html=_session_confirmed_founder_html(enq, first_alloc, first_rager),
+
+        # Check completion only against the founder-selected set from the active offer
+        offer = db.founder_offers.find_one(
+            {"enquiry_id": enquiry_id, "status": "responded"},
+            {"_id": 0}, sort=[("sent_at", -1)],
+        ) or {}
+        selected_ids = offer.get("selected_alloc_ids") or []
+
+        if selected_ids:
+            declined_count = db.allocations.count_documents({
+                "id":     {"$in": selected_ids},
+                "status": "rager_final_declined",
+            })
+            confirmed_count = db.allocations.count_documents({
+                "id":     {"$in": selected_ids},
+                "status": "rager_final_confirmed",
+            })
+            if declined_count > 0:
+                # At least one selected rager declined → admin needs to find replacement
+                db.enquiries.update_one(
+                    {"id": enquiry_id, "status": {"$ne": "confirmed_ready_to_schedule"}},
+                    {"$set": {"status": "needs_more_candidates"}},
                 )
-            # Confirmation email to this rager
-            this_alloc  = db.allocations.find_one({"id": alloc["id"]}, {"_id": 0}) or {}
-            this_rager  = db.ragers.find_one({"id": this_alloc.get("rager_id", "")}, {"_id": 0}) or {}
-            rager_email = this_rager.get("email") or this_alloc.get("rager_email", "")
-            if rager_email:
-                _send_email(
-                    to=[rager_email],
-                    subject="RAGE: Session Confirmed",
-                    html=_session_confirmed_rager_html(enq, this_alloc, this_rager),
+            elif confirmed_count == len(selected_ids):
+                # All founder-selected ragers confirmed → ready to schedule
+                enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0}) or {}
+                db.enquiries.update_one(
+                    {"id": enquiry_id},
+                    {"$set": {"status": "confirmed_ready_to_schedule", "confirmed_at": now}},
+                )
+                confirmed_allocs = list(db.allocations.find(
+                    {"id": {"$in": selected_ids}, "status": "rager_final_confirmed"}, {"_id": 0}
+                ))
+                if confirmed_allocs and enq.get("email"):
+                    first_alloc = confirmed_allocs[0]
+                    first_rager = db.ragers.find_one({"id": first_alloc.get("rager_id", "")}, {"_id": 0}) or {}
+                    _send_email(
+                        to=[enq["email"]],
+                        subject="RAGE: Session Confirmed",
+                        html=_session_confirmed_founder_html(enq, first_alloc, first_rager),
+                    )
+                this_alloc  = db.allocations.find_one({"id": alloc["id"]}, {"_id": 0}) or {}
+                this_rager  = db.ragers.find_one({"id": this_alloc.get("rager_id", "")}, {"_id": 0}) or {}
+                rager_email = this_rager.get("email") or this_alloc.get("rager_email", "")
+                if rager_email:
+                    _send_email(
+                        to=[rager_email],
+                        subject="RAGE: Session Confirmed",
+                        html=_session_confirmed_rager_html(enq, this_alloc, this_rager),
+                    )
+        else:
+            # Fallback (no offer / legacy data): old logic
+            still_pending = db.allocations.count_documents({
+                "enquiry_id": enquiry_id,
+                "status":     {"$in": ["selected_by_founder", "final_disclosure_sent"]},
+            })
+            if still_pending == 0:
+                enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0}) or {}
+                db.enquiries.update_one(
+                    {"id": enquiry_id},
+                    {"$set": {"status": "confirmed_ready_to_schedule", "confirmed_at": now}},
                 )
 
         return HTMLResponse(_response_page(
@@ -2172,6 +2193,23 @@ def rager_final_disclosure_respond(token: str, r: str):
             {"id": alloc["id"]},
             {"$set": {"status": "rager_final_declined", "rager_final_responded_at": now}},
         )
+        # Check if any still pending — if all responded and some declined, mark for admin
+        offer = db.founder_offers.find_one(
+            {"enquiry_id": enquiry_id, "status": "responded"},
+            {"_id": 0}, sort=[("sent_at", -1)],
+        ) or {}
+        selected_ids = offer.get("selected_alloc_ids") or []
+        if selected_ids:
+            still_pending = db.allocations.count_documents({
+                "id":     {"$in": selected_ids},
+                "status": {"$in": ["selected_by_founder", "final_disclosure_sent"]},
+            })
+            if still_pending == 0:
+                # All responded but at least one declined — needs replacement
+                db.enquiries.update_one(
+                    {"id": enquiry_id, "status": {"$ne": "confirmed_ready_to_schedule"}},
+                    {"$set": {"status": "needs_more_candidates"}},
+                )
         return HTMLResponse(_response_page(
             "Noted",
             "Thank you for letting us know. We&#8217;ll notify the RAGE team to make alternative arrangements.",

@@ -32,6 +32,7 @@ import SetupAccountPage from '@/pages/SetupAccountPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import RespondPage from '@/pages/RespondPage';
+import FounderSelectPage from '@/pages/FounderSelectPage';
 import '@/App.css';
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -114,6 +115,7 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/respond/:anon_token" element={<RespondPage />} />
+          <Route path="/founder-select/:token" element={<FounderSelectPage />} />
 
           <Route
             element={

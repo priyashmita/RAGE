@@ -13,7 +13,9 @@ const ENQ_STATUS_COLORS = {
   founder_offer_ready:           'bg-teal-500/10 text-teal-400 border-teal-500/20',
   // shortlist sent to founder
   founder_offer_sent:            'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  // founder made selection
+  // founder responded via selection page (new flow)
+  founder_selection_received:    'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  // legacy / backward-compat
   founder_selected:              'bg-teal-500/10 text-teal-400 border-teal-500/20',
   // founder wants more options
   needs_more_candidates:         'bg-orange-500/10 text-orange-400 border-orange-500/20',
@@ -337,8 +339,8 @@ function EnquiryRow({ enq }) {
   const canSendToFounder      = (reconfirmedCount > 0 || hasOldFlowAllocs) && savedOffer?.status === 'draft';
   // "Resend Shortlist" — shortlist was sent but founder hasn't responded yet
   const canResendOffer        = enq.status === 'founder_offer_sent' && savedOffer?.status === 'sent' && !savedOffer?.founder_response_type;
-  // "Send Final Disclosure" — founder has selected rager(s)
-  const canSendFinalDisclosure = enq.status === 'founder_selected' && selectedByFounder > 0;
+  // "Send Final Disclosure" — founder has selected rager(s) via new or legacy flow
+  const canSendFinalDisclosure = ['founder_selection_received', 'founder_selected'].includes(enq.status) && selectedByFounder > 0;
   const canSchedule           = ['confirmed', 'founder_accepted', 'confirmed_ready_to_schedule'].includes(enq.status);
 
   const inputCls = "w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B]";
@@ -603,6 +605,9 @@ function EnquiryRow({ enq }) {
                 )}
                 {enq.status === 'founder_offer_sent' && !canSendFinalDisclosure && (
                   <p className="text-xs text-amber-400"><Clock className="w-3 h-3 inline mr-1" />Shortlist sent — awaiting founder selection</p>
+                )}
+                {enq.status === 'founder_selection_received' && (
+                  <p className="text-xs text-teal-400"><CheckCircle className="w-3 h-3 inline mr-1" />Founder selected {selectedByFounder} advisor(s) — send final disclosure to proceed</p>
                 )}
                 {enq.status === 'founder_selected' && (
                   <p className="text-xs text-teal-400"><CheckCircle className="w-3 h-3 inline mr-1" />Founder selected {selectedByFounder} advisor(s) — send final disclosure to proceed</p>
