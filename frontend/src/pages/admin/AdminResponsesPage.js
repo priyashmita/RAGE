@@ -4,25 +4,29 @@ import { toast } from 'sonner';
 import { Loader2, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Calendar, Mail } from 'lucide-react';
 
 const ENQ_STATUS_COLORS = {
-  new:                   'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  matching:              'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  pending_rager:         'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  pending_founder:       'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  pending_founder_offer: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  confirmed:             'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  founder_accepted:      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  founder_rejected:      'bg-red-500/10 text-red-400 border-red-500/20',
-  declined:              'bg-red-500/10 text-red-400 border-red-500/20',
-  closed:                'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  new:                         'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  matching:                    'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  pending_rager:               'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  pending_founder:             'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  pending_founder_offer:       'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  rager_confirmation_pending:  'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  confirmed:                   'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_accepted:            'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_rejected:            'bg-red-500/10 text-red-400 border-red-500/20',
+  declined:                    'bg-red-500/10 text-red-400 border-red-500/20',
+  closed:                      'bg-gray-500/10 text-gray-400 border-gray-500/20',
 };
 
 const ALLOC_STATUS_LABELS = {
-  pending_rager:    { label: 'Awaiting response', color: 'text-[#71717A]' },
-  rager_accepted:   { label: 'Accepted',          color: 'text-emerald-400' },
-  rager_declined:   { label: 'Declined',          color: 'text-red-400' },
-  pending_founder:  { label: 'Sent to founder',   color: 'text-orange-400' },
-  confirmed:        { label: 'Confirmed',         color: 'text-emerald-400' },
-  founder_declined: { label: 'Not chosen',        color: 'text-[#52525B]' },
+  pending_rager:               { label: 'Awaiting response',        color: 'text-[#71717A]' },
+  rager_accepted:              { label: 'Accepted',                 color: 'text-emerald-400' },
+  rager_declined:              { label: 'Declined',                 color: 'text-red-400' },
+  pending_founder:             { label: 'Offer in progress',        color: 'text-orange-400' },
+  confirmed:                   { label: 'Confirmed',                color: 'text-emerald-400' },
+  founder_declined:            { label: 'Not chosen',               color: 'text-[#52525B]' },
+  rager_confirmation_pending:  { label: 'Awaiting rager confirm',   color: 'text-sky-400' },
+  rager_confirmed:             { label: 'Rager confirmed',          color: 'text-emerald-400' },
+  rager_declined_final:        { label: 'Rager unavailable',        color: 'text-red-400' },
 };
 
 const SHORTLIST_COLORS = {
@@ -118,19 +122,6 @@ function EnquiryRow({ enq }) {
     }
   };
 
-  const sendShortlist = async () => {
-    setActing(true);
-    try {
-      const res = await api.post(`/admin/enquiries/${enq.id}/send-shortlist`);
-      toast.success(`Shortlist sent to founder — ${res.data.advisors_shown} advisor(s)`);
-      setDetail(null);
-    } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to send shortlist');
-    } finally {
-      setActing(false);
-    }
-  };
-
   const saveOffer = async () => {
     setOfferSaving(true);
     try {
@@ -181,13 +172,14 @@ function EnquiryRow({ enq }) {
   const setOffer = (field, val) => setOfferForm(prev => ({ ...prev, [field]: val }));
 
   const allocations = detail?.allocations || [];
-  const shortlistedCount = allocations.filter(a => a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted').length;
-  // Ragers available for a founder offer: explicitly shortlisted, OR already in pending_founder (old send-shortlist flow)
-  const offerableCount   = allocations.filter(a => (a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted') || a.status === 'pending_founder').length;
-  const TERMINAL = ['founder_accepted', 'founder_rejected', 'confirmed', 'declined', 'closed'];
-  const canSendShortlist = shortlistedCount > 0 && ['pending_rager', 'matching', 'new', 'pending_founder'].includes(enq.status);
-  const canPrepareOffer  = offerableCount > 0 && !TERMINAL.includes(enq.status);
-  const canSchedule      = ['confirmed', 'founder_accepted'].includes(enq.status);
+  // Ragers available for offer: shortlisted+accepted OR already in offer pipeline
+  const offerableCount = allocations.filter(a =>
+    (a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted') ||
+    ['pending_founder', 'rager_confirmation_pending', 'rager_confirmed'].includes(a.status)
+  ).length;
+  const TERMINAL = ['founder_rejected', 'confirmed', 'declined', 'closed', 'rager_confirmed'];
+  const canPrepareOffer = offerableCount > 0 && !TERMINAL.includes(enq.status) && enq.status !== 'rager_confirmation_pending';
+  const canSchedule     = ['confirmed', 'founder_accepted', 'rager_confirmed'].includes(enq.status);
 
   const inputCls = "w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B]";
   const textareaCls = `${inputCls} resize-none leading-relaxed`;
@@ -317,18 +309,6 @@ function EnquiryRow({ enq }) {
 
               {/* Actions row */}
               <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-3 flex-wrap">
-                {canSendShortlist && (
-                  <button
-                    type="button"
-                    disabled={acting}
-                    onClick={sendShortlist}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#DC143C] hover:bg-[#B01030] text-white text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
-                  >
-                    {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-                    Send Shortlist to Founder ({shortlistedCount})
-                  </button>
-                )}
-
                 {canPrepareOffer && (
                   <button
                     type="button"
@@ -336,7 +316,7 @@ function EnquiryRow({ enq }) {
                     className={`flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider transition-colors border ${
                       offerMode
                         ? 'bg-[#DC143C]/10 text-[#DC143C] border-[#DC143C]/30'
-                        : 'bg-white/5 hover:bg-white/10 text-[#A1A1AA] border-white/10'
+                        : 'bg-[#DC143C] hover:bg-[#B01030] text-white border-transparent'
                     }`}
                   >
                     <Mail className="w-3.5 h-3.5" />
@@ -355,13 +335,6 @@ function EnquiryRow({ enq }) {
                   </button>
                 )}
 
-                {enq.status === 'pending_founder' && (
-                  <p className="text-xs text-[#52525B]">
-                    <Clock className="w-3 h-3 inline mr-1" />
-                    Awaiting founder selection
-                  </p>
-                )}
-
                 {enq.status === 'pending_founder_offer' && (
                   <p className="text-xs text-amber-400">
                     <Clock className="w-3 h-3 inline mr-1" />
@@ -369,10 +342,10 @@ function EnquiryRow({ enq }) {
                   </p>
                 )}
 
-                {enq.status === 'founder_accepted' && (
-                  <p className="text-xs text-emerald-400">
-                    <CheckCircle className="w-3 h-3 inline mr-1" />
-                    Founder accepted proposal
+                {enq.status === 'rager_confirmation_pending' && (
+                  <p className="text-xs text-sky-400">
+                    <Clock className="w-3 h-3 inline mr-1" />
+                    Founder accepted — awaiting rager confirmation
                   </p>
                 )}
 
@@ -380,6 +353,13 @@ function EnquiryRow({ enq }) {
                   <p className="text-xs text-red-400">
                     <XCircle className="w-3 h-3 inline mr-1" />
                     Founder declined proposal
+                  </p>
+                )}
+
+                {enq.status === 'confirmed' && (
+                  <p className="text-xs text-emerald-400">
+                    <CheckCircle className="w-3 h-3 inline mr-1" />
+                    Session confirmed — ready to schedule
                   </p>
                 )}
               </div>
@@ -567,7 +547,7 @@ export default function AdminResponsesPage() {
   const sorted = [...enquiries].reverse();
   const filtered = sorted.filter(e => {
     if (filter === 'active') return !['new', 'declined', 'closed', 'founder_rejected'].includes(e.status);
-    if (filter === 'confirmed') return ['confirmed', 'founder_accepted'].includes(e.status);
+    if (filter === 'confirmed') return ['confirmed', 'rager_confirmed'].includes(e.status);
     return true;
   });
 
