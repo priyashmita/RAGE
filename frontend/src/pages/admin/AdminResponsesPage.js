@@ -4,37 +4,52 @@ import { toast } from 'sonner';
 import { Loader2, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Calendar, Mail } from 'lucide-react';
 
 const ENQ_STATUS_COLORS = {
-  new:                          'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  matching:                     'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  pending_rager:                'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  pending_founder:              'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  // new flow statuses
-  reconfirmation_pending:       'bg-sky-500/10 text-sky-400 border-sky-500/20',
-  founder_offer_ready:          'bg-teal-500/10 text-teal-400 border-teal-500/20',
-  founder_offer_sent:           'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  confirmed_ready_to_schedule:  'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  new:                           'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  matching:                      'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  pending_rager:                 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  pending_founder:               'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  // pre-offer reconfirmation
+  reconfirmation_pending:        'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  founder_offer_ready:           'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  // shortlist sent to founder
+  founder_offer_sent:            'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  // founder made selection
+  founder_selected:              'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  // founder wants more options
+  needs_more_candidates:         'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  // waiting for rager final confirmation after founder selects
+  awaiting_final_confirmation:   'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  // all done
+  confirmed_ready_to_schedule:   'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   // backward-compat / legacy
-  pending_founder_offer:        'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  confirmed:                    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  founder_accepted:             'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  founder_rejected:             'bg-red-500/10 text-red-400 border-red-500/20',
-  declined:                     'bg-red-500/10 text-red-400 border-red-500/20',
-  closed:                       'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  pending_founder_offer:         'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  confirmed:                     'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_accepted:              'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_rejected:              'bg-red-500/10 text-red-400 border-red-500/20',
+  declined:                      'bg-red-500/10 text-red-400 border-red-500/20',
+  closed:                        'bg-gray-500/10 text-gray-400 border-gray-500/20',
 };
 
 const ALLOC_STATUS_LABELS = {
   pending_rager:               { label: 'Awaiting response',      color: 'text-[#71717A]' },
   rager_accepted:              { label: 'Interested',             color: 'text-emerald-400' },
   rager_declined:              { label: 'Declined outreach',      color: 'text-red-400' },
-  // new pre-offer reconfirmation statuses
+  // pre-offer reconfirmation
   reconfirmation_pending:      { label: 'Reconfirmation sent',    color: 'text-sky-400' },
   reconfirmed_for_offer:       { label: 'Reconfirmed ✓',          color: 'text-emerald-400' },
   reconfirmation_declined:     { label: 'Unavailable',            color: 'text-red-400' },
-  // offer + founder statuses
-  offer_sent_to_founder:       { label: 'In offer to founder',    color: 'text-amber-400' },
+  // shortlist sent to founder
+  offer_sent_to_founder:       { label: 'In shortlist',           color: 'text-amber-400' },
+  // founder selection outcomes
+  selected_by_founder:         { label: 'Selected by founder',    color: 'text-teal-400' },
+  not_selected_by_founder:     { label: 'Not chosen',             color: 'text-[#52525B]' },
+  // final disclosure step
+  final_disclosure_sent:       { label: 'Disclosure sent',        color: 'text-sky-400' },
+  rager_final_confirmed:       { label: 'Final confirmed ✓',      color: 'text-emerald-400' },
+  rager_final_declined:        { label: 'Final declined',         color: 'text-red-400' },
+  // old-flow / legacy
   founder_accepted:            { label: 'Session confirmed',      color: 'text-emerald-400' },
   founder_declined:            { label: 'Not chosen',             color: 'text-[#52525B]' },
-  // legacy backward-compat
   pending_founder:             { label: 'Pending',                color: 'text-orange-400' },
   confirmed:                   { label: 'Confirmed',              color: 'text-emerald-400' },
 };
@@ -75,6 +90,16 @@ function EnquiryRow({ enq }) {
   const [savedOffer, setSavedOffer] = useState(null);    // doc from DB (null = not loaded yet)
   const [offerLoaded, setOfferLoaded] = useState(false); // whether we've tried to fetch
   const [offerSaving, setOfferSaving] = useState(false);
+
+  // Auto-suggest state
+  const [autoSuggest, setAutoSuggest] = useState([]);
+  const [showAutoSuggest, setShowAutoSuggest] = useState(false);
+  const [loadingAutoSuggest, setLoadingAutoSuggest] = useState(false);
+
+  // Manual add rager form
+  const EMPTY_ADD_RAGER = { name: '', email: '', title: '', company: '', bio: '', cost_to_founder: '', payout_to_rager: '' };
+  const [showAddRager, setShowAddRager] = useState(false);
+  const [addRagerForm, setAddRagerForm] = useState(EMPTY_ADD_RAGER);
 
   // Auto-fetch whenever the row is open and detail is null (covers first open + after any action)
   useEffect(() => {
@@ -145,18 +170,82 @@ function EnquiryRow({ enq }) {
     }
   };
 
+  // Send shortlist to founder with per-rager selection tokens
   const sendOffer = async () => {
     setActing(true);
     try {
       await api.post(`/admin/enquiries/${enq.id}/founder-offer`, offerForm);
-      await api.post(`/admin/enquiries/${enq.id}/send-founder-offer`);
-      toast.success('Proposal sent to founder');
+      await api.post(`/admin/enquiries/${enq.id}/send-shortlist-to-founder`);
+      toast.success('Shortlist sent to founder');
       setOfferMode(false);
       setSavedOffer(null);
       setOfferLoaded(false);
       setDetail(null);
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Failed to send proposal');
+      toast.error(e.response?.data?.detail || 'Failed to send shortlist');
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const sendFinalDisclosure = async () => {
+    setActing(true);
+    try {
+      const res = await api.post(`/admin/enquiries/${enq.id}/send-final-disclosure`);
+      toast.success(`Final disclosure sent to ${res.data.emails_sent} rager(s)`);
+      setDetail(null);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to send final disclosure');
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const resendFinalDisclosure = async (allocId) => {
+    setActing(true);
+    try {
+      await api.post(`/admin/allocations/${allocId}/resend-final-disclosure`);
+      toast.success('Final disclosure resent');
+      setDetail(null);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to resend');
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const loadAutoSuggest = async () => {
+    if (loadingAutoSuggest) return;
+    setLoadingAutoSuggest(true);
+    try {
+      const res = await api.get(`/admin/enquiries/${enq.id}/auto-suggest`);
+      setAutoSuggest(res.data || []);
+      setShowAutoSuggest(true);
+    } catch {
+      toast.error('Failed to load suggestions');
+    } finally {
+      setLoadingAutoSuggest(false);
+    }
+  };
+
+  const addManualRager = async () => {
+    if (!addRagerForm.name || !addRagerForm.email) {
+      toast.error('Name and email are required');
+      return;
+    }
+    setActing(true);
+    try {
+      await api.post(`/admin/enquiries/${enq.id}/add-manual-rager`, {
+        ...addRagerForm,
+        cost_to_founder: parseInt(addRagerForm.cost_to_founder) || 0,
+        payout_to_rager: parseInt(addRagerForm.payout_to_rager) || 0,
+      });
+      toast.success(`${addRagerForm.name} added`);
+      setShowAddRager(false);
+      setAddRagerForm(EMPTY_ADD_RAGER);
+      setDetail(null);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to add rager');
     } finally {
       setActing(false);
     }
@@ -221,28 +310,36 @@ function EnquiryRow({ enq }) {
 
   const allocations = detail?.allocations || [];
 
-  // Derived counts for action gating
-  const shortlistedAccepted   = allocations.filter(a => a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted').length;
-  const reconfirmPending      = allocations.filter(a => a.status === 'reconfirmation_pending').length;
-  const reconfirmedCount      = allocations.filter(a => a.status === 'reconfirmed_for_offer').length;
-  const shortlistedTotal      = allocations.filter(a => a.shortlist_status === 'shortlisted').length;
+  // Derived counts
+  const shortlistedAccepted    = allocations.filter(a => a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted').length;
+  const reconfirmPending       = allocations.filter(a => a.status === 'reconfirmation_pending').length;
+  const reconfirmedCount       = allocations.filter(a => a.status === 'reconfirmed_for_offer').length;
+  const shortlistedTotal       = allocations.filter(a => a.shortlist_status === 'shortlisted').length;
+  const selectedByFounder      = allocations.filter(a => a.status === 'selected_by_founder').length;
+  const finalDisclosureSent    = allocations.filter(a => a.status === 'final_disclosure_sent').length;
+  const finalConfirmed         = allocations.filter(a => a.status === 'rager_final_confirmed').length;
 
-  const TERMINAL_ENQ = ['founder_rejected', 'confirmed', 'confirmed_ready_to_schedule', 'declined', 'closed'];
+  // Count eligible allocs for the offer form caption
+  const offerableCount = allocations.filter(a =>
+    a.status === 'reconfirmed_for_offer' ||
+    a.status === 'pending_founder' ||
+    (a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted')
+  ).length;
 
-  // Can open offer form: there are shortlisted ragers and enquiry is not terminal
-  const canPrepareOffer = shortlistedTotal > 0 && !TERMINAL_ENQ.includes(enq.status);
+  const TERMINAL_ENQ = [
+    'founder_rejected', 'confirmed', 'confirmed_ready_to_schedule', 'declined', 'closed',
+  ];
 
-  // Can send reconfirmation: draft offer saved AND shortlisted ragers not yet reconfirmed/declined
+  const canPrepareOffer       = shortlistedTotal > 0 && !TERMINAL_ENQ.includes(enq.status);
   const canSendReconfirmation = (shortlistedAccepted > 0 || reconfirmPending > 0) && !TERMINAL_ENQ.includes(enq.status);
-
-  // Can send offer to founder: at least one rager reconfirmed (or old-flow compat: pending_founder)
-  const hasOldFlowAllocs = allocations.some(a => a.status === 'pending_founder');
-  const canSendToFounder = (reconfirmedCount > 0 || hasOldFlowAllocs) && savedOffer?.status === 'draft';
-
-  // Can resend offer: offer is sent and founder hasn't responded
-  const canResendOffer = enq.status === 'founder_offer_sent' && savedOffer?.status === 'sent' && !savedOffer?.founder_response;
-
-  const canSchedule = ['confirmed', 'founder_accepted', 'confirmed_ready_to_schedule'].includes(enq.status);
+  const hasOldFlowAllocs      = allocations.some(a => a.status === 'pending_founder');
+  // "Send Shortlist to Founder" — requires ≥1 reconfirmed (or old-flow compat) AND draft not yet sent
+  const canSendToFounder      = (reconfirmedCount > 0 || hasOldFlowAllocs) && savedOffer?.status === 'draft';
+  // "Resend Shortlist" — shortlist was sent but founder hasn't responded yet
+  const canResendOffer        = enq.status === 'founder_offer_sent' && savedOffer?.status === 'sent' && !savedOffer?.founder_response_type;
+  // "Send Final Disclosure" — founder has selected rager(s)
+  const canSendFinalDisclosure = enq.status === 'founder_selected' && selectedByFounder > 0;
+  const canSchedule           = ['confirmed', 'founder_accepted', 'confirmed_ready_to_schedule'].includes(enq.status);
 
   const inputCls = "w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B]";
   const textareaCls = `${inputCls} resize-none leading-relaxed`;
@@ -355,7 +452,7 @@ function EnquiryRow({ enq }) {
                                     </button>
                                   </>
                                 )}
-                                {/* Resend reconfirmation — shown while waiting for rager response */}
+                                {/* Resend reconfirmation */}
                                 {alloc.status === 'reconfirmation_pending' && (
                                   <button
                                     type="button"
@@ -372,8 +469,30 @@ function EnquiryRow({ enq }) {
                                     <CheckCircle className="w-3 h-3" /> Ready
                                   </span>
                                 )}
-                                {/* Confirmed badge */}
-                                {alloc.status === 'founder_accepted' && (
+                                {/* Resend final disclosure */}
+                                {alloc.status === 'final_disclosure_sent' && (
+                                  <button
+                                    type="button"
+                                    disabled={acting}
+                                    onClick={() => resendFinalDisclosure(alloc.id)}
+                                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider bg-white/5 text-[#A1A1AA] border border-white/10 hover:bg-sky-500/10 hover:text-sky-400 transition-colors disabled:opacity-50"
+                                  >
+                                    <Mail className="w-3 h-3" /> Resend Disclosure
+                                  </button>
+                                )}
+                                {/* Resend if declined */}
+                                {alloc.status === 'rager_final_declined' && (
+                                  <button
+                                    type="button"
+                                    disabled={acting}
+                                    onClick={() => resendFinalDisclosure(alloc.id)}
+                                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider bg-white/5 text-red-400 border border-red-500/20 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                                  >
+                                    <Mail className="w-3 h-3" /> Re-disclose
+                                  </button>
+                                )}
+                                {/* Final confirmed badge */}
+                                {(alloc.status === 'rager_final_confirmed' || alloc.status === 'founder_accepted') && (
                                   <span className="text-[10px] text-emerald-400 flex items-center gap-1">
                                     <CheckCircle className="w-3 h-3" /> Confirmed
                                   </span>
@@ -394,7 +513,7 @@ function EnquiryRow({ enq }) {
                 {canPrepareOffer && (
                   <button
                     type="button"
-                    onClick={() => { setScheduleMode(false); setOfferMode(v => { if (!v) openOfferMode(); return !v; }); }}
+                    onClick={() => { setScheduleMode(false); setShowAutoSuggest(false); setShowAddRager(false); setOfferMode(v => { if (!v) openOfferMode(); return !v; }); }}
                     className={`flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider transition-colors border ${
                       offerMode
                         ? 'bg-[#DC143C]/10 text-[#DC143C] border-[#DC143C]/30'
@@ -402,11 +521,24 @@ function EnquiryRow({ enq }) {
                     }`}
                   >
                     <Mail className="w-3.5 h-3.5" />
-                    {offerMode ? 'Close' : 'Prepare / Send Offer'}
+                    {offerMode ? 'Close' : 'Prepare / Send Shortlist'}
                   </button>
                 )}
 
-                {/* Resend offer email */}
+                {/* Send final disclosure — after founder selects rager(s) */}
+                {canSendFinalDisclosure && (
+                  <button
+                    type="button"
+                    disabled={acting}
+                    onClick={sendFinalDisclosure}
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 border border-teal-500/20 text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                  >
+                    {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                    Send Final Disclosure ({selectedByFounder})
+                  </button>
+                )}
+
+                {/* Resend shortlist email */}
                 {canResendOffer && !offerMode && (
                   <button
                     type="button"
@@ -414,7 +546,39 @@ function EnquiryRow({ enq }) {
                     onClick={resendOffer}
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-[#71717A] text-xs uppercase tracking-wider transition-colors border border-white/10 disabled:opacity-50"
                   >
-                    <Mail className="w-3.5 h-3.5" /> Resend Offer
+                    <Mail className="w-3.5 h-3.5" /> Resend Shortlist
+                  </button>
+                )}
+
+                {/* Auto-suggest advisors */}
+                {!TERMINAL_ENQ.includes(enq.status) && (
+                  <button
+                    type="button"
+                    disabled={loadingAutoSuggest}
+                    onClick={() => { setOfferMode(false); setShowAddRager(false); if (showAutoSuggest) { setShowAutoSuggest(false); } else { loadAutoSuggest(); } }}
+                    className={`flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider transition-colors border disabled:opacity-50 ${
+                      showAutoSuggest
+                        ? 'bg-white/10 text-[#F5F5F0] border-white/20'
+                        : 'bg-white/5 hover:bg-white/10 text-[#71717A] border-white/10'
+                    }`}
+                  >
+                    {loadingAutoSuggest ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    {showAutoSuggest ? 'Hide Suggestions' : 'Auto-suggest'}
+                  </button>
+                )}
+
+                {/* Add external rager */}
+                {!TERMINAL_ENQ.includes(enq.status) && (
+                  <button
+                    type="button"
+                    onClick={() => { setOfferMode(false); setShowAutoSuggest(false); setShowAddRager(v => !v); }}
+                    className={`flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider transition-colors border ${
+                      showAddRager
+                        ? 'bg-white/10 text-[#F5F5F0] border-white/20'
+                        : 'bg-white/5 hover:bg-white/10 text-[#71717A] border-white/10'
+                    }`}
+                  >
+                    + Add Rager
                   </button>
                 )}
 
@@ -422,7 +586,7 @@ function EnquiryRow({ enq }) {
                 {canSchedule && (
                   <button
                     type="button"
-                    onClick={() => { setOfferMode(false); setScheduleMode(v => !v); }}
+                    onClick={() => { setOfferMode(false); setShowAutoSuggest(false); setShowAddRager(false); setScheduleMode(v => !v); }}
                     className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-[#A1A1AA] text-xs uppercase tracking-wider transition-colors border border-white/10"
                   >
                     <Calendar className="w-3.5 h-3.5" />
@@ -432,36 +596,140 @@ function EnquiryRow({ enq }) {
 
                 {/* Status messages */}
                 {enq.status === 'reconfirmation_pending' && (
-                  <p className="text-xs text-sky-400">
-                    <Clock className="w-3 h-3 inline mr-1" />
-                    Reconfirmation sent — waiting for rager responses
-                  </p>
+                  <p className="text-xs text-sky-400"><Clock className="w-3 h-3 inline mr-1" />Reconfirmation sent — waiting for rager responses</p>
                 )}
                 {enq.status === 'founder_offer_ready' && (
-                  <p className="text-xs text-teal-400">
-                    <CheckCircle className="w-3 h-3 inline mr-1" />
-                    Rager(s) reconfirmed — ready to send offer to founder
-                  </p>
+                  <p className="text-xs text-teal-400"><CheckCircle className="w-3 h-3 inline mr-1" />Rager(s) reconfirmed — ready to send shortlist to founder</p>
                 )}
-                {(enq.status === 'founder_offer_sent' || enq.status === 'pending_founder_offer') && (
-                  <p className="text-xs text-amber-400">
-                    <Clock className="w-3 h-3 inline mr-1" />
-                    Offer sent — awaiting founder response
-                  </p>
+                {enq.status === 'founder_offer_sent' && !canSendFinalDisclosure && (
+                  <p className="text-xs text-amber-400"><Clock className="w-3 h-3 inline mr-1" />Shortlist sent — awaiting founder selection</p>
+                )}
+                {enq.status === 'founder_selected' && (
+                  <p className="text-xs text-teal-400"><CheckCircle className="w-3 h-3 inline mr-1" />Founder selected {selectedByFounder} advisor(s) — send final disclosure to proceed</p>
+                )}
+                {enq.status === 'needs_more_candidates' && (
+                  <p className="text-xs text-orange-400"><XCircle className="w-3 h-3 inline mr-1" />Founder requested more options — source additional advisors and resend</p>
+                )}
+                {enq.status === 'awaiting_final_confirmation' && (
+                  <p className="text-xs text-sky-400"><Clock className="w-3 h-3 inline mr-1" />Awaiting rager final confirmation ({finalDisclosureSent} pending, {finalConfirmed} confirmed)</p>
                 )}
                 {enq.status === 'founder_rejected' && (
-                  <p className="text-xs text-red-400">
-                    <XCircle className="w-3 h-3 inline mr-1" />
-                    Founder declined proposal
-                  </p>
+                  <p className="text-xs text-red-400"><XCircle className="w-3 h-3 inline mr-1" />Founder declined proposal</p>
                 )}
                 {(enq.status === 'confirmed_ready_to_schedule' || enq.status === 'confirmed') && (
-                  <p className="text-xs text-emerald-400">
-                    <CheckCircle className="w-3 h-3 inline mr-1" />
-                    Session confirmed — ready to schedule
-                  </p>
+                  <p className="text-xs text-emerald-400"><CheckCircle className="w-3 h-3 inline mr-1" />Session confirmed — ready to schedule</p>
                 )}
               </div>
+
+              {/* ── Auto-suggest panel ── */}
+              {showAutoSuggest && (
+                <div className="mt-4 p-4 bg-[#0A0A0A] border border-white/5">
+                  <p className="text-[10px] uppercase tracking-wider text-[#52525B] font-medium mb-3">
+                    Suggested Advisors
+                    <span className="ml-2 text-[#3f3f46] normal-case tracking-normal">Based on enquiry context. Click to add to matching outreach.</span>
+                  </p>
+                  {autoSuggest.length === 0 ? (
+                    <p className="text-xs text-[#52525B]">No suggestions — all matching ragers may already be allocated.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {autoSuggest.map(r => (
+                        <div key={r.id} className="flex items-center justify-between gap-4 py-2 border-b border-white/5 last:border-0">
+                          <div className="min-w-0">
+                            <p className="text-xs text-[#F5F5F0]">{r.name}</p>
+                            <p className="text-[10px] text-[#52525B]">{r.title}{r.company ? ` · ${r.company}` : ''}</p>
+                            {r.categories?.length > 0 && (
+                              <p className="text-[10px] text-[#3f3f46] mt-0.5">{r.categories.slice(0, 3).join(', ')}</p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={acting}
+                            onClick={async () => {
+                              setActing(true);
+                              try {
+                                // Quick-add: pass name+email so add-manual-rager re-uses the existing rager record
+                                await api.post(`/admin/enquiries/${enq.id}/add-manual-rager`, {
+                                  name: r.name, email: r.email || '', title: r.title || '', company: r.company || '',
+                                  bio: r.bio || '', categories: r.categories || [],
+                                  cost_to_founder: 0, payout_to_rager: 0,
+                                });
+                                toast.success(`${r.name} added`);
+                                setAutoSuggest(prev => prev.filter(x => x.id !== r.id));
+                                setDetail(null);
+                              } catch (e) {
+                                toast.error(e.response?.data?.detail || 'Failed to add');
+                              } finally {
+                                setActing(false);
+                              }
+                            }}
+                            className="shrink-0 px-3 py-1 text-[10px] uppercase tracking-wider bg-white/5 text-[#A1A1AA] border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-50"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Add external rager form ── */}
+              {showAddRager && (
+                <div className="mt-4 p-4 bg-[#0A0A0A] border border-white/5 space-y-3">
+                  <p className="text-[10px] uppercase tracking-wider text-[#52525B] font-medium">
+                    Add External Rager
+                    <span className="ml-2 text-[#3f3f46] normal-case tracking-normal">Add a rager not already in the system. They'll receive an outreach email if a brief exists.</span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { field: 'name',        label: 'Name *',           placeholder: 'Full name' },
+                      { field: 'email',       label: 'Email *',          placeholder: 'email@example.com' },
+                      { field: 'title',       label: 'Title',            placeholder: 'e.g. Founder, VP Marketing' },
+                      { field: 'company',     label: 'Company',          placeholder: 'Company name' },
+                      { field: 'cost_to_founder', label: 'Cost to Founder (₹)', placeholder: '0' },
+                      { field: 'payout_to_rager', label: 'Payout to Rager (₹)',  placeholder: '0' },
+                    ].map(({ field, label, placeholder }) => (
+                      <div key={field}>
+                        <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1">{label}</label>
+                        <input
+                          type={field.includes('to_') ? 'number' : 'text'}
+                          value={addRagerForm[field]}
+                          onChange={e => setAddRagerForm(prev => ({ ...prev, [field]: e.target.value }))}
+                          placeholder={placeholder}
+                          className="w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-wider text-[#52525B] block mb-1">Bio</label>
+                    <textarea
+                      rows={2}
+                      value={addRagerForm.bio}
+                      onChange={e => setAddRagerForm(prev => ({ ...prev, bio: e.target.value }))}
+                      placeholder="Short bio (optional)"
+                      className="w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B] resize-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      disabled={acting}
+                      onClick={addManualRager}
+                      className="px-4 py-2 bg-[#DC143C] hover:bg-[#B01030] text-white text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                    >
+                      {acting ? 'Adding…' : 'Add Rager'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowAddRager(false); setAddRagerForm(EMPTY_ADD_RAGER); }}
+                      className="px-4 py-2 border border-white/10 text-[#71717A] text-xs uppercase tracking-wider hover:text-[#F5F5F0] transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* ── Founder offer form ── */}
               {offerMode && offerableCount > 0 && (
@@ -554,25 +822,24 @@ function EnquiryRow({ enq }) {
                     </OfferField>
                   </div>
 
-                  {/* Reconfirmation status hint */}
+                  {/* Status hints for the offer form */}
                   {reconfirmedCount === 0 && reconfirmPending === 0 && shortlistedAccepted > 0 && (
                     <p className="text-[10px] text-[#52525B] bg-white/[0.02] border border-white/5 px-3 py-2">
-                      Save the draft first, then send reconfirmation emails to shortlisted ragers before sending the offer to the founder.
+                      Save the draft first, then send reconfirmation to shortlisted ragers. Once they confirm, send the shortlist to the founder.
                     </p>
                   )}
                   {reconfirmPending > 0 && reconfirmedCount === 0 && (
                     <p className="text-[10px] text-sky-400 bg-sky-500/5 border border-sky-500/10 px-3 py-2">
-                      Reconfirmation sent to {reconfirmPending} rager(s) — waiting for responses before offer can go to founder.
+                      Reconfirmation sent to {reconfirmPending} rager(s) — waiting for responses before shortlist can go to founder.
                     </p>
                   )}
                   {reconfirmedCount > 0 && (
                     <p className="text-[10px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2">
-                      {reconfirmedCount} rager(s) reconfirmed ✓ — ready to send offer to founder.
+                      {reconfirmedCount} rager(s) reconfirmed ✓ — ready to send shortlist. Founder will select their preferred advisor(s).
                     </p>
                   )}
 
                   <div className="flex items-center gap-3 pt-2 flex-wrap">
-                    {/* Save draft */}
                     <button
                       type="button"
                       disabled={offerSaving || acting}
@@ -582,7 +849,6 @@ function EnquiryRow({ enq }) {
                       {offerSaving ? 'Saving…' : 'Save Draft'}
                     </button>
 
-                    {/* Send reconfirmation — requires draft saved, eligible ragers exist */}
                     {canSendReconfirmation && (
                       <button
                         type="button"
@@ -596,7 +862,7 @@ function EnquiryRow({ enq }) {
                       </button>
                     )}
 
-                    {/* Send to founder — requires at least one reconfirmed rager */}
+                    {/* Send shortlist — founder gets individual Select buttons per advisor */}
                     <button
                       type="button"
                       disabled={acting || !canSendToFounder}
@@ -605,7 +871,7 @@ function EnquiryRow({ enq }) {
                       className="flex items-center gap-2 px-5 py-2.5 bg-[#DC143C] hover:bg-[#B01030] text-white text-xs uppercase tracking-wider transition-colors disabled:opacity-40"
                     >
                       {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                      Send to Founder
+                      Send Shortlist to Founder
                     </button>
                   </div>
                 </div>
@@ -680,8 +946,8 @@ export default function AdminResponsesPage() {
 
   const sorted = [...enquiries].reverse();
   const filtered = sorted.filter(e => {
-    if (filter === 'active') return !['new', 'declined', 'closed', 'founder_rejected'].includes(e.status);
-    if (filter === 'confirmed') return ['confirmed', 'rager_confirmed'].includes(e.status);
+    if (filter === 'active') return !['new', 'declined', 'closed', 'founder_rejected', 'needs_more_candidates'].includes(e.status);
+    if (filter === 'confirmed') return ['confirmed', 'confirmed_ready_to_schedule', 'rager_confirmed'].includes(e.status);
     return true;
   });
 
