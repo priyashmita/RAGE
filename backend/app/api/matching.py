@@ -1832,19 +1832,17 @@ def get_shortlist(token: str):
         raise HTTPException(status_code=410, detail="This shortlist is no longer active.")
 
     enquiry_id = offer["enquiry_id"]
-    enq = db.founder_offers.find_one({"id": offer["id"]}, {"_id": 0})  # unused — get enquiry
-    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0}) or {}
 
+    # Return the frozen snapshot — all allocation_ids on this offer version,
+    # regardless of their current live status. Status may have advanced after
+    # founder responded; the snapshot must still render correctly on re-open.
     allocs = [
         db.allocations.find_one({"id": aid}, {"_id": 0}) or {}
         for aid in offer["allocation_ids"]
     ]
-    active_allocs = [a for a in allocs if a.get("status") in (
-        "offer_sent_to_founder", "reconfirmed_for_offer", "rager_accepted", "pending_founder",
-    )]
 
     advisors = []
-    for alloc in active_allocs:
+    for alloc in allocs:
         rager = db.ragers.find_one(
             {"id": alloc.get("rager_id", "")},
             {"_id": 0, "email": 0, "phone": 0},
@@ -1895,9 +1893,13 @@ def respond_to_shortlist(token: str, data: FounderShortlistResponse):
     if offer.get("status") not in ("sent", "responded"):
         raise HTTPException(status_code=410, detail="This shortlist is no longer active.")
 
-    # Idempotency: if already responded with same type, return current state
-    if offer.get("founder_response_type") == data.response_type:
-        return {"status": "already_recorded", "response_type": data.response_type}
+    # Idempotency: once any response is recorded this offer is immutable
+    if offer.get("founder_response_type") is not None:
+        return {
+            "status":        "already_recorded",
+            "response_type": offer["founder_response_type"],
+            "selected_alloc_ids": offer.get("selected_alloc_ids", []),
+        }
 
     enquiry_id = offer["enquiry_id"]
     now        = _now()
@@ -1985,21 +1987,28 @@ def send_final_disclosure(enquiry_id: str, admin=Depends(require_admin)):
     if not enq:
         raise HTTPException(status_code=404, detail="Enquiry not found")
 
-    selected = list(db.allocations.find(
-        {"enquiry_id": enquiry_id, "status": "selected_by_founder"},
+    # Scope to the most recent responded offer's selected_alloc_ids, not all enquiry allocs
+    offer = db.founder_offers.find_one(
+        {"enquiry_id": enquiry_id, "status": "responded", "founder_response_type": "selection"},
         {"_id": 0},
-    ))
+        sort=[("sent_at", -1)],
+    )
+    if not offer or not offer.get("selected_alloc_ids"):
+        raise HTTPException(
+            status_code=400,
+            detail="No founder selection found. Wait for founder to choose from the shortlist.",
+        )
+
+    selected = [
+        db.allocations.find_one({"id": aid, "status": "selected_by_founder"}, {"_id": 0})
+        for aid in offer["selected_alloc_ids"]
+    ]
+    selected = [a for a in selected if a]  # drop any that have already advanced past this status
     if not selected:
         raise HTTPException(
             status_code=400,
-            detail="No ragers selected by founder yet. Wait for founder to choose from the shortlist.",
+            detail="All selected ragers have already been disclosed. Use resend for individual ragers if needed.",
         )
-
-    offer = db.founder_offers.find_one(
-        {"enquiry_id": enquiry_id},
-        {"_id": 0},
-        sort=[("created_at", -1)],
-    ) or {}
 
     now = _now()
     sent_count = 0
@@ -2046,7 +2055,12 @@ def resend_final_disclosure(alloc_id: str, admin=Depends(require_admin)):
         raise HTTPException(status_code=404, detail="Allocation not found")
     if alloc["status"] == "rager_final_confirmed":
         raise HTTPException(status_code=400, detail="Rager has already confirmed. No need to resend.")
-    if alloc["status"] not in ("final_disclosure_sent", "rager_final_declined"):
+    if alloc["status"] == "rager_final_declined":
+        raise HTTPException(
+            status_code=400,
+            detail="Rager explicitly declined. Source a replacement candidate rather than resending.",
+        )
+    if alloc["status"] not in ("final_disclosure_sent",):
         raise HTTPException(
             status_code=400,
             detail=f"Cannot resend disclosure for allocation with status '{alloc['status']}'.",
