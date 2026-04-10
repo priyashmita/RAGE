@@ -72,7 +72,7 @@ backend/app/
     auth.py        — /auth/login, /auth/signup, /auth/me
     admin.py       — /admin/* + /public/reports + analytics + Chatham House reports
     member.py      — /member/* endpoints
-    seed.py        — /seed/admin (bootstrap admin@rage.com / admin123)
+    seed.py        — /seed/admin (bootstrap seed only — actual admin is forchangerage@gmail.com)
     content.py     — /admin/content, /public/content/{page} (auto-detects legacy format)
     ragers.py      — /admin/ragers, /public/ragers (strips email+phone)
 
@@ -125,7 +125,8 @@ frontend/src/
 ## Important Notes
 - CORS_ORIGINS must be comma-separated (main.py splits on comma)
 - All MongoDB documents use `id` (UUID string), NOT `_id`
-- Admin bootstrap: `POST /api/seed/admin` creates admin@rage.com / admin123
+- Admin login: `forchangerage@gmail.com` / `R@ge2025!`
+- `POST /api/seed/admin` creates a bootstrap admin@rage.com account — do NOT use this to reset the real admin
 - Login pages use `Navigate` component (not useEffect) for redirect — avoids flash
 - `operations.py` is dead code — safe to delete
 - Rager phone/email never exposed on public API (`/public/ragers` strips them)

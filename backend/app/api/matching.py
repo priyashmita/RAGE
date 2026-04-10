@@ -665,7 +665,71 @@ def decline_enquiry(enquiry_id: str, admin=Depends(require_admin)):
 
 # ── Email template helpers ────────────────────────────────────────────────────
 
-def _rager_disclosure_html(rager: dict, enq: dict, offer: dict,
+def _rager_reconfirm_html(rager: dict, offer: dict,
+                           confirm_link: str, decline_link: str) -> str:
+    """
+    Pre-offer reconfirmation email to rager.
+    Founder identity NOT revealed — still under Chatham House Rule.
+    Shows broad session details so rager can confirm availability.
+    """
+    rager_name = rager.get("name", "")
+    first_name = rager_name.split()[0] if rager_name else "there"
+
+    detail_rows = [
+        ("Format",         (offer.get("format_type") or "").capitalize()),
+        ("Duration",       offer.get("duration_text", "")),
+        ("Proposed Dates", offer.get("optional_dates", "")),
+        ("Investment",     offer.get("budget_text", "")),
+        ("Venue",          offer.get("venue", "")),
+    ]
+    rows_html = "".join(
+        f'<tr>'
+        f'<td style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#71717a;padding:7px 20px 7px 0;vertical-align:top;white-space:nowrap;">{k}</td>'
+        f'<td style="font-size:13px;color:#1a1a1a;padding:7px 0;">{v}</td>'
+        f'</tr>'
+        for k, v in detail_rows if v
+    )
+    details_html = f"""
+<div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:20px 24px;margin:24px 0;">
+  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 14px;">Session Overview</p>
+  <table style="border-collapse:collapse;width:100%;">{rows_html}</table>
+</div>""" if rows_html else ""
+
+    year = datetime.now().year
+    return f"""
+<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
+  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
+    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
+    <h1 style="font-size:22px;font-weight:400;margin:0;">Are you still available?</h1>
+  </div>
+  <div style="padding:32px 40px;">
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {first_name},</p>
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">
+      We&#8217;re progressing the advisory request you expressed interest in. Before we send a formal proposal to the founder, we&#8217;d like to confirm you&#8217;re still available and comfortable with the broad session details below.
+    </p>
+    <p style="color:#a1a1aa;font-size:12px;font-style:italic;line-height:1.6;margin:0 0 4px;">
+      Under Chatham House Rule — founder details will be shared once both parties confirm.
+    </p>
+    {details_html}
+    <p style="color:#52525b;font-size:14px;line-height:1.7;margin:0 0 24px;">
+      Please confirm whether you&#8217;re available and happy to proceed.
+    </p>
+    <div>
+      <a href="{confirm_link}" style="display:inline-block;background:#dc143c;color:#fff;padding:12px 28px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;font-weight:600;margin-right:12px;">Yes, I&#8217;m Available</a>
+      <a href="{decline_link}" style="display:inline-block;background:#f5f5f0;color:#52525b;border:1px solid #d4d4d4;padding:12px 24px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;">Not Available</a>
+    </div>
+    <p style="color:#a1a1aa;font-size:12px;line-height:1.6;margin-top:20px;">
+      Questions? Reply to this email and the RAGE team will be in touch.
+    </p>
+  </div>
+  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
+    <p style="font-size:11px;color:#a1a1aa;margin:0;">&#169; {year} R.A.G.E. &#8212; Radical Alliance for Gender Equity</p>
+  </div>
+</div>"""
+
+
+# (old _rager_disclosure_html removed — replaced by _rager_reconfirm_html above)
+def _UNUSED_rager_disclosure_html(rager: dict, enq: dict, offer: dict,
                             confirm_link: str, decline_link: str) -> str:
     rager_name   = rager.get("name", "")
     first_name   = rager_name.split()[0] if rager_name else "there"
@@ -728,33 +792,6 @@ def _rager_disclosure_html(rager: dict, enq: dict, offer: dict,
 </div>"""
 
 
-def _founder_accept_ack_html(enq: dict) -> str:
-    first_name = enq.get("name", "").split()[0] if enq.get("name") else "there"
-    year = datetime.now().year
-    return f"""
-<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
-  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
-    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
-    <h1 style="font-size:22px;font-weight:400;margin:0;">Proposal accepted</h1>
-  </div>
-  <div style="padding:32px 40px;">
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {first_name},</p>
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">
-      We've received your acceptance — thank you.
-    </p>
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">
-      We're now confirming final availability with your advisor. You'll receive a follow-up email shortly with full session details and contact information.
-    </p>
-    <p style="color:#52525b;font-size:13px;line-height:1.7;margin-top:16px;">
-      If you have any questions in the meantime, reply to this email.
-    </p>
-  </div>
-  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
-    <p style="font-size:11px;color:#a1a1aa;margin:0;">© {year} R.A.G.E. — Radical Alliance for Gender Equity</p>
-  </div>
-</div>"""
-
-
 def _session_confirmed_founder_html(enq: dict, alloc: dict, rager: dict) -> str:
     first_name    = enq.get("name", "").split()[0] if enq.get("name") else "there"
     rager_name    = rager.get("name", alloc.get("rager_name", ""))
@@ -771,7 +808,7 @@ def _session_confirmed_founder_html(enq: dict, alloc: dict, rager: dict) -> str:
   </div>
   <div style="padding:32px 40px;">
     <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {first_name},</p>
-    <p style="color:#52525b;font-size:14px;line-height:1.7;">Your advisor has confirmed. Here are the full details:</p>
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">You&#8217;ve accepted the proposal &#8212; here are your advisor&#8217;s full details:</p>
     <div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:20px 24px;margin:24px 0;">
       <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 12px;">Your Advisor</p>
       <p style="font-size:17px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{rager_name}</p>
@@ -952,7 +989,7 @@ def update_session(enquiry_id: str, data: ScheduleRequest, admin=Depends(require
     enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
     if not enq:
         raise HTTPException(status_code=404, detail="Enquiry not found")
-    if enq.get("status") not in ("confirmed", "founder_accepted"):
+    if enq.get("status") not in ("confirmed", "founder_accepted", "confirmed_ready_to_schedule"):
         raise HTTPException(status_code=400, detail="Session scheduling only available for confirmed enquiries")
     db.enquiries.update_one(
         {"id": enquiry_id},
@@ -969,17 +1006,23 @@ def save_founder_offer(enquiry_id: str, data: FounderOfferRequest, admin=Depends
     if not enq:
         raise HTTPException(status_code=404, detail="Enquiry not found")
 
-    # Accept: explicitly shortlisted rager_accepted OR any pending_founder (old send-shortlist flow)
+    # Prefer reconfirmed_for_offer; backward compat keeps old-flow statuses working
     shortlisted = list(db.allocations.find(
         {"enquiry_id": enquiry_id,
          "$or": [
+             {"status": "reconfirmed_for_offer"},
+             {"status": "offer_sent_to_founder"},
+             # backward compat for pre-reconfirmation-flow data:
              {"shortlist_status": "shortlisted", "status": "rager_accepted"},
              {"status": "pending_founder"},
          ]},
         {"_id": 0}
     ))
     if not shortlisted:
-        raise HTTPException(status_code=400, detail="No accepted ragers found for this enquiry.")
+        raise HTTPException(
+            status_code=400,
+            detail="No eligible ragers found. Shortlist ragers, send reconfirmation emails, and wait for responses first.",
+        )
 
     allocation_ids = [a["id"] for a in shortlisted]
     now = _now()
@@ -1051,6 +1094,20 @@ def send_founder_offer_email(enquiry_id: str, admin=Depends(require_admin)):
     offer = db.founder_offers.find_one({"enquiry_id": enquiry_id, "status": "draft"}, {"_id": 0})
     if not offer:
         raise HTTPException(status_code=400, detail="No draft offer found. Save a draft first.")
+
+    # Guard: require at least one reconfirmed rager (backward compat: allow old-flow statuses)
+    allocs_in_offer = [
+        db.allocations.find_one({"id": aid}, {"_id": 0}) or {}
+        for aid in offer["allocation_ids"]
+    ]
+    reconfirmed_allocs = [a for a in allocs_in_offer if a.get("status") == "reconfirmed_for_offer"]
+    old_flow_allocs    = [a for a in allocs_in_offer if a.get("status") in ("pending_founder",)
+                          or (a.get("shortlist_status") == "shortlisted" and a.get("status") == "rager_accepted")]
+    if not reconfirmed_allocs and not old_flow_allocs:
+        raise HTTPException(
+            status_code=400,
+            detail="No reconfirmed ragers in this offer. Send reconfirmation emails to shortlisted ragers first.",
+        )
 
     # Build rager profile cards (no choose button — founder accepts/rejects whole proposal)
     profiles_html = ""
@@ -1132,8 +1189,14 @@ def send_founder_offer_email(enquiry_id: str, admin=Depends(require_admin)):
 </div>""",
     )
 
-    db.founder_offers.update_one({"id": offer["id"]}, {"$set": {"status": "sent", "sent_at": _now()}})
-    db.enquiries.update_one({"id": enquiry_id}, {"$set": {"status": "pending_founder_offer"}})
+    now = _now()
+    db.founder_offers.update_one({"id": offer["id"]}, {"$set": {"status": "sent", "sent_at": now}})
+    # Mark each alloc in offer as offer_sent_to_founder
+    db.allocations.update_many(
+        {"id": {"$in": offer["allocation_ids"]}},
+        {"$set": {"status": "offer_sent_to_founder", "offer_sent_at": now}},
+    )
+    db.enquiries.update_one({"id": enquiry_id}, {"$set": {"status": "founder_offer_sent"}})
     return {"status": "sent", "offer_id": offer["id"]}
 
 
@@ -1170,48 +1233,47 @@ def founder_offer_respond(token: str, r: str):
     if r == "accept":
         enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0}) or {}
 
-        # Move each allocation to rager_confirmation_pending and generate final tokens
+        # Mark each alloc as founder_accepted and send confirmation emails
         for alloc_id in offer["allocation_ids"]:
-            c_tok = secrets.token_urlsafe(32)
-            d_tok = secrets.token_urlsafe(32)
             db.allocations.update_one(
                 {"id": alloc_id},
-                {"$set": {
-                    "status":                    "rager_confirmation_pending",
-                    "founder_responded_at":      now,
-                    "rager_final_confirm_token": c_tok,
-                    "rager_final_decline_token": d_tok,
-                }},
+                {"$set": {"status": "founder_accepted", "founder_responded_at": now}},
             )
-            # Reload alloc after update so tokens are in the doc
             alloc = db.allocations.find_one({"id": alloc_id}, {"_id": 0}) or {}
             rager = db.ragers.find_one({"id": alloc.get("rager_id", "")}, {"_id": 0}) or {}
             rager_email = rager.get("email") or alloc.get("rager_email", "")
+
+            # Confirmation email to rager (reveals founder details)
             if rager_email:
-                confirm_link = f"{BACKEND_URL}/api/rager-final-confirm/{c_tok}?r=confirm"
-                decline_link = f"{BACKEND_URL}/api/rager-final-confirm/{d_tok}?r=decline"
                 _send_email(
                     to=[rager_email],
-                    subject="RAGE: Founder Has Accepted — Please Confirm",
-                    html=_rager_disclosure_html(rager, enq, offer, confirm_link, decline_link),
+                    subject="RAGE: Session Confirmed",
+                    html=_session_confirmed_rager_html(enq, alloc, rager),
                 )
 
         db.enquiries.update_one(
             {"id": enquiry_id},
-            {"$set": {"status": "rager_confirmation_pending", "founder_accepted_at": now}},
+            {"$set": {"status": "confirmed_ready_to_schedule", "founder_accepted_at": now}},
         )
 
+        # Confirmation email to founder (reveals rager details)
+        # Use the first confirmed alloc for the email (typical case: one rager)
+        first_alloc = db.allocations.find_one(
+            {"id": {"$in": offer["allocation_ids"]}, "status": "founder_accepted"},
+            {"_id": 0},
+        ) or {}
+        first_rager = db.ragers.find_one({"id": first_alloc.get("rager_id", "")}, {"_id": 0}) or {}
         if enq.get("email"):
             _send_email(
                 to=[enq["email"]],
-                subject="RAGE: Proposal Accepted — Confirming Your Advisor",
-                html=_founder_accept_ack_html(enq),
+                subject="RAGE: Session Confirmed",
+                html=_session_confirmed_founder_html(enq, first_alloc, first_rager),
             )
 
         return HTMLResponse(_response_page(
             "Proposal Accepted",
-            "Thank you &#8212; we&#8217;ve received your acceptance. "
-            "We&#8217;re now confirming final availability with your advisor and will be in touch shortly."
+            "Thank you &#8212; your session is confirmed. "
+            "Check your email for your advisor&#8217;s full contact details.",
         ))
 
     else:  # reject
@@ -1229,80 +1291,302 @@ def founder_offer_respond(token: str, r: str):
         ))
 
 
-# ── Public: Rager confirms or declines after founder acceptance ───────────────
+# ── Public: rager-final-confirm — DEPRECATED (flow redesigned) ───────────────
+# Post-founder rager confirmation has been removed from the primary flow.
+# Rager reconfirmation now happens BEFORE the offer is sent to the founder.
+# See /rager-reconfirm/{token} for the current pre-offer reconfirmation endpoint.
 
 @router.get("/rager-final-confirm/{token}", response_class=HTMLResponse)
-def rager_final_confirm(token: str, r: str):
+def rager_final_confirm(token: str, r: str = ""):
+    return HTMLResponse(
+        _response_page(
+            "Link no longer valid",
+            "This link is from an older flow that has been updated. "
+            "Please contact the RAGE team if you need assistance.",
+        ),
+        status_code=410,
+    )
+
+
+# ── Public: Rager responds to pre-offer reconfirmation ───────────────────────
+
+@router.get("/rager-reconfirm/{token}", response_class=HTMLResponse)
+def rager_reconfirm(token: str, r: str):
     if r not in ("confirm", "decline"):
         return HTMLResponse(_response_page("Invalid link", "This link is not valid."), status_code=400)
 
-    field = "rager_final_confirm_token" if r == "confirm" else "rager_final_decline_token"
+    field = "rager_reconfirm_token" if r == "confirm" else "rager_reconfirm_decline_token"
     alloc = db.allocations.find_one({field: token}, {"_id": 0})
     if not alloc:
         return HTMLResponse(_response_page("Link not found", "This link is invalid or has expired."), status_code=404)
 
     # Idempotency guards
-    if alloc["status"] == "rager_confirmed":
+    if alloc["status"] == "reconfirmed_for_offer":
         return HTMLResponse(_response_page(
             "Already confirmed",
-            "You&#8217;ve already confirmed this session. Check your email for the full details.",
+            "You&#8217;ve already confirmed your availability. The RAGE team will be in touch with next steps.",
         ))
-    if alloc["status"] == "rager_declined_final":
+    if alloc["status"] == "reconfirmation_declined":
         return HTMLResponse(_response_page(
             "Already responded",
-            "You&#8217;ve already responded to this request. Thank you.",
+            "You&#8217;ve already indicated you&#8217;re unavailable for this request. Thank you.",
         ))
-    if alloc["status"] != "rager_confirmation_pending":
+    if alloc["status"] != "reconfirmation_pending":
         return HTMLResponse(_response_page(
             "Link no longer valid",
-            "This confirmation link is no longer active. Please contact RAGE if you need assistance.",
+            "This reconfirmation link is no longer active. Please contact RAGE if you need assistance.",
         ), status_code=400)
 
-    enquiry_id  = alloc["enquiry_id"]
-    enq         = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0}) or {}
-    rager       = db.ragers.find_one({"id": alloc["rager_id"]}, {"_id": 0}) or {}
-    rager_email = rager.get("email") or alloc.get("rager_email", "")
-    rager_name  = rager.get("name", alloc.get("rager_name", ""))
-    now         = _now()
+    enquiry_id = alloc["enquiry_id"]
+    now        = _now()
 
     if r == "confirm":
         db.allocations.update_one(
             {"id": alloc["id"]},
-            {"$set": {"status": "rager_confirmed", "rager_confirmed_at": now}},
+            {"$set": {"status": "reconfirmed_for_offer", "reconfirmed_at": now}},
         )
+        # Advance enquiry to founder_offer_ready if not already further along
         db.enquiries.update_one(
-            {"id": enquiry_id},
-            {"$set": {"status": "confirmed", "confirmed_at": now}},
+            {"id": enquiry_id,
+             "status": {"$nin": ["founder_offer_sent", "founder_accepted",
+                                  "confirmed_ready_to_schedule", "founder_rejected", "declined", "closed"]}},
+            {"$set": {"status": "founder_offer_ready"}},
         )
-
-        # Confirmation email to founder
-        if enq.get("email"):
-            _send_email(
-                to=[enq["email"]],
-                subject="RAGE: Session Confirmed",
-                html=_session_confirmed_founder_html(enq, alloc, rager),
-            )
-
-        # Confirmation email to rager
-        if rager_email:
-            _send_email(
-                to=[rager_email],
-                subject="RAGE: Session Confirmed",
-                html=_session_confirmed_rager_html(enq, alloc, rager),
-            )
-
         return HTMLResponse(_response_page(
-            "Session Confirmed",
-            f"Thank you &#8212; you&#8217;ve confirmed the session. "
-            f"Both you and {enq.get('name', 'the founder')} have been notified with full details.",
+            "Confirmed",
+            "Thank you &#8212; you&#8217;ve confirmed your availability. "
+            "The RAGE team will be in touch with the next steps shortly.",
         ))
 
     else:  # decline
         db.allocations.update_one(
             {"id": alloc["id"]},
-            {"$set": {"status": "rager_declined_final", "rager_declined_final_at": now}},
+            {"$set": {"status": "reconfirmation_declined", "reconfirmation_declined_at": now}},
         )
         return HTMLResponse(_response_page(
             "Noted",
-            "Thank you for letting us know. The RAGE team has been notified and will follow up.",
+            "Thank you for letting us know. We&#8217;ll keep you in mind for future opportunities.",
         ))
+
+
+# ── Admin: send pre-offer reconfirmation emails to shortlisted ragers ─────────
+
+@router.post("/admin/enquiries/{enquiry_id}/send-rager-reconfirmation")
+def send_rager_reconfirmation(enquiry_id: str, admin=Depends(require_admin)):
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+
+    # Require a saved offer draft (needed for session detail context in email)
+    offer = db.founder_offers.find_one({"enquiry_id": enquiry_id, "status": "draft"}, {"_id": 0})
+    if not offer:
+        raise HTTPException(
+            status_code=400,
+            detail="Save an offer draft first (format, budget, dates) so we can include session details in the reconfirmation email.",
+        )
+
+    # Find shortlisted ragers not yet declined or already reconfirmed
+    eligible = list(db.allocations.find(
+        {"enquiry_id": enquiry_id,
+         "shortlist_status": "shortlisted",
+         "status": {"$in": ["rager_accepted", "reconfirmation_pending"]}},
+        {"_id": 0},
+    ))
+    if not eligible:
+        raise HTTPException(
+            status_code=400,
+            detail="No shortlisted ragers eligible for reconfirmation (must be accepted and not yet reconfirmed or declined).",
+        )
+
+    now = _now()
+    sent_count = 0
+
+    for alloc in eligible:
+        c_tok = secrets.token_urlsafe(32)
+        d_tok = secrets.token_urlsafe(32)
+        db.allocations.update_one(
+            {"id": alloc["id"]},
+            {"$set": {
+                "status":                       "reconfirmation_pending",
+                "rager_reconfirm_token":        c_tok,
+                "rager_reconfirm_decline_token": d_tok,
+                "reconfirm_sent_at":            now,
+            }},
+        )
+
+        rager = db.ragers.find_one({"id": alloc["rager_id"]}, {"_id": 0}) or {}
+        rager_email = rager.get("email") or alloc.get("rager_email", "")
+        if not rager_email:
+            continue
+
+        confirm_link = f"{BACKEND_URL}/api/rager-reconfirm/{c_tok}?r=confirm"
+        decline_link = f"{BACKEND_URL}/api/rager-reconfirm/{d_tok}?r=decline"
+        _send_email(
+            to=[rager_email],
+            subject="RAGE: Please Confirm Availability",
+            html=_rager_reconfirm_html(rager, offer, confirm_link, decline_link),
+        )
+        sent_count += 1
+
+    db.enquiries.update_one(
+        {"id": enquiry_id,
+         "status": {"$nin": ["founder_offer_sent", "founder_accepted",
+                              "confirmed_ready_to_schedule", "founder_rejected"]}},
+        {"$set": {"status": "reconfirmation_pending"}},
+    )
+
+    return {"status": "sent", "emails_sent": sent_count}
+
+
+# ── Admin: resend reconfirmation to a single rager ────────────────────────────
+
+@router.post("/admin/allocations/{alloc_id}/resend-reconfirmation")
+def resend_rager_reconfirmation(alloc_id: str, admin=Depends(require_admin)):
+    alloc = db.allocations.find_one({"id": alloc_id}, {"_id": 0})
+    if not alloc:
+        raise HTTPException(status_code=404, detail="Allocation not found")
+    if alloc["status"] == "reconfirmed_for_offer":
+        raise HTTPException(status_code=400, detail="Rager has already reconfirmed. No need to resend.")
+    if alloc["status"] not in ("reconfirmation_pending",):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot resend reconfirmation for allocation with status '{alloc['status']}'. "
+                   "Send the initial reconfirmation first.",
+        )
+
+    enquiry_id = alloc["enquiry_id"]
+    offer = db.founder_offers.find_one({"enquiry_id": enquiry_id, "status": "draft"}, {"_id": 0})
+    if not offer:
+        raise HTTPException(status_code=400, detail="No offer draft found for this enquiry.")
+
+    rager = db.ragers.find_one({"id": alloc["rager_id"]}, {"_id": 0}) or {}
+    rager_email = rager.get("email") or alloc.get("rager_email", "")
+    if not rager_email:
+        raise HTTPException(status_code=400, detail="No email address for this rager.")
+
+    # Generate fresh tokens (old tokens become invalid)
+    c_tok = secrets.token_urlsafe(32)
+    d_tok = secrets.token_urlsafe(32)
+    now   = _now()
+    db.allocations.update_one(
+        {"id": alloc_id},
+        {"$set": {
+            "rager_reconfirm_token":        c_tok,
+            "rager_reconfirm_decline_token": d_tok,
+            "reconfirm_sent_at":            now,
+        }},
+    )
+
+    confirm_link = f"{BACKEND_URL}/api/rager-reconfirm/{c_tok}?r=confirm"
+    decline_link = f"{BACKEND_URL}/api/rager-reconfirm/{d_tok}?r=decline"
+    _send_email(
+        to=[rager_email],
+        subject="RAGE: Reminder — Please Confirm Availability",
+        html=_rager_reconfirm_html(rager, offer, confirm_link, decline_link),
+    )
+    return {"status": "resent", "rager_email": rager_email}
+
+
+# ── Admin: resend founder offer email ─────────────────────────────────────────
+
+@router.post("/admin/enquiries/{enquiry_id}/resend-founder-offer")
+def resend_founder_offer(enquiry_id: str, admin=Depends(require_admin)):
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+
+    # Find the most recently sent offer
+    offer = db.founder_offers.find_one(
+        {"enquiry_id": enquiry_id, "status": "sent"},
+        {"_id": 0},
+        sort=[("sent_at", -1)],
+    )
+    if not offer:
+        raise HTTPException(
+            status_code=400,
+            detail="No sent offer found. Use 'Send to Founder' to send the initial offer first.",
+        )
+    if offer.get("founder_response"):
+        raise HTTPException(
+            status_code=400,
+            detail="Founder has already responded to this offer. Cannot resend.",
+        )
+
+    # Rebuild and resend the same email using the existing tokens
+    profiles_html = ""
+    for alloc_id in offer["allocation_ids"]:
+        alloc = db.allocations.find_one({"id": alloc_id}, {"_id": 0}) or {}
+        rager = db.ragers.find_one({"id": alloc.get("rager_id", "")}, {"_id": 0}) or {}
+        name    = rager.get("name", alloc.get("rager_name", ""))
+        title   = rager.get("title", "")
+        company = rager.get("company", "")
+        bio     = rager.get("bio", "")
+        cats    = ", ".join(rager.get("categories", []))
+        profiles_html += f"""
+<div style="border:1px solid #e5e5e5;padding:20px;margin-bottom:12px;">
+  <p style="font-size:16px;font-weight:600;color:#1a1a1a;margin:0 0 4px;">{name}</p>
+  <p style="font-size:12px;color:#dc143c;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 10px;">{title}{(" · " + company) if company else ""}</p>
+  {f'<p style="font-size:13px;color:#52525b;line-height:1.6;margin:0 0 8px;">{bio}</p>' if bio else ""}
+  {f'<p style="font-size:11px;color:#a1a1aa;margin:0;">{cats}</p>' if cats else ""}
+</div>"""
+
+    detail_rows = [
+        ("Format",         (offer.get("format_type") or "").capitalize()),
+        ("Duration",       offer.get("duration_text", "")),
+        ("Venue",          offer.get("venue", "")),
+        ("Proposed Dates", offer.get("optional_dates", "")),
+        ("Investment",     offer.get("budget_text", "")),
+        ("Notes",          offer.get("cost_notes", "")),
+    ]
+    rows_html = "".join(
+        f'<tr><td style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#71717a;padding:7px 20px 7px 0;vertical-align:top;white-space:nowrap;">{k}</td>'
+        f'<td style="font-size:13px;color:#1a1a1a;padding:7px 0;">{v}</td></tr>'
+        for k, v in detail_rows if v
+    )
+    details_html = f"""
+<div style="background:#f9f9f9;border-left:3px solid #dc143c;padding:20px 24px;margin:24px 0;">
+  <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:0 0 14px;">Session Proposal</p>
+  <table style="border-collapse:collapse;width:100%;">{rows_html}</table>
+</div>""" if rows_html else ""
+
+    accept_link = f"{BACKEND_URL}/api/founder-offer-respond/{offer['accept_token']}?r=accept"
+    reject_link = f"{BACKEND_URL}/api/founder-offer-respond/{offer['reject_token']}?r=reject"
+    intro       = (offer.get("intro_message") or "").strip()
+    first_name  = enq["name"].split()[0]
+    plural      = len(offer["allocation_ids"]) > 1
+
+    _send_email(
+        to=[enq["email"]],
+        subject="RAGE: Your Session Proposal (Reminder)",
+        html=f"""
+<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;background:#fff;">
+  <div style="border-bottom:3px solid #dc143c;padding:32px 40px 20px;">
+    <p style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#dc143c;margin:0 0 6px;">R.A.G.E.</p>
+    <h1 style="font-size:22px;font-weight:400;margin:0;">Your Session Proposal</h1>
+  </div>
+  <div style="padding:32px 40px;">
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">Hi {first_name},</p>
+    <p style="color:#52525b;font-size:14px;line-height:1.7;">
+      {intro if intro else "A reminder about your pending session proposal — please let us know whether you&#8217;d like to proceed."}
+    </p>
+    <p style="font-size:11px;text-transform:uppercase;letter-spacing:0.15em;color:#71717a;margin:24px 0 12px;">
+      Your Advisor{"s" if plural else ""}
+    </p>
+    {profiles_html}
+    {details_html}
+    <div style="margin-top:24px;">
+      <a href="{accept_link}" style="display:inline-block;background:#dc143c;color:#fff;padding:12px 28px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;font-weight:600;margin-right:12px;">Accept Proposal</a>
+      <a href="{reject_link}" style="display:inline-block;background:#f5f5f0;color:#52525b;border:1px solid #d4d4d4;padding:12px 24px;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;text-decoration:none;">Decline</a>
+    </div>
+    <p style="color:#a1a1aa;font-size:12px;line-height:1.6;margin-top:24px;">
+      Questions? Reply to this email and we&#8217;ll be in touch.
+    </p>
+  </div>
+  <div style="background:#f9f9f9;padding:16px 40px;border-top:1px solid #e5e5e5;">
+    <p style="font-size:11px;color:#a1a1aa;margin:0;">&#169; {datetime.now().year} R.A.G.E. &#8212; Radical Alliance for Gender Equity</p>
+  </div>
+</div>""",
+    )
+
+    db.founder_offers.update_one({"id": offer["id"]}, {"$set": {"resent_at": _now()}})
+    return {"status": "resent", "offer_id": offer["id"]}

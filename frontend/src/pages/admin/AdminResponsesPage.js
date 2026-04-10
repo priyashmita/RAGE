@@ -4,29 +4,39 @@ import { toast } from 'sonner';
 import { Loader2, ChevronDown, ChevronRight, CheckCircle, XCircle, Clock, Calendar, Mail } from 'lucide-react';
 
 const ENQ_STATUS_COLORS = {
-  new:                         'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  matching:                    'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  pending_rager:               'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  pending_founder:             'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  pending_founder_offer:       'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  rager_confirmation_pending:  'bg-sky-500/10 text-sky-400 border-sky-500/20',
-  confirmed:                   'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  founder_accepted:            'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  founder_rejected:            'bg-red-500/10 text-red-400 border-red-500/20',
-  declined:                    'bg-red-500/10 text-red-400 border-red-500/20',
-  closed:                      'bg-gray-500/10 text-gray-400 border-gray-500/20',
+  new:                          'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+  matching:                     'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  pending_rager:                'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  pending_founder:              'bg-orange-500/10 text-orange-400 border-orange-500/20',
+  // new flow statuses
+  reconfirmation_pending:       'bg-sky-500/10 text-sky-400 border-sky-500/20',
+  founder_offer_ready:          'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  founder_offer_sent:           'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  confirmed_ready_to_schedule:  'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  // backward-compat / legacy
+  pending_founder_offer:        'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  confirmed:                    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_accepted:             'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  founder_rejected:             'bg-red-500/10 text-red-400 border-red-500/20',
+  declined:                     'bg-red-500/10 text-red-400 border-red-500/20',
+  closed:                       'bg-gray-500/10 text-gray-400 border-gray-500/20',
 };
 
 const ALLOC_STATUS_LABELS = {
-  pending_rager:               { label: 'Awaiting response',        color: 'text-[#71717A]' },
-  rager_accepted:              { label: 'Accepted',                 color: 'text-emerald-400' },
-  rager_declined:              { label: 'Declined',                 color: 'text-red-400' },
-  pending_founder:             { label: 'Offer in progress',        color: 'text-orange-400' },
-  confirmed:                   { label: 'Confirmed',                color: 'text-emerald-400' },
-  founder_declined:            { label: 'Not chosen',               color: 'text-[#52525B]' },
-  rager_confirmation_pending:  { label: 'Awaiting rager confirm',   color: 'text-sky-400' },
-  rager_confirmed:             { label: 'Rager confirmed',          color: 'text-emerald-400' },
-  rager_declined_final:        { label: 'Rager unavailable',        color: 'text-red-400' },
+  pending_rager:               { label: 'Awaiting response',      color: 'text-[#71717A]' },
+  rager_accepted:              { label: 'Interested',             color: 'text-emerald-400' },
+  rager_declined:              { label: 'Declined outreach',      color: 'text-red-400' },
+  // new pre-offer reconfirmation statuses
+  reconfirmation_pending:      { label: 'Reconfirmation sent',    color: 'text-sky-400' },
+  reconfirmed_for_offer:       { label: 'Reconfirmed ✓',          color: 'text-emerald-400' },
+  reconfirmation_declined:     { label: 'Unavailable',            color: 'text-red-400' },
+  // offer + founder statuses
+  offer_sent_to_founder:       { label: 'In offer to founder',    color: 'text-amber-400' },
+  founder_accepted:            { label: 'Session confirmed',      color: 'text-emerald-400' },
+  founder_declined:            { label: 'Not chosen',             color: 'text-[#52525B]' },
+  // legacy backward-compat
+  pending_founder:             { label: 'Pending',                color: 'text-orange-400' },
+  confirmed:                   { label: 'Confirmed',              color: 'text-emerald-400' },
 };
 
 const SHORTLIST_COLORS = {
@@ -171,15 +181,68 @@ function EnquiryRow({ enq }) {
 
   const setOffer = (field, val) => setOfferForm(prev => ({ ...prev, [field]: val }));
 
+  const sendReconfirmation = async () => {
+    setActing(true);
+    try {
+      const res = await api.post(`/admin/enquiries/${enq.id}/send-rager-reconfirmation`);
+      toast.success(`Reconfirmation sent to ${res.data.emails_sent} rager(s)`);
+      setDetail(null);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to send reconfirmation');
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const resendReconfirmation = async (allocId) => {
+    setActing(true);
+    try {
+      await api.post(`/admin/allocations/${allocId}/resend-reconfirmation`);
+      toast.success('Reconfirmation reminder sent');
+      setDetail(null);
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to resend');
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const resendOffer = async () => {
+    setActing(true);
+    try {
+      await api.post(`/admin/enquiries/${enq.id}/resend-founder-offer`);
+      toast.success('Offer reminder sent to founder');
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Failed to resend offer');
+    } finally {
+      setActing(false);
+    }
+  };
+
   const allocations = detail?.allocations || [];
-  // Ragers available for offer: shortlisted+accepted OR already in offer pipeline
-  const offerableCount = allocations.filter(a =>
-    (a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted') ||
-    ['pending_founder', 'rager_confirmation_pending', 'rager_confirmed'].includes(a.status)
-  ).length;
-  const TERMINAL = ['founder_rejected', 'confirmed', 'declined', 'closed', 'rager_confirmed'];
-  const canPrepareOffer = offerableCount > 0 && !TERMINAL.includes(enq.status) && enq.status !== 'rager_confirmation_pending';
-  const canSchedule     = ['confirmed', 'founder_accepted', 'rager_confirmed'].includes(enq.status);
+
+  // Derived counts for action gating
+  const shortlistedAccepted   = allocations.filter(a => a.shortlist_status === 'shortlisted' && a.status === 'rager_accepted').length;
+  const reconfirmPending      = allocations.filter(a => a.status === 'reconfirmation_pending').length;
+  const reconfirmedCount      = allocations.filter(a => a.status === 'reconfirmed_for_offer').length;
+  const shortlistedTotal      = allocations.filter(a => a.shortlist_status === 'shortlisted').length;
+
+  const TERMINAL_ENQ = ['founder_rejected', 'confirmed', 'confirmed_ready_to_schedule', 'declined', 'closed'];
+
+  // Can open offer form: there are shortlisted ragers and enquiry is not terminal
+  const canPrepareOffer = shortlistedTotal > 0 && !TERMINAL_ENQ.includes(enq.status);
+
+  // Can send reconfirmation: draft offer saved AND shortlisted ragers not yet reconfirmed/declined
+  const canSendReconfirmation = (shortlistedAccepted > 0 || reconfirmPending > 0) && !TERMINAL_ENQ.includes(enq.status);
+
+  // Can send offer to founder: at least one rager reconfirmed (or old-flow compat: pending_founder)
+  const hasOldFlowAllocs = allocations.some(a => a.status === 'pending_founder');
+  const canSendToFounder = (reconfirmedCount > 0 || hasOldFlowAllocs) && savedOffer?.status === 'draft';
+
+  // Can resend offer: offer is sent and founder hasn't responded
+  const canResendOffer = enq.status === 'founder_offer_sent' && savedOffer?.status === 'sent' && !savedOffer?.founder_response;
+
+  const canSchedule = ['confirmed', 'founder_accepted', 'confirmed_ready_to_schedule'].includes(enq.status);
 
   const inputCls = "w-full bg-[#111] border border-white/10 text-[#F5F5F0] text-xs px-3 py-2 outline-none focus:border-white/20 placeholder:text-[#52525B]";
   const textareaCls = `${inputCls} resize-none leading-relaxed`;
@@ -260,44 +323,62 @@ function EnquiryRow({ enq }) {
                               )}
                             </td>
                             <td className="py-2.5">
-                              {canShortlist && (
-                                <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {/* Shortlist toggle — only while rager is in initial accepted state */}
+                                {canShortlist && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      disabled={acting}
+                                      onClick={() => shortlist(alloc.id, alloc.shortlist_status === 'shortlisted' ? null : 'shortlisted')}
+                                      className={`flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider transition-colors disabled:opacity-50 ${
+                                        alloc.shortlist_status === 'shortlisted'
+                                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                          : 'bg-white/5 text-[#A1A1AA] border border-white/10 hover:bg-emerald-500/10 hover:text-emerald-400'
+                                      }`}
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      {alloc.shortlist_status === 'shortlisted' ? 'Listed' : 'Shortlist'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={acting}
+                                      onClick={() => shortlist(alloc.id, alloc.shortlist_status === 'rejected' ? null : 'rejected')}
+                                      className={`flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider transition-colors disabled:opacity-50 ${
+                                        alloc.shortlist_status === 'rejected'
+                                          ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                          : 'bg-white/5 text-[#A1A1AA] border border-white/10 hover:bg-red-500/10 hover:text-red-400'
+                                      }`}
+                                    >
+                                      <XCircle className="w-3 h-3" />
+                                      {alloc.shortlist_status === 'rejected' ? 'Rejected' : 'Reject'}
+                                    </button>
+                                  </>
+                                )}
+                                {/* Resend reconfirmation — shown while waiting for rager response */}
+                                {alloc.status === 'reconfirmation_pending' && (
                                   <button
                                     type="button"
                                     disabled={acting}
-                                    onClick={() => shortlist(alloc.id, alloc.shortlist_status === 'shortlisted' ? null : 'shortlisted')}
-                                    className={`flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider transition-colors disabled:opacity-50 ${
-                                      alloc.shortlist_status === 'shortlisted'
-                                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                        : 'bg-white/5 text-[#A1A1AA] border border-white/10 hover:bg-emerald-500/10 hover:text-emerald-400'
-                                    }`}
+                                    onClick={() => resendReconfirmation(alloc.id)}
+                                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider bg-white/5 text-[#A1A1AA] border border-white/10 hover:bg-sky-500/10 hover:text-sky-400 transition-colors disabled:opacity-50"
                                   >
-                                    <CheckCircle className="w-3 h-3" />
-                                    {alloc.shortlist_status === 'shortlisted' ? 'Listed' : 'Shortlist'}
+                                    <Mail className="w-3 h-3" /> Resend
                                   </button>
-                                  <button
-                                    type="button"
-                                    disabled={acting}
-                                    onClick={() => shortlist(alloc.id, alloc.shortlist_status === 'rejected' ? null : 'rejected')}
-                                    className={`flex items-center gap-1 px-2.5 py-1 text-[10px] uppercase tracking-wider transition-colors disabled:opacity-50 ${
-                                      alloc.shortlist_status === 'rejected'
-                                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                        : 'bg-white/5 text-[#A1A1AA] border border-white/10 hover:bg-red-500/10 hover:text-red-400'
-                                    }`}
-                                  >
-                                    <XCircle className="w-3 h-3" />
-                                    {alloc.shortlist_status === 'rejected' ? 'Rejected' : 'Reject'}
-                                  </button>
-                                </div>
-                              )}
-                              {alloc.status === 'confirmed' && (
-                                <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-                                  <CheckCircle className="w-3 h-3" /> Chosen
-                                </span>
-                              )}
-                              {alloc.status === 'pending_founder' && (
-                                <span className="text-[10px] text-orange-400">Awaiting founder</span>
-                              )}
+                                )}
+                                {/* Reconfirmed badge */}
+                                {alloc.status === 'reconfirmed_for_offer' && (
+                                  <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" /> Ready
+                                  </span>
+                                )}
+                                {/* Confirmed badge */}
+                                {alloc.status === 'founder_accepted' && (
+                                  <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                                    <CheckCircle className="w-3 h-3" /> Confirmed
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -309,6 +390,7 @@ function EnquiryRow({ enq }) {
 
               {/* Actions row */}
               <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-3 flex-wrap">
+                {/* Open / close offer form */}
                 {canPrepareOffer && (
                   <button
                     type="button"
@@ -316,14 +398,27 @@ function EnquiryRow({ enq }) {
                     className={`flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider transition-colors border ${
                       offerMode
                         ? 'bg-[#DC143C]/10 text-[#DC143C] border-[#DC143C]/30'
-                        : 'bg-[#DC143C] hover:bg-[#B01030] text-white border-transparent'
+                        : 'bg-white/5 hover:bg-white/10 text-[#A1A1AA] border-white/10'
                     }`}
                   >
                     <Mail className="w-3.5 h-3.5" />
-                    {offerMode ? 'Close' : 'Prepare Founder Mail'}
+                    {offerMode ? 'Close' : 'Prepare / Send Offer'}
                   </button>
                 )}
 
+                {/* Resend offer email */}
+                {canResendOffer && !offerMode && (
+                  <button
+                    type="button"
+                    disabled={acting}
+                    onClick={resendOffer}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-[#71717A] text-xs uppercase tracking-wider transition-colors border border-white/10 disabled:opacity-50"
+                  >
+                    <Mail className="w-3.5 h-3.5" /> Resend Offer
+                  </button>
+                )}
+
+                {/* Schedule session */}
                 {canSchedule && (
                   <button
                     type="button"
@@ -335,28 +430,32 @@ function EnquiryRow({ enq }) {
                   </button>
                 )}
 
-                {enq.status === 'pending_founder_offer' && (
-                  <p className="text-xs text-amber-400">
-                    <Clock className="w-3 h-3 inline mr-1" />
-                    Proposal sent — awaiting founder response
-                  </p>
-                )}
-
-                {enq.status === 'rager_confirmation_pending' && (
+                {/* Status messages */}
+                {enq.status === 'reconfirmation_pending' && (
                   <p className="text-xs text-sky-400">
                     <Clock className="w-3 h-3 inline mr-1" />
-                    Founder accepted — awaiting rager confirmation
+                    Reconfirmation sent — waiting for rager responses
                   </p>
                 )}
-
+                {enq.status === 'founder_offer_ready' && (
+                  <p className="text-xs text-teal-400">
+                    <CheckCircle className="w-3 h-3 inline mr-1" />
+                    Rager(s) reconfirmed — ready to send offer to founder
+                  </p>
+                )}
+                {(enq.status === 'founder_offer_sent' || enq.status === 'pending_founder_offer') && (
+                  <p className="text-xs text-amber-400">
+                    <Clock className="w-3 h-3 inline mr-1" />
+                    Offer sent — awaiting founder response
+                  </p>
+                )}
                 {enq.status === 'founder_rejected' && (
                   <p className="text-xs text-red-400">
                     <XCircle className="w-3 h-3 inline mr-1" />
                     Founder declined proposal
                   </p>
                 )}
-
-                {enq.status === 'confirmed' && (
+                {(enq.status === 'confirmed_ready_to_schedule' || enq.status === 'confirmed') && (
                   <p className="text-xs text-emerald-400">
                     <CheckCircle className="w-3 h-3 inline mr-1" />
                     Session confirmed — ready to schedule
@@ -455,16 +554,25 @@ function EnquiryRow({ enq }) {
                     </OfferField>
                   </div>
 
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      type="button"
-                      disabled={acting}
-                      onClick={sendOffer}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-[#DC143C] hover:bg-[#B01030] text-white text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
-                    >
-                      {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-                      Send to Founder
-                    </button>
+                  {/* Reconfirmation status hint */}
+                  {reconfirmedCount === 0 && reconfirmPending === 0 && shortlistedAccepted > 0 && (
+                    <p className="text-[10px] text-[#52525B] bg-white/[0.02] border border-white/5 px-3 py-2">
+                      Save the draft first, then send reconfirmation emails to shortlisted ragers before sending the offer to the founder.
+                    </p>
+                  )}
+                  {reconfirmPending > 0 && reconfirmedCount === 0 && (
+                    <p className="text-[10px] text-sky-400 bg-sky-500/5 border border-sky-500/10 px-3 py-2">
+                      Reconfirmation sent to {reconfirmPending} rager(s) — waiting for responses before offer can go to founder.
+                    </p>
+                  )}
+                  {reconfirmedCount > 0 && (
+                    <p className="text-[10px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2">
+                      {reconfirmedCount} rager(s) reconfirmed ✓ — ready to send offer to founder.
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-3 pt-2 flex-wrap">
+                    {/* Save draft */}
                     <button
                       type="button"
                       disabled={offerSaving || acting}
@@ -472,6 +580,32 @@ function EnquiryRow({ enq }) {
                       className="px-4 py-2.5 border border-white/10 text-[#71717A] hover:text-[#F5F5F0] hover:border-white/20 text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
                     >
                       {offerSaving ? 'Saving…' : 'Save Draft'}
+                    </button>
+
+                    {/* Send reconfirmation — requires draft saved, eligible ragers exist */}
+                    {canSendReconfirmation && (
+                      <button
+                        type="button"
+                        disabled={acting || !savedOffer}
+                        onClick={sendReconfirmation}
+                        title={!savedOffer ? 'Save the draft first' : ''}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 text-xs uppercase tracking-wider transition-colors disabled:opacity-50"
+                      >
+                        {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                        Send Reconfirmation ({shortlistedAccepted + reconfirmPending})
+                      </button>
+                    )}
+
+                    {/* Send to founder — requires at least one reconfirmed rager */}
+                    <button
+                      type="button"
+                      disabled={acting || !canSendToFounder}
+                      onClick={sendOffer}
+                      title={!canSendToFounder ? (reconfirmedCount === 0 ? 'Wait for rager reconfirmation first' : 'Save the draft first') : ''}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-[#DC143C] hover:bg-[#B01030] text-white text-xs uppercase tracking-wider transition-colors disabled:opacity-40"
+                    >
+                      {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+                      Send to Founder
                     </button>
                   </div>
                 </div>
