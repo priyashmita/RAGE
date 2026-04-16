@@ -36,7 +36,8 @@ export default function RSVPPage() {
         const res = await axios.get(`${BASE}/api/public/rsvp/${token}`);
         setData(res.data);
       } catch (err) {
-        setError(err?.response?.status === 404 ? 'invalid' : 'error');
+        const status = err?.response?.status;
+        setError(status === 404 ? 'invalid' : status === 410 ? 'gone' : 'error');
       } finally { setLoading(false); }
     }
     load();
@@ -51,7 +52,8 @@ export default function RSVPPage() {
       });
       setDone({ attending, message: res.data.message });
     } catch (err) {
-      setError('submit_error');
+      if (err?.response?.status === 410) setError('gone');
+      else setError('submit_error');
     } finally { setSubmitting(false); }
   }
 
@@ -68,6 +70,15 @@ export default function RSVPPage() {
       <div className="text-center py-16">
         <p className="text-[#888] text-sm">This link is no longer valid.</p>
         <p className="text-[#aaa] text-xs mt-2">Please contact the RAGE team if you believe this is an error.</p>
+      </div>
+    </Shell>
+  );
+
+  if (error === 'gone') return (
+    <Shell>
+      <div className="text-center py-16">
+        <p className="text-[#888] text-sm">This event is no longer active.</p>
+        <p className="text-[#aaa] text-xs mt-2">Please contact the RAGE team for more information.</p>
       </div>
     </Shell>
   );

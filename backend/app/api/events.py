@@ -109,6 +109,15 @@ def _invite_summary(event_id: str) -> dict:
     return {"total": total, "rsvp_yes": yes, "rsvp_no": no, "prereads": pre}
 
 
+def _require_not_archived(ev: dict) -> None:
+    """Raise 423 Locked if the event is archived. Call before any mutating action."""
+    if ev.get("status") == "archived":
+        raise HTTPException(
+            status_code=423,
+            detail="Event is archived. Restore it before taking this action.",
+        )
+
+
 # ─── Events CRUD ──────────────────────────────────────────────────────────────
 
 @router.post("/admin/events")
@@ -149,10 +158,16 @@ def get_event(event_id: str, admin=Depends(require_admin)):
 
 @router.put("/admin/events/{event_id}")
 def update_event(event_id: str, data: EventUpdate, admin=Depends(require_admin)):
-    _get_event_or_404(event_id)
+    ev = _get_event_or_404(event_id)
+    _require_not_archived(ev)
     patch = {k: v for k, v in data.model_dump().items() if v is not None}
     if not patch:
         raise HTTPException(status_code=400, detail="Nothing to update")
+    if patch.get("status") == "archived":
+        raise HTTPException(
+            status_code=400,
+            detail="Use the /archive endpoint to archive an event.",
+        )
     patch["updated_at"] = _NOW()
     db.events.update_one({"id": event_id}, {"$set": patch})
     return db.events.find_one({"id": event_id}, {"_id": 0})
@@ -173,11 +188,50 @@ def delete_event(event_id: str, admin=Depends(require_admin)):
     return {"deleted": True}
 
 
+# ─── Archive / Restore ───────────────────────────────────────────────────────
+
+@router.post("/admin/events/{event_id}/archive")
+def archive_event(event_id: str, admin=Depends(require_admin)):
+    """
+    Archive an event. Preserves all data for audit/history.
+    All public token links become inactive (410 Gone).
+    No emails can be sent while archived.
+    """
+    ev = _get_event_or_404(event_id)
+    if ev.get("status") == "archived":
+        raise HTTPException(status_code=400, detail="Event is already archived")
+    db.events.update_one({"id": event_id}, {"$set": {
+        "status":             "archived",
+        "archived_at":        _NOW(),
+        "archived_by":        admin.get("id"),
+        "pre_archive_status": ev.get("status"),   # remembered for reference
+    }})
+    return db.events.find_one({"id": event_id}, {"_id": 0})
+
+
+@router.post("/admin/events/{event_id}/restore")
+def restore_event(event_id: str, admin=Depends(require_admin)):
+    """
+    Restore an archived event to 'draft' status.
+    Does not auto-send anything. Admin must take all actions explicitly.
+    """
+    ev = _get_event_or_404(event_id)
+    if ev.get("status") != "archived":
+        raise HTTPException(status_code=400, detail="Event is not archived")
+    db.events.update_one({"id": event_id}, {"$set": {
+        "status":      "draft",
+        "restored_at": _NOW(),
+        "restored_by": admin.get("id"),
+    }})
+    return db.events.find_one({"id": event_id}, {"_id": 0})
+
+
 # ─── Guest / Invite management ────────────────────────────────────────────────
 
 @router.post("/admin/events/{event_id}/guests")
 def add_guest(event_id: str, data: GuestIn, admin=Depends(require_admin)):
-    _get_event_or_404(event_id)
+    ev = _get_event_or_404(event_id)
+    _require_not_archived(ev)
 
     # Prevent duplicate email per event
     existing = db.invites.find_one({"event_id": event_id, "email": data.email.lower()})
@@ -241,6 +295,7 @@ def remove_guest(event_id: str, guest_id: str, admin=Depends(require_admin)):
 @router.post("/admin/events/{event_id}/send-invites")
 def send_invites(event_id: str, data: SendInvitesIn, admin=Depends(require_admin)):
     ev = _get_event_or_404(event_id)
+    _require_not_archived(ev)
 
     query = {"event_id": event_id, "invite_sent": False}
     if data.invite_ids:
@@ -287,6 +342,7 @@ def send_invites(event_id: str, data: SendInvitesIn, admin=Depends(require_admin
 @router.post("/admin/events/{event_id}/send-prereads")
 def send_prereads(event_id: str, data: SendPrereadsIn, admin=Depends(require_admin)):
     ev = _get_event_or_404(event_id)
+    _require_not_archived(ev)
 
     query = {"event_id": event_id, "rsvp_status": "yes", "preread_sent": False}
     if data.invite_ids:
@@ -329,6 +385,7 @@ def send_prereads(event_id: str, data: SendPrereadsIn, admin=Depends(require_adm
 @router.post("/admin/events/{event_id}/send-confirmation")
 def send_confirmation(event_id: str, data: SendConfirmationIn, admin=Depends(require_admin)):
     ev = _get_event_or_404(event_id)
+    _require_not_archived(ev)
 
     query = {"event_id": event_id, "rsvp_status": "yes"}
     if data.invite_ids:
@@ -587,6 +644,7 @@ def get_intro_suggestions(event_id: str, admin=Depends(require_admin)):
 @router.post("/admin/events/{event_id}/intros/send")
 def send_intro(event_id: str, data: IntroSendIn, admin=Depends(require_admin)):
     ev = _get_event_or_404(event_id)
+    _require_not_archived(ev)
 
     inv_a = db.invites.find_one({"id": data.invite_id_a, "event_id": event_id}, {"_id": 0})
     inv_b = db.invites.find_one({"id": data.invite_id_b, "event_id": event_id}, {"_id": 0})

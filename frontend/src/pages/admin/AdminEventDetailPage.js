@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import {
   ChevronLeft, Loader2, Plus, Trash2, Send, Users, Search,
   RefreshCw, CheckCircle2, XCircle, Clock, AlertCircle,
-  ArrowLeftRight, Sparkles, Mail,
+  ArrowLeftRight, Sparkles, Mail, Archive, RotateCcw,
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -25,8 +25,10 @@ const STATUS_META = {
   confirmed:    { label: 'Confirmed',   color: 'text-emerald-400 border-emerald-500/20' },
   completed:    { label: 'Completed',   color: 'text-[#A1A1AA] border-white/10' },
   cancelled:    { label: 'Cancelled',   color: 'text-red-400 border-red-500/20' },
+  archived:     { label: 'Archived',    color: 'text-[#52525B] border-white/8' },
 };
 
+// archived is intentionally excluded — use archive/restore endpoints
 const STATUS_ORDER = ['draft', 'invites_sent', 'rsvp_open', 'confirmed', 'completed', 'cancelled'];
 
 const RSVP_DOT = {
@@ -77,7 +79,7 @@ function EmptyState({ icon: Icon, text, sub }) {
 
 // ─── Tab: Details ─────────────────────────────────────────────────────────────
 
-function DetailsTab({ event, onRefresh }) {
+function DetailsTab({ event, onRefresh, isArchived }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
 
@@ -126,6 +128,7 @@ function DetailsTab({ event, onRefresh }) {
         <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border ${meta.color}`}>
           {meta.label}
         </span>
+        {!isArchived && (
         <div className="flex gap-1.5">
           {nextStatuses.map(s => (
             <button
@@ -137,6 +140,7 @@ function DetailsTab({ event, onRefresh }) {
             </button>
           ))}
         </div>
+        )}
       </div>
 
       <div>
@@ -226,8 +230,9 @@ function DetailsTab({ event, onRefresh }) {
       </div>
       <Button
         onClick={save}
-        disabled={saving}
-        className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-9 px-6 text-sm"
+        disabled={saving || isArchived}
+        title={isArchived ? 'Restore the event before editing' : undefined}
+        className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-9 px-6 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
       </Button>
@@ -237,7 +242,7 @@ function DetailsTab({ event, onRefresh }) {
 
 // ─── Tab: Guest List ──────────────────────────────────────────────────────────
 
-function GuestListTab({ event, guests, onRefresh }) {
+function GuestListTab({ event, guests, onRefresh, isArchived }) {
   const [showAdd, setShowAdd] = useState(false);
   const [addMode, setAddMode] = useState('rager');   // 'rager' | 'manual'
   const [ragers, setRagers] = useState([]);
@@ -315,7 +320,7 @@ function GuestListTab({ event, guests, onRefresh }) {
     <div>
       <SectionHeader
         title={`${guests.length} guest${guests.length !== 1 ? 's' : ''}`}
-        action={
+        action={!isArchived && (
           <div className="flex gap-2">
             <Button
               onClick={() => openAdd('rager')}
@@ -332,7 +337,7 @@ function GuestListTab({ event, guests, onRefresh }) {
               <Plus className="w-3.5 h-3.5" /> Add manually
             </Button>
           </div>
-        }
+        )}
       />
 
       {guests.length === 0 ? (
@@ -504,7 +509,7 @@ function GuestListTab({ event, guests, onRefresh }) {
 
 // ─── Tab: Invite Status ───────────────────────────────────────────────────────
 
-function InviteStatusTab({ event, guests, onRefresh }) {
+function InviteStatusTab({ event, guests, onRefresh, isArchived }) {
   const [sending, setSending] = useState(null);
 
   async function sendBatch(endpoint, label) {
@@ -528,30 +533,39 @@ function InviteStatusTab({ event, guests, onRefresh }) {
     <div>
       {/* Action bar */}
       <div className="flex flex-wrap gap-3 mb-6 p-4 bg-[#080808] border border-white/8">
-        <button
-          onClick={() => sendBatch('send-invites', 'invites')}
-          disabled={!!sending || uninvited === 0}
-          className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          {sending === 'send-invites' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-          Send Invites ({uninvited} unsent)
-        </button>
-        <button
-          onClick={() => sendBatch('send-prereads', 'pre-read requests')}
-          disabled={!!sending || yesNoPreread === 0}
-          className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          {sending === 'send-prereads' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
-          Send Pre-read Requests ({yesNoPreread} eligible)
-        </button>
-        <button
-          onClick={() => sendBatch('send-confirmation', 'confirmations')}
-          disabled={!!sending || confirmed === 0}
-          className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-        >
-          {sending === 'send-confirmation' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-          Send Confirmations + Package ({confirmed} confirmed)
-        </button>
+        {isArchived ? (
+          <p className="text-xs text-[#52525B] flex items-center gap-1.5">
+            <Archive className="w-3.5 h-3.5" />
+            Email dispatch is disabled while this event is archived.
+          </p>
+        ) : (
+          <>
+            <button
+              onClick={() => sendBatch('send-invites', 'invites')}
+              disabled={!!sending || uninvited === 0}
+              className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {sending === 'send-invites' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              Send Invites ({uninvited} unsent)
+            </button>
+            <button
+              onClick={() => sendBatch('send-prereads', 'pre-read requests')}
+              disabled={!!sending || yesNoPreread === 0}
+              className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {sending === 'send-prereads' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mail className="w-3.5 h-3.5" />}
+              Send Pre-read Requests ({yesNoPreread} eligible)
+            </button>
+            <button
+              onClick={() => sendBatch('send-confirmation', 'confirmations')}
+              disabled={!!sending || confirmed === 0}
+              className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {sending === 'send-confirmation' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Send Confirmations + Package ({confirmed} confirmed)
+            </button>
+          </>
+        )}
       </div>
 
       {guests.length === 0 ? (
@@ -669,7 +683,7 @@ function PrereadsTab({ event }) {
 
 // ─── Tab: Seating ─────────────────────────────────────────────────────────────
 
-function SeatingTab({ event, guests }) {
+function SeatingTab({ event, guests, isArchived }) {
   const [seating, setSeating] = useState(null);
   const [loading, setLoading] = useState(true);
   const [suggesting, setSuggesting] = useState(false);
@@ -750,6 +764,13 @@ function SeatingTab({ event, guests }) {
     <div>
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-[#080808] border border-white/8">
+        {isArchived ? (
+          <p className="text-xs text-[#52525B] flex items-center gap-1.5">
+            <Archive className="w-3.5 h-3.5" />
+            Seating changes are disabled while this event is archived.
+          </p>
+        ) : (
+        <>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-[#71717A] whitespace-nowrap">Tables</Label>
           <Input
@@ -792,6 +813,8 @@ function SeatingTab({ event, guests }) {
           <span className="text-xs text-emerald-400 border border-emerald-400/30 px-2 py-1">
             Finalised
           </span>
+        )}
+        </>
         )}
       </div>
 
@@ -888,7 +911,7 @@ function SeatingTab({ event, guests }) {
 
 // ─── Tab: Intro Engine ────────────────────────────────────────────────────────
 
-function IntroEngineTab({ event, guests }) {
+function IntroEngineTab({ event, guests, isArchived }) {
   const [pairs, setPairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(null);
@@ -961,7 +984,9 @@ function IntroEngineTab({ event, guests }) {
             </button>
             <button
               onClick={() => setShowManual(true)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] transition-colors"
+              disabled={isArchived}
+              title={isArchived ? 'Restore the event to send intros' : undefined}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <Plus className="w-3 h-3" /> Manual Pair
             </button>
@@ -999,8 +1024,9 @@ function IntroEngineTab({ event, guests }) {
                 </div>
                 <button
                   onClick={() => sendIntro(pair)}
-                  disabled={isSending}
-                  className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 transition-colors"
+                  disabled={isSending || isArchived}
+                  title={isArchived ? 'Restore the event to send intros' : undefined}
+                  className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                   Send Intro
@@ -1093,6 +1119,7 @@ export default function AdminEventDetailPage() {
   const [event, setEvent] = useState(null);
   const [guests, setGuests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [archiving, setArchiving] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -1109,6 +1136,29 @@ export default function AdminEventDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  async function handleArchive() {
+    if (!window.confirm(`Archive "${event.title}"? Public token links will return 410 Gone. You can restore it later.`)) return;
+    setArchiving(true);
+    try {
+      await api.post(`/admin/events/${id}/archive`);
+      toast.success('Event archived');
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to archive');
+    } finally { setArchiving(false); }
+  }
+
+  async function handleRestore() {
+    setArchiving(true);
+    try {
+      await api.post(`/admin/events/${id}/restore`);
+      toast.success('Event restored to draft');
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to restore');
+    } finally { setArchiving(false); }
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-24">
       <Loader2 className="w-5 h-5 animate-spin text-[#52525B]" />
@@ -1122,11 +1172,12 @@ export default function AdminEventDetailPage() {
   );
 
   const meta = STATUS_META[event.status] || STATUS_META.draft;
+  const isArchived = event.status === 'archived';
 
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start gap-3 mb-6">
+      <div className="flex items-start gap-3 mb-4">
         <button
           onClick={() => navigate('/admin/events')}
           className="mt-1 text-[#52525B] hover:text-[#A1A1AA] transition-colors"
@@ -1135,7 +1186,9 @@ export default function AdminEventDetailPage() {
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl font-medium text-[#F5F5F0] truncate">{event.title}</h1>
+            <h1 className={`text-xl font-medium truncate ${isArchived ? 'text-[#71717A]' : 'text-[#F5F5F0]'}`}>
+              {event.title}
+            </h1>
             <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border ${meta.color}`}>
               {meta.label}
             </span>
@@ -1144,7 +1197,43 @@ export default function AdminEventDetailPage() {
             {event.location}{event.date ? ` · ${new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''}
           </p>
         </div>
+        {/* Archive / Restore button */}
+        <div className="shrink-0 mt-0.5">
+          {isArchived ? (
+            <button
+              onClick={handleRestore}
+              disabled={archiving}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-400/10 disabled:opacity-40 transition-colors"
+            >
+              {archiving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+              Restore
+            </button>
+          ) : (
+            <button
+              onClick={handleArchive}
+              disabled={archiving}
+              className="flex items-center gap-1.5 text-xs px-3 py-2 border border-white/10 text-[#52525B] hover:text-[#A1A1AA] hover:border-white/20 disabled:opacity-40 transition-colors"
+            >
+              {archiving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Archive className="w-3.5 h-3.5" />}
+              Archive
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Archived banner */}
+      {isArchived && (
+        <div className="flex items-start gap-3 mb-5 p-4 border border-[#52525B]/30 bg-[#0A0A0A]">
+          <Archive className="w-4 h-4 text-[#52525B] shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-[#71717A]">This event is archived.</p>
+            <p className="text-xs text-[#52525B] mt-0.5">
+              All public RSVP and pre-read links return 410 Gone. Guest data and history are preserved.
+              No emails can be sent. Restore to resume working on this event.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Tab bar */}
       <div className="flex border-b border-white/8 mb-6 overflow-x-auto">
@@ -1164,12 +1253,12 @@ export default function AdminEventDetailPage() {
       </div>
 
       {/* Tab content */}
-      {tab === 'Details'       && <DetailsTab event={event} onRefresh={load} />}
-      {tab === 'Guest List'    && <GuestListTab event={event} guests={guests} onRefresh={load} />}
-      {tab === 'Invite Status' && <InviteStatusTab event={event} guests={guests} onRefresh={load} />}
+      {tab === 'Details'       && <DetailsTab event={event} onRefresh={load} isArchived={isArchived} />}
+      {tab === 'Guest List'    && <GuestListTab event={event} guests={guests} onRefresh={load} isArchived={isArchived} />}
+      {tab === 'Invite Status' && <InviteStatusTab event={event} guests={guests} onRefresh={load} isArchived={isArchived} />}
       {tab === 'Pre-reads'     && <PrereadsTab event={event} />}
-      {tab === 'Seating'       && <SeatingTab event={event} guests={guests} />}
-      {tab === 'Intro Engine'  && <IntroEngineTab event={event} guests={guests} />}
+      {tab === 'Seating'       && <SeatingTab event={event} guests={guests} isArchived={isArchived} />}
+      {tab === 'Intro Engine'  && <IntroEngineTab event={event} guests={guests} isArchived={isArchived} />}
     </div>
   );
 }

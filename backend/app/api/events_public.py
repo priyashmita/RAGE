@@ -29,10 +29,21 @@ def _public_event(event_id: str) -> dict:
     ev = db.events.find_one({"id": event_id}, {"_id": 0})
     if not ev:
         raise HTTPException(status_code=404, detail="Event not found")
+    if ev.get("status") == "archived":
+        raise HTTPException(status_code=410, detail="This event is no longer active")
     # Strip admin-only fields
     ev.pop("created_by", None)
     ev.pop("pre_read_content", None)
     return ev
+
+
+def _check_event_not_archived(event_id: str) -> None:
+    """Used by endpoints that don't call _public_event directly."""
+    ev = db.events.find_one({"id": event_id}, {"_id": 0, "status": 1})
+    if not ev:
+        raise HTTPException(status_code=404, detail="Event not found")
+    if ev.get("status") == "archived":
+        raise HTTPException(status_code=410, detail="This event is no longer active")
 
 
 # ─── Pydantic models ──────────────────────────────────────────────────────────
@@ -73,6 +84,7 @@ def get_rsvp_page(token: str):
 def submit_rsvp(token: str, data: RsvpIn):
     """Submit RSVP yes or no."""
     inv = _resolve_token(token)
+    _check_event_not_archived(inv["event_id"])
 
     if inv.get("rsvp_status") not in ("pending", "yes", "no"):
         raise HTTPException(status_code=400, detail="RSVP is no longer editable")
@@ -131,6 +143,7 @@ def get_preread_form(token: str):
 def submit_preread(token: str, data: PrereadIn):
     """Submit or update the pre-read form."""
     inv = _resolve_token(token)
+    _check_event_not_archived(inv["event_id"])
 
     if inv.get("rsvp_status") != "yes":
         raise HTTPException(
@@ -178,6 +191,7 @@ def get_preread_package(token: str):
     Open questions stay admin-only.
     """
     inv = _resolve_token(token)
+    _check_event_not_archived(inv["event_id"])
 
     if inv.get("rsvp_status") != "yes":
         raise HTTPException(

@@ -34,7 +34,7 @@ export default function PrereadViewPage() {
         setData(res.data);
       } catch (err) {
         const status = err?.response?.status;
-        setError(status === 404 ? 'invalid' : status === 403 ? 'not_attending' : 'error');
+        setError(status === 404 ? 'invalid' : status === 403 ? 'not_attending' : status === 410 ? 'gone' : 'error');
       } finally { setLoading(false); }
     }
     load();
@@ -50,6 +50,10 @@ export default function PrereadViewPage() {
 
   if (error === 'not_attending') return (
     <Shell><div className="text-center py-16"><p className="text-sm text-[#888]">The pre-read package is only available to confirmed guests.</p></div></Shell>
+  );
+
+  if (error === 'gone') return (
+    <Shell><div className="text-center py-16"><p className="text-sm text-[#888]">This event is no longer active.</p><p className="text-xs text-[#bbb] mt-2">Please contact the RAGE team for more information.</p></div></Shell>
   );
 
   if (error) return (

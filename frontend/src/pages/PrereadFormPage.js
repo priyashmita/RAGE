@@ -78,6 +78,7 @@ export default function PrereadFormPage() {
         const status = err?.response?.status;
         if (status === 404) setError('invalid');
         else if (status === 403) setError('not_attending');
+        else if (status === 410) setError('gone');
         else setError('error');
       } finally { setLoading(false); }
     }
@@ -121,6 +122,15 @@ export default function PrereadFormPage() {
       <div className="text-center py-16">
         <p className="text-sm text-[#888]">The pre-read form is only available to confirmed attendees.</p>
         <p className="text-xs text-[#aaa] mt-2">Please RSVP first, then return to this link.</p>
+      </div>
+    </Shell>
+  );
+
+  if (error === 'gone') return (
+    <Shell>
+      <div className="text-center py-16">
+        <p className="text-sm text-[#888]">This event is no longer active.</p>
+        <p className="text-xs text-[#aaa] mt-2">Please contact the RAGE team for more information.</p>
       </div>
     </Shell>
   );

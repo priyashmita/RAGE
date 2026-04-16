@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, CalendarDays, MapPin, Users, ChevronRight, Loader2 } from 'lucide-react';
+import { Plus, CalendarDays, MapPin, Users, ChevronRight, Loader2, Archive, RotateCcw } from 'lucide-react';
 
 const STATUS_META = {
   draft:        { label: 'Draft',        color: 'text-[#71717A] border-white/10' },
@@ -17,6 +17,7 @@ const STATUS_META = {
   confirmed:    { label: 'Confirmed',   color: 'text-emerald-400 border-emerald-500/20' },
   completed:    { label: 'Completed',   color: 'text-[#A1A1AA] border-white/10' },
   cancelled:    { label: 'Cancelled',   color: 'text-red-400 border-red-500/20' },
+  archived:     { label: 'Archived',    color: 'text-[#52525B] border-white/8' },
 };
 
 const EMPTY = {
@@ -39,6 +40,8 @@ export default function AdminEventsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [actioning, setActioning] = useState(null);
   const [form, setForm] = useState(EMPTY);
 
   useEffect(() => { load(); }, []);
@@ -71,6 +74,100 @@ export default function AdminEventsPage() {
     } finally { setCreating(false); }
   }
 
+  async function archiveEvent(e, ev) {
+    e.stopPropagation();
+    if (!window.confirm(`Archive "${ev.title}"? Public links will return 410 Gone. You can restore it later.`)) return;
+    setActioning(ev.id);
+    try {
+      await api.post(`/admin/events/${ev.id}/archive`);
+      toast.success('Event archived');
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to archive');
+    } finally { setActioning(null); }
+  }
+
+  async function restoreEvent(e, ev) {
+    e.stopPropagation();
+    setActioning(ev.id);
+    try {
+      await api.post(`/admin/events/${ev.id}/restore`);
+      toast.success('Event restored to draft');
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to restore');
+    } finally { setActioning(null); }
+  }
+
+  const active   = events.filter(ev => ev.status !== 'archived');
+  const archived = events.filter(ev => ev.status === 'archived');
+
+  function EventRow({ ev, isArchived: rowArchived }) {
+    const meta = STATUS_META[ev.status] || STATUS_META.draft;
+    const s = ev._summary || {};
+    const busy = actioning === ev.id;
+    return (
+      <button
+        onClick={() => navigate(`/admin/events/${ev.id}`)}
+        className={`w-full text-left border transition-colors p-5 group ${
+          rowArchived
+            ? 'bg-[#050505] border-white/5 opacity-60 hover:opacity-80'
+            : 'bg-[#080808] border-white/8 hover:border-white/15'
+        }`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-3 mb-2">
+              <span className={`font-medium text-sm truncate ${rowArchived ? 'text-[#71717A]' : 'text-[#F5F5F0]'}`}>
+                {ev.title}
+              </span>
+              <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border ${meta.color}`}>
+                {meta.label}
+              </span>
+            </div>
+            <div className="flex items-center gap-5 text-xs text-[#71717A]">
+              <span className="flex items-center gap-1.5">
+                <CalendarDays className="w-3.5 h-3.5" />{fmt(ev.date)}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />{ev.location || '—'}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                {s.total ?? 0} invited · {s.rsvp_yes ?? 0} yes · {s.prereads ?? 0} pre-reads
+              </span>
+            </div>
+            {ev.theme && <p className="text-xs text-[#52525B] mt-1.5 italic">"{ev.theme}"</p>}
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-0.5">
+            {rowArchived ? (
+              <button
+                onClick={e => restoreEvent(e, ev)}
+                disabled={busy}
+                title="Restore to draft"
+                className="flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-1 border border-white/10 text-[#71717A] hover:text-emerald-400 hover:border-emerald-400/30 disabled:opacity-40 transition-colors"
+              >
+                {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                Restore
+              </button>
+            ) : (
+              <button
+                onClick={e => archiveEvent(e, ev)}
+                disabled={busy}
+                title="Archive event"
+                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 text-[10px] uppercase tracking-wider px-2 py-1 border border-white/10 text-[#52525B] hover:text-[#A1A1AA] hover:border-white/20 disabled:opacity-40 transition-all"
+              >
+                {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Archive className="w-3 h-3" />}
+                Archive
+              </button>
+            )}
+            <ChevronRight className={`w-4 h-4 transition-colors ${rowArchived ? 'text-[#3F3F46]' : 'text-[#3F3F46] group-hover:text-[#71717A]'}`} />
+          </div>
+        </div>
+      </button>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -90,7 +187,7 @@ export default function AdminEventsPage() {
         <div className="flex items-center justify-center py-24">
           <Loader2 className="w-5 h-5 animate-spin text-[#52525B]" />
         </div>
-      ) : events.length === 0 ? (
+      ) : active.length === 0 && archived.length === 0 ? (
         <div className="text-center py-24 border border-white/8">
           <CalendarDays className="w-8 h-8 text-[#3F3F46] mx-auto mb-4" />
           <p className="text-[#52525B] text-sm">No events yet</p>
@@ -98,46 +195,31 @@ export default function AdminEventsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {events.map(ev => {
-            const meta = STATUS_META[ev.status] || STATUS_META.draft;
-            const s = ev._summary || {};
-            return (
+          {active.length === 0 ? (
+            <div className="text-center py-12 border border-white/8">
+              <p className="text-[#52525B] text-sm">No active events</p>
+            </div>
+          ) : (
+            active.map(ev => <EventRow key={ev.id} ev={ev} isArchived={false} />)
+          )}
+
+          {/* Archived section */}
+          {archived.length > 0 && (
+            <div className="pt-4">
               <button
-                key={ev.id}
-                onClick={() => navigate(`/admin/events/${ev.id}`)}
-                className="w-full text-left bg-[#080808] border border-white/8 hover:border-white/15 transition-colors p-5 group"
+                onClick={() => setShowArchived(v => !v)}
+                className="flex items-center gap-2 text-xs text-[#52525B] hover:text-[#71717A] transition-colors mb-3"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-[#F5F5F0] font-medium text-sm truncate">{ev.title}</span>
-                      <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border ${meta.color}`}>
-                        {meta.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-5 text-xs text-[#71717A]">
-                      <span className="flex items-center gap-1.5">
-                        <CalendarDays className="w-3.5 h-3.5" />
-                        {fmt(ev.date)}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {ev.location || '—'}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5" />
-                        {s.total ?? 0} invited · {s.rsvp_yes ?? 0} yes · {s.prereads ?? 0} pre-reads
-                      </span>
-                    </div>
-                    {ev.theme && (
-                      <p className="text-xs text-[#52525B] mt-1.5 italic">"{ev.theme}"</p>
-                    )}
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-[#3F3F46] group-hover:text-[#71717A] transition-colors mt-1 shrink-0" />
-                </div>
+                <Archive className="w-3.5 h-3.5" />
+                {showArchived ? 'Hide' : 'Show'} archived ({archived.length})
               </button>
-            );
-          })}
+              {showArchived && (
+                <div className="space-y-1.5">
+                  {archived.map(ev => <EventRow key={ev.id} ev={ev} isArchived={true} />)}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
