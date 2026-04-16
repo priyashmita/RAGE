@@ -33,6 +33,11 @@ import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
 import RespondPage from '@/pages/RespondPage';
 import FounderSelectPage from '@/pages/FounderSelectPage';
+import AdminEventsPage from '@/pages/admin/AdminEventsPage';
+import AdminEventDetailPage from '@/pages/admin/AdminEventDetailPage';
+import RSVPPage from '@/pages/RSVPPage';
+import PrereadFormPage from '@/pages/PrereadFormPage';
+import PrereadViewPage from '@/pages/PrereadViewPage';
 import '@/App.css';
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -116,6 +121,9 @@ function App() {
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/respond/:anon_token" element={<RespondPage />} />
           <Route path="/founder-select/:token" element={<FounderSelectPage />} />
+          <Route path="/rsvp/:token" element={<RSVPPage />} />
+          <Route path="/preread/:token" element={<PrereadFormPage />} />
+          <Route path="/preread-view/:token" element={<PrereadViewPage />} />
 
           <Route
             element={
@@ -145,6 +153,8 @@ function App() {
             <Route path="responses" element={<AdminResponsesPage />} />
             <Route path="matching" element={<MatchingPanel />} />
             <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="events" element={<AdminEventsPage />} />
+            <Route path="events/:id" element={<AdminEventDetailPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

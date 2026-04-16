@@ -14,6 +14,8 @@ from app.api.contacts import router as contacts_router
 from app.api.users import router as users_router
 from app.api.founder import router as founder_router
 from app.api.public_outreach import router as public_outreach_router
+from app.api.events import router as events_router
+from app.api.events_public import router as events_public_router
 from app.core.db import db
 
 app = FastAPI()
@@ -50,6 +52,16 @@ def auto_seed_content():
     db.users.create_index("email", unique=True, background=True)
     db.users.create_index("id",    unique=True, background=True)
     db.ragers.create_index("id",   unique=True, background=True)
+
+    # Private Table indexes
+    db.events.create_index("id",         unique=True, background=True)
+    db.invites.create_index("id",        unique=True, background=True)
+    db.invites.create_index("token",     unique=True, sparse=True, background=True)
+    db.invites.create_index("event_id",  background=True)
+    db.prereads.create_index("id",       unique=True, sparse=True, background=True)
+    db.prereads.create_index("invite_id", unique=True, sparse=True, background=True)
+    db.seatings.create_index("id",       unique=True, background=True)
+    db.seatings.create_index("event_id", background=True)
 
 
 @app.get("/")
@@ -88,3 +100,5 @@ app.include_router(contacts_router,  prefix="/api")
 app.include_router(users_router,     prefix="/api")
 app.include_router(founder_router,        prefix="/api")
 app.include_router(public_outreach_router, prefix="/api")
+app.include_router(events_router,         prefix="/api")
+app.include_router(events_public_router,  prefix="/api")

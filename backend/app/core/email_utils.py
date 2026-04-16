@@ -124,6 +124,191 @@ def invite_email_html(name: str, setup_url: str, role: str) -> str:
   </p>""")
 
 
+# ── Private Table email templates ────────────────────────────────────────────
+
+def event_invite_html(
+    name: str,
+    event_title: str,
+    event_date: str,
+    location: str,
+    theme: str,
+    rsvp_url: str,
+) -> str:
+    theme_line = f"""
+  <p style="font-size:13px;color:#8a8a8a;margin:0 0 32px;letter-spacing:0.03em;">
+    Theme: {theme}
+  </p>""" if theme else ""
+    return _base(f"""
+  <h2 style="font-size:22px;font-weight:400;margin:0 0 16px;">
+    You're invited to {event_title}
+  </h2>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 8px;">
+    Hi {name},
+  </p>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 24px;">
+    We'd love to have you join us for an intimate evening with fellow founders
+    and industry leaders.
+  </p>
+  <table style="width:100%;border-collapse:collapse;margin:0 0 32px;">
+    <tr>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:12px;
+                 letter-spacing:0.06em;text-transform:uppercase;color:#8a8a8a;
+                 width:30%;">Date</td>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:14px;color:#1a1a1a;">
+        {event_date}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:12px;
+                 letter-spacing:0.06em;text-transform:uppercase;color:#8a8a8a;">
+        Location
+      </td>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:14px;color:#1a1a1a;">
+        {location}
+      </td>
+    </tr>
+  </table>
+  {theme_line}
+  <a href="{rsvp_url}"
+     style="display:inline-block;background:#1c2b1c;color:#fff;
+            text-decoration:none;padding:14px 28px;font-size:12px;
+            letter-spacing:0.06em;text-transform:uppercase;">
+    RSVP Now
+  </a>
+  <p style="font-size:13px;color:#888;margin:32px 0 0;">
+    Seats are limited. Please respond at your earliest convenience.
+  </p>""")
+
+
+def preread_request_html(name: str, event_title: str, preread_url: str) -> str:
+    return _base(f"""
+  <h2 style="font-size:22px;font-weight:400;margin:0 0 16px;">
+    Your pre-read for {event_title}
+  </h2>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 8px;">
+    Hi {name},
+  </p>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 24px;">
+    To make the most of your evening, we ask each guest to complete a short
+    pre-read form. Your responses help us curate conversations and introductions
+    tailored to the room.
+  </p>
+  <p style="font-size:14px;line-height:1.7;color:#666;margin:0 0 32px;">
+    It takes about 5 minutes. Your answers are shared with other confirmed guests
+    ahead of the dinner — except your open question, which is for our team only.
+  </p>
+  <a href="{preread_url}"
+     style="display:inline-block;background:#1c2b1c;color:#fff;
+            text-decoration:none;padding:14px 28px;font-size:12px;
+            letter-spacing:0.06em;text-transform:uppercase;">
+    Complete Pre-read
+  </a>""")
+
+
+def event_confirmation_html(
+    name: str,
+    event_title: str,
+    event_date: str,
+    location: str,
+    dress_code: str,
+    package_url: str,
+) -> str:
+    dress_line = f"""
+    <tr>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:12px;
+                 letter-spacing:0.06em;text-transform:uppercase;color:#8a8a8a;
+                 width:30%;">Dress</td>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:14px;color:#1a1a1a;">
+        {dress_code}
+      </td>
+    </tr>""" if dress_code else ""
+    return _base(f"""
+  <h2 style="font-size:22px;font-weight:400;margin:0 0 16px;">
+    See you at {event_title}
+  </h2>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 8px;">
+    Hi {name},
+  </p>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 24px;">
+    You're confirmed. Here are your details for the evening.
+  </p>
+  <table style="width:100%;border-collapse:collapse;margin:0 0 32px;">
+    <tr>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:12px;
+                 letter-spacing:0.06em;text-transform:uppercase;color:#8a8a8a;
+                 width:30%;">Date</td>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:14px;color:#1a1a1a;">
+        {event_date}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:12px;
+                 letter-spacing:0.06em;text-transform:uppercase;color:#8a8a8a;">
+        Location
+      </td>
+      <td style="padding:10px 0;border-top:1px solid #e8e4dc;font-size:14px;color:#1a1a1a;">
+        {location}
+      </td>
+    </tr>
+    {dress_line}
+  </table>
+  <p style="font-size:14px;line-height:1.7;color:#666;margin:0 0 24px;">
+    Your pre-read package is ready — meet the other guests before you arrive.
+  </p>
+  <a href="{package_url}"
+     style="display:inline-block;background:#1c2b1c;color:#fff;
+            text-decoration:none;padding:14px 28px;font-size:12px;
+            letter-spacing:0.06em;text-transform:uppercase;">
+    View Pre-read Package
+  </a>""")
+
+
+def intro_email_html(
+    to_name: str,
+    other_name: str,
+    other_company: str,
+    other_title: str,
+    other_blurb: str,
+    other_linkedin: str,
+    reason: str,
+    event_title: str,
+) -> str:
+    linkedin_line = f"""
+  <p style="margin:16px 0 0;">
+    <a href="{other_linkedin}"
+       style="font-size:13px;color:#1c2b1c;text-decoration:underline;">
+      View LinkedIn Profile
+    </a>
+  </p>""" if other_linkedin else ""
+    return _base(f"""
+  <h2 style="font-size:22px;font-weight:400;margin:0 0 16px;">
+    Meet {other_name}
+  </h2>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 8px;">
+    Hi {to_name},
+  </p>
+  <p style="font-size:15px;line-height:1.7;color:#444;margin:0 0 24px;">
+    Following {event_title}, we think you and {other_name} should connect.
+  </p>
+  <div style="background:#fff;border:1px solid #e8e4dc;padding:20px 24px;margin:0 0 24px;">
+    <p style="font-size:15px;font-weight:500;color:#1a1a1a;margin:0 0 4px;">
+      {other_name}
+    </p>
+    <p style="font-size:13px;color:#666;margin:0 0 12px;">
+      {other_title}{"," if other_title and other_company else ""} {other_company}
+    </p>
+    <p style="font-size:14px;line-height:1.6;color:#444;margin:0;">
+      {other_blurb}
+    </p>
+    {linkedin_line}
+  </div>
+  <p style="font-size:14px;line-height:1.7;color:#666;margin:0;">
+    {reason}
+  </p>""")
+
+
+# ── Standard templates ────────────────────────────────────────────────────────
+
 def reset_email_html(name: str, reset_url: str) -> str:
     return _base(f"""
   <h2 style="font-size:22px;font-weight:400;margin:0 0 16px;">
