@@ -16,7 +16,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const TABS = ['Details', 'Guest List', 'Invite Status', 'Pre-reads', 'Seating', 'Intro Engine'];
+const TABS = ['Details', 'Guest List', 'Invite Status', 'Pre-reads', 'Seating', 'Intro Engine', 'Emails'];
 
 const STATUS_META = {
   draft:        { label: 'Draft',        color: 'text-[#71717A] border-white/10' },
@@ -40,11 +40,25 @@ const RSVP_DOT = {
   cancelled: { icon: XCircle,      color: 'text-[#52525B]',  label: 'Cancelled' },
 };
 
-const GUEST_TYPE_COLORS = {
-  founder: 'text-[#DC143C] border-[#DC143C]/30',
-  leader:  'text-blue-400 border-blue-400/30',
-  guest:   'text-[#71717A] border-white/15',
-};
+const GUEST_TYPES = [
+  { value: 'founder',   label: 'Founder',   color: 'text-[#DC143C] border-[#DC143C]/30' },
+  { value: 'investor',  label: 'Investor',  color: 'text-violet-400 border-violet-400/30' },
+  { value: 'operator',  label: 'Operator',  color: 'text-blue-400 border-blue-400/30' },
+  { value: 'expert',    label: 'Expert',    color: 'text-cyan-400 border-cyan-400/30' },
+  { value: 'sponsor',   label: 'Sponsor',   color: 'text-yellow-400 border-yellow-400/30' },
+  { value: 'media',     label: 'Media',     color: 'text-pink-400 border-pink-400/30' },
+  { value: 'rage_host', label: 'RAGE Host', color: 'text-emerald-400 border-emerald-400/30' },
+];
+
+const GUEST_TYPE_MAP = Object.fromEntries(GUEST_TYPES.map(t => [t.value, t]));
+
+function guestTypeColor(type) {
+  return (GUEST_TYPE_MAP[type] || { color: 'text-[#71717A] border-white/15' }).color;
+}
+
+function guestTypeLabel(type) {
+  return (GUEST_TYPE_MAP[type] || { label: type || '—' }).label;
+}
 
 function fmt(iso) {
   if (!iso) return '—';
@@ -248,7 +262,7 @@ function GuestListTab({ event, guests, onRefresh, isArchived }) {
   const [ragers, setRagers] = useState([]);
   const [ragerSearch, setRagerSearch] = useState('');
   const [adding, setAdding] = useState(false);
-  const [manual, setManual] = useState({ name: '', email: '', company: '', title: '', guest_type: 'guest' });
+  const [manual, setManual] = useState({ name: '', email: '', company: '', title: '', guest_type: 'founder' });
   const [removing, setRemoving] = useState(null);
 
   async function loadRagers() {
@@ -294,7 +308,7 @@ function GuestListTab({ event, guests, onRefresh, isArchived }) {
     try {
       await api.post(`/admin/events/${event.id}/guests`, manual);
       toast.success(`${manual.name} added`);
-      setManual({ name: '', email: '', company: '', title: '', guest_type: 'guest' });
+      setManual({ name: '', email: '', company: '', title: '', guest_type: 'founder' });
       setShowAdd(false);
       onRefresh();
     } catch (err) {
@@ -345,14 +359,14 @@ function GuestListTab({ event, guests, onRefresh, isArchived }) {
       ) : (
         <div className="space-y-1.5">
           {guests.map(g => {
-            const typeColor = GUEST_TYPE_COLORS[g.guest_type] || GUEST_TYPE_COLORS.guest;
+            const typeColor = guestTypeColor(g.guest_type);
             return (
               <div key={g.id} className="flex items-center gap-3 bg-[#080808] border border-white/8 px-4 py-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-[#F5F5F0] font-medium">{g.name}</span>
                     <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 border ${typeColor}`}>
-                      {g.guest_type}
+                      {guestTypeLabel(g.guest_type)}
                     </span>
                   </div>
                   <p className="text-xs text-[#71717A] mt-0.5">
@@ -407,15 +421,15 @@ function GuestListTab({ event, guests, onRefresh, isArchived }) {
                         </p>
                       </div>
                       {!already && (
-                        <div className="flex gap-1.5 shrink-0">
-                          {['founder', 'leader', 'guest'].map(type => (
+                        <div className="flex gap-1.5 shrink-0 flex-wrap justify-end max-w-[200px]">
+                          {GUEST_TYPES.map(({ value, label, color }) => (
                             <button
-                              key={type}
+                              key={value}
                               disabled={adding === r.id}
-                              onClick={() => addFromRager(r, type)}
-                              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border transition-colors ${GUEST_TYPE_COLORS[type]} hover:bg-white/5`}
+                              onClick={() => addFromRager(r, value)}
+                              className={`text-[10px] uppercase tracking-wider px-2 py-0.5 border transition-colors ${color} hover:bg-white/5`}
                             >
-                              {type}
+                              {label}
                             </button>
                           ))}
                         </div>
@@ -474,19 +488,19 @@ function GuestListTab({ event, guests, onRefresh, isArchived }) {
               </div>
               <div>
                 <Label className="text-xs uppercase tracking-wider text-[#71717A] mb-1.5 block">Guest type</Label>
-                <div className="flex gap-2">
-                  {['founder', 'leader', 'guest'].map(type => (
+                <div className="flex flex-wrap gap-1.5">
+                  {GUEST_TYPES.map(({ value, label, color }) => (
                     <button
-                      key={type}
+                      key={value}
                       type="button"
-                      onClick={() => setManual(m => ({ ...m, guest_type: type }))}
+                      onClick={() => setManual(m => ({ ...m, guest_type: value }))}
                       className={`text-xs uppercase tracking-wider px-3 py-1.5 border transition-colors ${
-                        manual.guest_type === type
-                          ? GUEST_TYPE_COLORS[type] + ' bg-white/5'
+                        manual.guest_type === value
+                          ? color + ' bg-white/5'
                           : 'text-[#52525B] border-white/10 hover:text-[#A1A1AA]'
                       }`}
                     >
-                      {type}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -586,7 +600,7 @@ function InviteStatusTab({ event, guests, onRefresh, isArchived }) {
               {guests.map(g => {
                 const rsvpMeta = RSVP_DOT[g.rsvp_status] || RSVP_DOT.pending;
                 const RsvpIcon = rsvpMeta.icon;
-                const typeColor = GUEST_TYPE_COLORS[g.guest_type] || GUEST_TYPE_COLORS.guest;
+                const typeColor = guestTypeColor(g.guest_type);
                 return (
                   <tr key={g.id} className="border-b border-white/5 hover:bg-white/[0.02]">
                     <td className="py-3 pr-4">
@@ -597,7 +611,7 @@ function InviteStatusTab({ event, guests, onRefresh, isArchived }) {
                     </td>
                     <td className="py-3 pr-4">
                       <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 border ${typeColor}`}>
-                        {g.guest_type}
+                        {guestTypeLabel(g.guest_type)}
                       </span>
                     </td>
                     <td className="py-3 pr-4">
@@ -850,11 +864,11 @@ function SeatingTab({ event, guests, isArchived }) {
                   )}
                   {tableGuests.map(g => {
                     if (!g) return null;
-                    const typeColor = GUEST_TYPE_COLORS[g.guest_type] || GUEST_TYPE_COLORS.guest;
+                    const typeColor = guestTypeColor(g.guest_type);
                     return (
                       <div key={g.id} className="flex items-center gap-2 text-sm">
                         <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 border ${typeColor} shrink-0`}>
-                          {g.guest_type?.[0]}
+                          {guestTypeLabel(g.guest_type)?.[0]}
                         </span>
                         <span className="text-[#F5F5F0] truncate">{g.name}</span>
                         <span className="text-[#52525B] text-xs truncate">{g.company}</span>
@@ -1098,11 +1112,11 @@ function IntroEngineTab({ event, guests, isArchived }) {
 }
 
 function GuestChip({ g }) {
-  const typeColor = GUEST_TYPE_COLORS[g.guest_type] || GUEST_TYPE_COLORS.guest;
+  const typeColor = guestTypeColor(g.guest_type);
   return (
     <span className="flex items-center gap-1.5 text-sm">
       <span className={`text-[9px] uppercase tracking-wider px-1 py-0.5 border ${typeColor}`}>
-        {g.guest_type?.[0]}
+        {guestTypeLabel(g.guest_type)?.[0]}
       </span>
       <span className="text-[#F5F5F0]">{g.name}</span>
       {g.company && <span className="text-[#71717A] text-xs">{g.company}</span>}
@@ -1259,6 +1273,206 @@ export default function AdminEventDetailPage() {
       {tab === 'Pre-reads'     && <PrereadsTab event={event} />}
       {tab === 'Seating'       && <SeatingTab event={event} guests={guests} isArchived={isArchived} />}
       {tab === 'Intro Engine'  && <IntroEngineTab event={event} guests={guests} isArchived={isArchived} />}
+      {tab === 'Emails'        && <EmailsTab event={event} onRefresh={load} isArchived={isArchived} />}
+    </div>
+  );
+}
+
+// ─── Emails Tab ───────────────────────────────────────────────────────────────
+
+const EMAIL_TEMPLATES = [
+  {
+    key: 'invite',
+    label: 'Invite Email',
+    description: 'Sent when you dispatch invites to guests',
+    placeholders: ['{{name}}', '{{event_title}}', '{{date}}', '{{location}}', '{{rsvp_link}}'],
+    defaultSubject: (ev) => `You're invited: ${ev.title}`,
+    defaultBody: (ev) =>
+      `Hi {{name}},\n\nYou're invited to ${ev.title}.\n\nDate: {{date}}\nLocation: {{location}}\n\nRSVP here: {{rsvp_link}}\n\nSee you at the table.`,
+  },
+  {
+    key: 'preread',
+    label: 'Pre-read Email',
+    description: 'Sent to confirmed guests asking them to fill the pre-read form',
+    placeholders: ['{{name}}', '{{event_title}}', '{{date}}', '{{location}}', '{{preread_link}}'],
+    defaultSubject: (ev) => `Your pre-read for ${ev.title}`,
+    defaultBody: (ev) =>
+      `Hi {{name}},\n\nThank you for confirming your attendance at ${ev.title}.\n\nPlease fill your pre-read so other guests can prepare for a great conversation:\n{{preread_link}}\n\nSee you at the table.`,
+  },
+  {
+    key: 'confirmation',
+    label: 'Confirmation Email',
+    description: 'Sent as a final confirmation with the pre-read package link',
+    placeholders: ['{{name}}', '{{event_title}}', '{{date}}', '{{location}}', '{{preread_link}}'],
+    defaultSubject: (ev) => `See you there — ${ev.title}`,
+    defaultBody: (ev) =>
+      `Hi {{name}},\n\nWe look forward to seeing you at ${ev.title}.\n\nDate: {{date}}\nLocation: {{location}}\n\nView the pre-read package: {{preread_link}}\n\nSee you at the table.`,
+  },
+];
+
+function applyPreview(text, ev) {
+  const sample = {
+    name: 'Priya Sharma',
+    event_title: ev.title || 'Private Table',
+    date: ev.date ? new Date(ev.date).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : 'TBD',
+    location: ev.location || 'Venue TBD',
+    rsvp_link: 'https://rage.com/rsvp/preview-token',
+    preread_link: 'https://rage.com/preread/preview-token',
+  };
+  let out = text;
+  for (const [k, v] of Object.entries(sample)) {
+    out = out.replaceAll(`{{${k}}}`, v);
+  }
+  return out;
+}
+
+function EmailTemplateSection({ tmplDef, event, emailContent, onSaved, isArchived }) {
+  const existing = (emailContent || {})[tmplDef.key] || {};
+  const [subject, setSubject] = useState(existing.subject || '');
+  const [body,    setBody]    = useState(existing.body    || '');
+  const [saving,  setSaving]  = useState(false);
+  const [preview, setPreview] = useState(false);
+
+  const isDirty = subject !== (existing.subject || '') || body !== (existing.body || '');
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const patch = { email_content: { ...emailContent } };
+      patch.email_content[tmplDef.key] = { subject: subject.trim(), body: body.trim() };
+      await api.patch(`/admin/events/${event.id}`, patch);
+      toast.success(`${tmplDef.label} saved`);
+      onSaved();
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleClear() {
+    setSubject('');
+    setBody('');
+  }
+
+  const previewSubject = subject.trim() || tmplDef.defaultSubject(event);
+  const previewBody    = body.trim()    || tmplDef.defaultBody(event);
+
+  return (
+    <div className="border border-white/8 p-5 space-y-4">
+      <div>
+        <p className="text-sm font-medium text-[#F5F5F0]">{tmplDef.label}</p>
+        <p className="text-xs text-[#71717A] mt-0.5">{tmplDef.description}</p>
+      </div>
+
+      <div className="text-xs text-[#52525B] flex flex-wrap gap-1.5">
+        {tmplDef.placeholders.map(p => (
+          <code key={p} className="bg-white/5 px-1.5 py-0.5 rounded text-[#A1A1AA]">{p}</code>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label className="text-xs text-[#71717A] mb-1.5 block">Subject</Label>
+          <Input
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            placeholder={tmplDef.defaultSubject(event)}
+            disabled={isArchived}
+            className="bg-[#111] border-white/10 text-[#F5F5F0] text-sm placeholder:text-[#52525B]"
+          />
+        </div>
+        <div>
+          <Label className="text-xs text-[#71717A] mb-1.5 block">Body</Label>
+          <Textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            placeholder={tmplDef.defaultBody(event)}
+            disabled={isArchived}
+            rows={8}
+            className="bg-[#111] border-white/10 text-[#F5F5F0] text-sm placeholder:text-[#52525B] font-mono resize-y"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={saving || isArchived || !isDirty}
+          className="bg-[#DC143C] hover:bg-[#B01030] text-white text-xs"
+        >
+          {saving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
+          Save
+        </Button>
+        <Button
+          size="sm" variant="outline"
+          onClick={() => setPreview(true)}
+          className="border-white/10 text-[#A1A1AA] hover:text-[#F5F5F0] text-xs"
+        >
+          Preview
+        </Button>
+        {(subject || body) && (
+          <Button
+            size="sm" variant="ghost"
+            onClick={handleClear}
+            disabled={isArchived}
+            className="text-[#52525B] hover:text-[#A1A1AA] text-xs"
+          >
+            Reset to default
+          </Button>
+        )}
+      </div>
+
+      {/* Preview modal */}
+      <Dialog open={preview} onOpenChange={setPreview}>
+        <DialogContent className="bg-[#0A0A0A] border-white/10 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium text-[#F5F5F0]">{tmplDef.label} — Preview</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1">Subject</p>
+              <p className="text-sm text-[#F5F5F0] bg-white/5 px-3 py-2 rounded">
+                {applyPreview(previewSubject, event)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1">Body</p>
+              <pre className="text-sm text-[#A1A1AA] bg-white/5 px-3 py-2 rounded whitespace-pre-wrap font-sans leading-relaxed">
+                {applyPreview(previewBody, event)}
+              </pre>
+            </div>
+            <p className="text-[10px] text-[#52525B]">Sample data used for preview. Actual emails use real guest names and links.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function EmailsTab({ event, onRefresh, isArchived }) {
+  const emailContent = event.email_content || {};
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm text-[#71717A]">
+          Customise email subjects and bodies per event. Leave blank to use the default template.
+          Use placeholders like <code className="text-[#A1A1AA] bg-white/5 px-1">{'{{name}}'}</code> to personalise content.
+        </p>
+      </div>
+
+      {EMAIL_TEMPLATES.map(tmpl => (
+        <EmailTemplateSection
+          key={tmpl.key}
+          tmplDef={tmpl}
+          event={event}
+          emailContent={emailContent}
+          onSaved={onRefresh}
+          isArchived={isArchived}
+        />
+      ))}
     </div>
   );
 }

@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional
 from app.core.db import db
 from app.core.auth import hash_token
+from app.api.events import _normalize_invite
 
 router = APIRouter()
 
@@ -204,10 +205,10 @@ def get_preread_package(token: str):
         raise HTTPException(status_code=404, detail="Event not found")
 
     # Confirmed guests
-    confirmed_invites = list(db.invites.find(
+    confirmed_invites = [_normalize_invite(i) for i in db.invites.find(
         {"event_id": inv["event_id"], "rsvp_status": "yes"},
         {"_id": 0}
-    ))
+    )]
     confirmed_ids = {i["id"] for i in confirmed_invites}
     invite_by_id  = {i["id"]: i for i in confirmed_invites}
 

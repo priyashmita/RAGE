@@ -14,12 +14,19 @@ function fmt(iso) {
   } catch { return iso; }
 }
 
-const TYPE_LABEL = { founder: 'Founder', leader: 'Leader', guest: 'Guest' };
-const TYPE_COLOR = {
-  founder: { bg: '#fff8f8', border: '#f5c0c0', label: '#c0392b' },
-  leader:  { bg: '#f8f9ff', border: '#c0c8f5', label: '#2c3e9e' },
-  guest:   { bg: '#fafafa', border: '#e8e4dc', label: '#888' },
+const TYPE_META = {
+  founder:   { label: 'Founder',   bg: '#fff8f8', border: '#f5c0c0', label_color: '#c0392b' },
+  investor:  { label: 'Investor',  bg: '#faf8ff', border: '#d0c0f5', label_color: '#5b21b6' },
+  operator:  { label: 'Operator',  bg: '#f8f9ff', border: '#c0c8f5', label_color: '#2c3e9e' },
+  expert:    { label: 'Expert',    bg: '#f8ffff', border: '#b0e0e8', label_color: '#0e7490' },
+  sponsor:   { label: 'Sponsor',   bg: '#fffdf0', border: '#e8d898', label_color: '#92600a' },
+  media:     { label: 'Media',     bg: '#fff0f8', border: '#f0b8d8', label_color: '#9d174d' },
+  rage_host: { label: 'RAGE Host', bg: '#f0fff8', border: '#a8e8c8', label_color: '#065f46' },
+  // legacy — normalized on backend read, kept here as fallback
+  leader:    { label: 'Operator',  bg: '#f8f9ff', border: '#c0c8f5', label_color: '#2c3e9e' },
+  guest:     { label: 'Expert',    bg: '#f8ffff', border: '#b0e0e8', label_color: '#0e7490' },
 };
+const _DEFAULT_META = { label: 'Guest', bg: '#fafafa', border: '#e8e4dc', label_color: '#888' };
 
 export default function PrereadViewPage() {
   const { token } = useParams();
@@ -121,11 +128,11 @@ export default function PrereadViewPage() {
       ) : (
         <div className="space-y-6">
           {prereads.map((pr, idx) => {
-            const colors = TYPE_COLOR[pr.guest_type] || TYPE_COLOR.guest;
+            const meta = TYPE_META[pr.guest_type] || _DEFAULT_META;
             return (
               <div
                 key={pr.id || idx}
-                style={{ background: colors.bg, borderColor: colors.border }}
+                style={{ background: meta.bg, borderColor: meta.border }}
                 className="border p-5"
               >
                 <div className="flex items-start justify-between gap-3 mb-4">
@@ -136,10 +143,10 @@ export default function PrereadViewPage() {
                     </p>
                   </div>
                   <span
-                    style={{ color: colors.label, borderColor: colors.border }}
+                    style={{ color: meta.label_color, borderColor: meta.border }}
                     className="text-[10px] uppercase tracking-[0.1em] border px-2 py-0.5 shrink-0"
                   >
-                    {TYPE_LABEL[pr.guest_type] || 'Guest'}
+                    {meta.label}
                   </span>
                 </div>
 

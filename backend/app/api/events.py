@@ -21,6 +21,17 @@ _NOW = lambda: datetime.now(timezone.utc).isoformat()
 
 # ─── Pydantic models ──────────────────────────────────────────────────────────
 
+class EmailTemplate(BaseModel):
+    subject: Optional[str] = ""
+    body: Optional[str] = ""
+
+
+class EmailContent(BaseModel):
+    invite:       Optional[EmailTemplate] = EmailTemplate()
+    preread:      Optional[EmailTemplate] = EmailTemplate()
+    confirmation: Optional[EmailTemplate] = EmailTemplate()
+
+
 class EventIn(BaseModel):
     title: str
     date: str
@@ -30,6 +41,7 @@ class EventIn(BaseModel):
     description: Optional[str] = ""
     dress_code: Optional[str] = ""
     pre_read_content: Optional[dict] = {}
+    email_content: Optional[EmailContent] = None
     status: Optional[str] = "draft"
 
 
@@ -42,6 +54,7 @@ class EventUpdate(BaseModel):
     description: Optional[str] = None
     dress_code: Optional[str] = None
     pre_read_content: Optional[dict] = None
+    email_content: Optional[EmailContent] = None
     status: Optional[str] = None
 
 
@@ -51,7 +64,7 @@ class GuestIn(BaseModel):
     email: str
     company: Optional[str] = ""
     title: Optional[str] = ""
-    guest_type: str = "guest"   # founder | leader | guest
+    guest_type: str = "founder"  # founder|investor|operator|expert|sponsor|media|rage_host
     notes: Optional[str] = ""
 
 
@@ -109,6 +122,41 @@ def _invite_summary(event_id: str) -> dict:
     return {"total": total, "rsvp_yes": yes, "rsvp_no": no, "prereads": pre}
 
 
+# Old → new category migration map (applied on read, never written back)
+_CATEGORY_MIGRATION = {"leader": "operator", "guest": "expert"}
+
+def _normalize_guest_type(guest_type: str) -> str:
+    return _CATEGORY_MIGRATION.get(guest_type, guest_type)
+
+
+def _normalize_invite(inv: dict) -> dict:
+    """Normalize legacy guest_type values on read. Does not mutate the DB."""
+    if inv.get("guest_type") in _CATEGORY_MIGRATION:
+        inv = {**inv, "guest_type": _CATEGORY_MIGRATION[inv["guest_type"]]}
+    return inv
+
+
+def _apply_placeholders(text: str, values: dict) -> str:
+    """Replace {{key}} placeholders with values. Unknown placeholders left as-is."""
+    for key, val in values.items():
+        text = text.replace(f"{{{{{key}}}}}", str(val) if val else "")
+    return text
+
+
+def _custom_or_default(ev: dict, template_key: str) -> tuple:
+    """
+    Return (subject, body|None) from event's email_content if set and non-empty.
+    Returns (None, None) if no custom content — caller uses the default template.
+    """
+    ec = ev.get("email_content") or {}
+    tmpl = ec.get(template_key) or {}
+    subject = (tmpl.get("subject") or "").strip()
+    body    = (tmpl.get("body") or "").strip()
+    if subject or body:
+        return subject or None, body or None
+    return None, None
+
+
 def _require_not_archived(ev: dict) -> None:
     """Raise 423 Locked if the event is archived. Call before any mutating action."""
     if ev.get("status") == "archived":
@@ -132,6 +180,7 @@ def create_event(data: EventIn, admin=Depends(require_admin)):
         "description":      data.description,
         "dress_code":       data.dress_code,
         "pre_read_content": data.pre_read_content or {},
+        "email_content":    data.email_content.model_dump() if data.email_content else {},
         "status":           data.status or "draft",
         "created_at":       _NOW(),
         "created_by":       admin.get("id"),
@@ -261,13 +310,14 @@ def add_guest(event_id: str, data: GuestIn, admin=Depends(require_admin)):
     }
     db.invites.insert_one(invite)
     invite.pop("_id", None)
-    return invite
+    return _normalize_invite(invite)
 
 
 @router.get("/admin/events/{event_id}/guests")
 def list_guests(event_id: str, admin=Depends(require_admin)):
     _get_event_or_404(event_id)
-    return list(db.invites.find({"event_id": event_id}, {"_id": 0}).sort("created_at", 1))
+    return [_normalize_invite(inv) for inv in
+            db.invites.find({"event_id": event_id}, {"_id": 0}).sort("created_at", 1)]
 
 
 @router.patch("/admin/events/{event_id}/guests/{guest_id}")
@@ -278,7 +328,7 @@ def update_guest(event_id: str, guest_id: str, data: GuestUpdate, admin=Depends(
     patch = {k: v for k, v in data.model_dump().items() if v is not None}
     if patch:
         db.invites.update_one({"id": guest_id}, {"$set": patch})
-    return db.invites.find_one({"id": guest_id}, {"_id": 0})
+    return _normalize_invite(db.invites.find_one({"id": guest_id}, {"_id": 0}) or {})
 
 
 @router.delete("/admin/events/{event_id}/guests/{guest_id}")
@@ -306,23 +356,38 @@ def send_invites(event_id: str, data: SendInvitesIn, admin=Depends(require_admin
         raise HTTPException(status_code=400, detail="No eligible guests to invite")
 
     results = []
+    custom_inv_subject, custom_inv_body = _custom_or_default(ev, "invite")
     for inv in invites:
         plain_token = inv.get("plain_token") or generate_secure_token()
         rsvp_url = f"{FRONTEND_URL}/rsvp/{plain_token}"
+        placeholders = {
+            "name": inv["name"],
+            "event_title": ev["title"],
+            "date": ev.get("date", ""),
+            "location": ev.get("location", ""),
+            "rsvp_link": rsvp_url,
+            "preread_link": "",
+        }
+        if custom_inv_subject or custom_inv_body:
+            email_subject = _apply_placeholders(custom_inv_subject or f"You're invited: {ev['title']}", placeholders)
+            email_html    = _apply_placeholders(custom_inv_body or "", placeholders).replace("\n", "<br>")
+        else:
+            email_subject = f"You're invited: {ev['title']}"
+            email_html    = event_invite_html(
+                name=inv["name"],
+                event_title=ev["title"],
+                event_date=ev.get("date", ""),
+                location=ev.get("location", ""),
+                theme=ev.get("theme", ""),
+                rsvp_url=rsvp_url,
+            )
         try:
             send_email(
                 to_email=inv["email"],
                 to_name=inv["name"],
                 template="private_table_invite",
-                subject=f"You're invited: {ev['title']}",
-                html_body=event_invite_html(
-                    name=inv["name"],
-                    event_title=ev["title"],
-                    event_date=ev.get("date", ""),
-                    location=ev.get("location", ""),
-                    theme=ev.get("theme", ""),
-                    rsvp_url=rsvp_url,
-                ),
+                subject=email_subject,
+                html_body=email_html,
                 entity_type="invite",
                 entity_id=inv["id"],
             )
@@ -353,20 +418,35 @@ def send_prereads(event_id: str, data: SendPrereadsIn, admin=Depends(require_adm
         raise HTTPException(status_code=400, detail="No eligible guests (need RSVP yes + pre-read not yet sent)")
 
     results = []
+    custom_pr_subject, custom_pr_body = _custom_or_default(ev, "preread")
     for inv in invites:
         plain_token = inv.get("plain_token") or generate_secure_token()
         preread_url = f"{FRONTEND_URL}/preread/{plain_token}"
+        placeholders = {
+            "name": inv["name"],
+            "event_title": ev["title"],
+            "date": ev.get("date", ""),
+            "location": ev.get("location", ""),
+            "rsvp_link": "",
+            "preread_link": preread_url,
+        }
+        if custom_pr_subject or custom_pr_body:
+            email_subject = _apply_placeholders(custom_pr_subject or f"Your pre-read for {ev['title']}", placeholders)
+            email_html    = _apply_placeholders(custom_pr_body or "", placeholders).replace("\n", "<br>")
+        else:
+            email_subject = f"Your pre-read for {ev['title']}"
+            email_html    = preread_request_html(
+                name=inv["name"],
+                event_title=ev["title"],
+                preread_url=preread_url,
+            )
         try:
             send_email(
                 to_email=inv["email"],
                 to_name=inv["name"],
                 template="private_table_preread",
-                subject=f"Your pre-read for {ev['title']}",
-                html_body=preread_request_html(
-                    name=inv["name"],
-                    event_title=ev["title"],
-                    preread_url=preread_url,
-                ),
+                subject=email_subject,
+                html_body=email_html,
                 entity_type="invite",
                 entity_id=inv["id"],
             )
@@ -396,23 +476,38 @@ def send_confirmation(event_id: str, data: SendConfirmationIn, admin=Depends(req
         raise HTTPException(status_code=400, detail="No confirmed guests found")
 
     results = []
+    custom_conf_subject, custom_conf_body = _custom_or_default(ev, "confirmation")
     for inv in invites:
         plain_token = inv.get("plain_token") or generate_secure_token()
         package_url = f"{FRONTEND_URL}/preread-view/{plain_token}"
+        placeholders = {
+            "name": inv["name"],
+            "event_title": ev["title"],
+            "date": ev.get("date", ""),
+            "location": ev.get("location", ""),
+            "rsvp_link": "",
+            "preread_link": package_url,
+        }
+        if custom_conf_subject or custom_conf_body:
+            email_subject = _apply_placeholders(custom_conf_subject or f"See you there — {ev['title']}", placeholders)
+            email_html    = _apply_placeholders(custom_conf_body or "", placeholders).replace("\n", "<br>")
+        else:
+            email_subject = f"See you there — {ev['title']}"
+            email_html    = event_confirmation_html(
+                name=inv["name"],
+                event_title=ev["title"],
+                event_date=ev.get("date", ""),
+                location=ev.get("location", ""),
+                dress_code=ev.get("dress_code", ""),
+                package_url=package_url,
+            )
         try:
             send_email(
                 to_email=inv["email"],
                 to_name=inv["name"],
                 template="private_table_confirmation",
-                subject=f"See you there — {ev['title']}",
-                html_body=event_confirmation_html(
-                    name=inv["name"],
-                    event_title=ev["title"],
-                    event_date=ev.get("date", ""),
-                    location=ev.get("location", ""),
-                    dress_code=ev.get("dress_code", ""),
-                    package_url=package_url,
-                ),
+                subject=email_subject,
+                html_body=email_html,
                 entity_type="invite",
                 entity_id=inv["id"],
             )
@@ -450,10 +545,10 @@ def suggest_seating(event_id: str, body: dict, admin=Depends(require_admin)):
     if num_tables < 1:
         raise HTTPException(status_code=400, detail="num_tables must be >= 1")
 
-    invites = list(db.invites.find(
+    invites = [_normalize_invite(inv) for inv in db.invites.find(
         {"event_id": event_id, "rsvp_status": "yes"},
         {"_id": 0}
-    ))
+    )]
     if not invites:
         raise HTTPException(status_code=400, detail="No confirmed guests (RSVP yes) to seat")
 
@@ -461,14 +556,18 @@ def suggest_seating(event_id: str, body: dict, admin=Depends(require_admin)):
     return {"tables": tables, "total_guests": len(invites)}
 
 
+_FOUNDER_TYPES     = {"founder"}
+_NON_FOUNDER_TYPES = {"investor", "operator", "expert", "sponsor", "media", "rage_host"}
+
 def _seating_algorithm(guests: list, num_tables: int) -> list:
     """
     Greedy seating with type-mixing + same-company avoidance.
+    Founders mixed with non-founders across tables.
     Returns list of table dicts with guest summaries.
     """
-    founders = [g for g in guests if g.get("guest_type") == "founder"]
-    leaders  = [g for g in guests if g.get("guest_type") == "leader"]
-    others   = [g for g in guests if g.get("guest_type") not in ("founder", "leader")]
+    founders = [g for g in guests if g.get("guest_type") in _FOUNDER_TYPES]
+    leaders  = [g for g in guests if g.get("guest_type") in _NON_FOUNDER_TYPES]
+    others   = [g for g in guests if g.get("guest_type") not in _FOUNDER_TYPES | _NON_FOUNDER_TYPES]
 
     # Interleave types for round-robin assignment
     ordered = []
@@ -529,13 +628,16 @@ def _company_clash(table: list) -> int:
 
 
 def _table_note(guests: list) -> str:
-    founders = sum(1 for g in guests if g.get("guest_type") == "founder")
-    leaders  = sum(1 for g in guests if g.get("guest_type") == "leader")
-    companies = list({g.get("company", "") for g in guests if g.get("company")})
-    f_str = f"{founders} founder{'s' if founders != 1 else ''}"
-    l_str = f"{leaders} leader{'s' if leaders != 1 else ''}"
+    founders   = sum(1 for g in guests if g.get("guest_type") in _FOUNDER_TYPES)
+    non_found  = sum(1 for g in guests if g.get("guest_type") in _NON_FOUNDER_TYPES)
+    companies  = list({g.get("company", "") for g in guests if g.get("company")})
+    type_counts = {}
+    for g in guests:
+        t = g.get("guest_type", "")
+        type_counts[t] = type_counts.get(t, 0) + 1
+    type_str = ", ".join(f"{v} {k}" for k, v in sorted(type_counts.items()))
     c_str = ", ".join(companies[:4]) + ("…" if len(companies) > 4 else "")
-    return f"{f_str}, {l_str}. {c_str}"
+    return f"{type_str}. {c_str}".strip(". ")
 
 
 @router.post("/admin/events/{event_id}/seating")
@@ -578,7 +680,7 @@ def get_seating(event_id: str, admin=Depends(require_admin)):
 
     # Hydrate seats with guest info
     all_invites = {
-        inv["id"]: inv
+        inv["id"]: _normalize_invite(inv)
         for inv in db.invites.find({"event_id": event_id}, {"_id": 0})
     }
     for table in seating.get("tables", []):
@@ -617,10 +719,10 @@ def get_intro_suggestions(event_id: str, admin=Depends(require_admin)):
     """
     _get_event_or_404(event_id)
 
-    invites = list(db.invites.find(
+    invites = [_normalize_invite(inv) for inv in db.invites.find(
         {"event_id": event_id, "rsvp_status": "yes"},
         {"_id": 0}
-    ))
+    )]
     prereads = {
         pr["invite_id"]: pr
         for pr in db.prereads.find({"event_id": event_id}, {"_id": 0})
