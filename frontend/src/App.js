@@ -35,6 +35,7 @@ import RespondPage from '@/pages/RespondPage';
 import FounderSelectPage from '@/pages/FounderSelectPage';
 import AdminEventsPage from '@/pages/admin/AdminEventsPage';
 import AdminEventDetailPage from '@/pages/admin/AdminEventDetailPage';
+import AdminPodcastPage from '@/pages/admin/AdminPodcastPage';
 import RSVPPage from '@/pages/RSVPPage';
 import PrereadFormPage from '@/pages/PrereadFormPage';
 import PrereadViewPage from '@/pages/PrereadViewPage';
@@ -155,6 +156,7 @@ function App() {
             <Route path="settings" element={<AdminSettingsPage />} />
             <Route path="events" element={<AdminEventsPage />} />
             <Route path="events/:id" element={<AdminEventDetailPage />} />
+            <Route path="podcast" element={<AdminPodcastPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

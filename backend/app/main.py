@@ -16,6 +16,7 @@ from app.api.founder import router as founder_router
 from app.api.public_outreach import router as public_outreach_router
 from app.api.events import router as events_router
 from app.api.events_public import router as events_public_router
+from app.api.podcast import router as podcast_router
 from app.core.db import db
 
 app = FastAPI()
@@ -63,6 +64,15 @@ def auto_seed_content():
     db.seatings.create_index("id",       unique=True, background=True)
     db.seatings.create_index("event_id", background=True)
 
+    # Podcast Intelligence indexes
+    db.podcast_candidates.create_index("id",        unique=True, background=True)
+    db.podcast_candidates.create_index("person_id", unique=True, background=True)
+    db.podcast_candidates.create_index("score",     background=True)
+    db.podcast_pairs.create_index("id",             unique=True, background=True)
+    db.podcast_panels.create_index("id",            unique=True, background=True)
+    db.podcast_invite_decisions.create_index("id",  unique=True, background=True)
+    db.podcast_topic_signals.create_index("id",     unique=True, background=True)
+
 
 @app.get("/")
 def home():
@@ -102,3 +112,4 @@ app.include_router(founder_router,        prefix="/api")
 app.include_router(public_outreach_router, prefix="/api")
 app.include_router(events_router,         prefix="/api")
 app.include_router(events_public_router,  prefix="/api")
+app.include_router(podcast_router,        prefix="/api")

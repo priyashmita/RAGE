@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import {
-  LayoutDashboard, FileText, Users, Inbox, Zap, BarChart2, LogOut, ChevronDown, User, Menu, X, BookUser, Settings, MessageSquare, UtensilsCrossed
+  LayoutDashboard, FileText, Users, Inbox, Zap, BarChart2, LogOut, ChevronDown, User, Menu, X, BookUser, Settings, MessageSquare, UtensilsCrossed, Mic
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -17,6 +17,7 @@ const NAV = [
   { to: '/admin/matching', label: 'Matching', icon: Zap },
   { to: '/admin/responses', label: 'Responses', icon: MessageSquare },
   { to: '/admin/events',    label: 'Private Table', icon: UtensilsCrossed },
+  { to: '/admin/podcast',   label: 'Podcast',       icon: Mic },
   { to: '/admin/analytics', label: 'Analytics', icon: BarChart2 },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];

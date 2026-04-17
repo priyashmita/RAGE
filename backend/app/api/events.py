@@ -205,6 +205,7 @@ def get_event(event_id: str, admin=Depends(require_admin)):
     return ev
 
 
+@router.patch("/admin/events/{event_id}")
 @router.put("/admin/events/{event_id}")
 def update_event(event_id: str, data: EventUpdate, admin=Depends(require_admin)):
     ev = _get_event_or_404(event_id)
