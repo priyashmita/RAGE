@@ -425,7 +425,8 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
             print(f"[generate attempt {attempt + 1}] raw (first 600): {raw_text[:600]}", flush=True)
             parsed = _json.loads(raw_text)
 
-            # Required field check
+            # Only retry on missing required fields or JSON parse error —
+            # never on format/length issues (would cause double API call + timeout).
             missing = _REQUIRED_GENERATE_FIELDS - set(parsed.keys())
             if missing:
                 last_err = f"Missing required fields: {sorted(missing)}"
@@ -433,30 +434,20 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
                 parsed = None
                 continue
 
-            # internal_summary must contain all six section headers
+            # Log-only checks (warn but accept — no retry)
             internal = parsed.get("internal_summary", "")
             missing_sections = [s for s in _INTERNAL_SUMMARY_SECTIONS if s not in internal]
             if missing_sections:
-                last_err = f"internal_summary missing sections: {missing_sections}"
-                print(f"[generate attempt {attempt + 1}] {last_err}", flush=True)
-                parsed = None
-                continue
+                print(f"[generate] WARNING: internal_summary missing sections: {missing_sections}", flush=True)
 
-            # founder_summary: check sections present + length
             fs = parsed.get("founder_summary", "")
             fs_sections = ["What's happening", "What this means", "What to do next", "Bottom line"]
             missing_fs = [s for s in fs_sections if s not in fs]
             if missing_fs:
-                last_err = f"founder_summary missing sections: {missing_fs}"
-                print(f"[generate attempt {attempt + 1}] {last_err}", flush=True)
-                parsed = None
-                continue
+                print(f"[generate] WARNING: founder_summary missing sections: {missing_fs}", flush=True)
             word_count = len(fs.split())
             if word_count > 200:
-                print(f"[generate attempt {attempt + 1}] founder_summary is {word_count} words (target ≤150) — retrying", flush=True)
-                last_err = f"founder_summary too long ({word_count} words)"
-                parsed = None
-                continue
+                print(f"[generate] WARNING: founder_summary is {word_count} words (target ≤150)", flush=True)
 
             break
         except Exception as e:
