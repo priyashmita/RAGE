@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import { getRagerToken, setRagerToken } from '@/lib/ragerAuth';
 
 const LOGO_URL = '/logo.png';
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
@@ -17,21 +18,16 @@ export default function RagerLoginPage() {
   const [remember, setRemember] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  const existing = localStorage.getItem('rage_rager_token');
-  if (existing) return <Navigate to="/rager-dashboard" replace />;
+  // Redirect if already logged in (checks both localStorage and sessionStorage)
+  if (getRagerToken()) return <Navigate to="/rager/dashboard" replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
       const res = await axios.post(`${BACKEND}/api/rager/login`, { email, password });
-      if (remember) {
-        localStorage.setItem('rage_rager_token', res.data.access_token);
-      } else {
-        sessionStorage.setItem('rage_rager_token', res.data.access_token);
-        localStorage.removeItem('rage_rager_token');
-      }
-      navigate('/rager-dashboard', { replace: true });
+      setRagerToken(res.data.access_token, remember);
+      navigate('/rager/dashboard', { replace: true });
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Login failed');
     } finally {

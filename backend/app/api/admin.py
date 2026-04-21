@@ -3,13 +3,15 @@ import os
 import httpx
 from collections import Counter
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from app.core.db import db
 from app.core.auth import require_admin
 
 router = APIRouter()
+
+ARCHIVE_REASONS = {"testing", "duplicate", "invalid", "other"}
 
 
 class AllocationCreateRequest(BaseModel):
@@ -22,6 +24,19 @@ class AllocationCreateRequest(BaseModel):
 class AnonymisedOutreachRequest(BaseModel):
     enquiry_id: str
     rager_ids: List[str]
+
+
+class ArchiveRequest(BaseModel):
+    reason: str = "testing"
+
+
+class BulkArchiveRequest(BaseModel):
+    enquiry_ids: List[str]
+    reason: str = "testing"
+
+
+class BulkRestoreRequest(BaseModel):
+    enquiry_ids: List[str]
 
 
 class ReportIn(BaseModel):
@@ -44,8 +59,94 @@ class TranscriptRequest(BaseModel):
 
 
 @router.get("/admin/enquiries")
-def get_enquiries(admin=Depends(require_admin)):
-    return list(db.enquiries.find({}, {"_id": 0}))
+def get_enquiries(
+    filter: str = Query("active", regex="^(active|archived|all)$"),
+    admin=Depends(require_admin),
+):
+    """
+    filter=active   → exclude archived (default)
+    filter=archived → only archived
+    filter=all      → everything
+    """
+    if filter == "active":
+        query = {"is_archived": {"$ne": True}}
+    elif filter == "archived":
+        query = {"is_archived": True}
+    else:
+        query = {}
+    return list(db.enquiries.find(query, {"_id": 0}))
+
+
+@router.post("/admin/enquiries/{enquiry_id}/archive")
+def archive_enquiry(enquiry_id: str, data: ArchiveRequest, admin=Depends(require_admin)):
+    if data.reason not in ARCHIVE_REASONS:
+        raise HTTPException(status_code=400, detail=f"Invalid reason. Use: {', '.join(ARCHIVE_REASONS)}")
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    now = datetime.now(timezone.utc).isoformat()
+    db.enquiries.update_one(
+        {"id": enquiry_id},
+        {"$set": {
+            "is_archived":    True,
+            "archived_at":    now,
+            "archived_by":    admin.get("email") or admin.get("id"),
+            "archive_reason": data.reason,
+        }},
+    )
+    return {"status": "archived", "enquiry_id": enquiry_id}
+
+
+@router.post("/admin/enquiries/{enquiry_id}/restore")
+def restore_enquiry(enquiry_id: str, admin=Depends(require_admin)):
+    enq = db.enquiries.find_one({"id": enquiry_id}, {"_id": 0})
+    if not enq:
+        raise HTTPException(status_code=404, detail="Enquiry not found")
+    db.enquiries.update_one(
+        {"id": enquiry_id},
+        {"$set": {
+            "is_archived":    False,
+            "archived_at":    None,
+            "archived_by":    None,
+            "archive_reason": None,
+        }},
+    )
+    return {"status": "restored", "enquiry_id": enquiry_id}
+
+
+@router.post("/admin/enquiries/bulk-archive")
+def bulk_archive_enquiries(data: BulkArchiveRequest, admin=Depends(require_admin)):
+    if data.reason not in ARCHIVE_REASONS:
+        raise HTTPException(status_code=400, detail=f"Invalid reason. Use: {', '.join(ARCHIVE_REASONS)}")
+    if not data.enquiry_ids:
+        raise HTTPException(status_code=400, detail="No enquiry_ids provided")
+    now = datetime.now(timezone.utc).isoformat()
+    result = db.enquiries.update_many(
+        {"id": {"$in": data.enquiry_ids}},
+        {"$set": {
+            "is_archived":    True,
+            "archived_at":    now,
+            "archived_by":    admin.get("email") or admin.get("id"),
+            "archive_reason": data.reason,
+        }},
+    )
+    return {"status": "archived", "modified": result.modified_count}
+
+
+@router.post("/admin/enquiries/bulk-restore")
+def bulk_restore_enquiries(data: BulkRestoreRequest, admin=Depends(require_admin)):
+    if not data.enquiry_ids:
+        raise HTTPException(status_code=400, detail="No enquiry_ids provided")
+    result = db.enquiries.update_many(
+        {"id": {"$in": data.enquiry_ids}},
+        {"$set": {
+            "is_archived":    False,
+            "archived_at":    None,
+            "archived_by":    None,
+            "archive_reason": None,
+        }},
+    )
+    return {"status": "restored", "modified": result.modified_count}
 
 
 @router.get("/admin/allocations")
@@ -61,10 +162,11 @@ def create_allocation(data: AllocationCreateRequest, admin=Depends(require_admin
 
 @router.get("/admin/stats")
 def get_stats(admin=Depends(require_admin)):
+    active_filter = {"is_archived": {"$ne": True}}
     return {
         "ragers":              db.ragers.count_documents({}),
         "public_ragers":       db.ragers.count_documents({"is_public": True}),
-        "enquiries":           db.enquiries.count_documents({}),
+        "enquiries":           db.enquiries.count_documents(active_filter),
         "pending_allocations": db.allocations.count_documents({
             "status": {"$in": ["pending_rager", "rager_accepted", "pending_founder"]}
         }),
@@ -74,7 +176,7 @@ def get_stats(admin=Depends(require_admin)):
 
 @router.get("/admin/analytics")
 def get_analytics(admin=Depends(require_admin)):
-    enquiries = list(db.enquiries.find({}, {"_id": 0}))
+    enquiries = list(db.enquiries.find({"is_archived": {"$ne": True}}, {"_id": 0}))
     allocations = list(db.allocations.find({}, {"_id": 0}))
     ragers = list(db.ragers.find({}, {"_id": 0, "categories": 1, "is_public": 1}))
 

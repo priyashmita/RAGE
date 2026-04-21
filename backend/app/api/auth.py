@@ -7,7 +7,7 @@ from typing import Optional
 from app.core.db import db
 from app.core.auth import (
     verify_password, hash_password, validate_password_strength,
-    create_access_token, serialize_user, get_current_user,
+    create_access_token, create_rager_token, serialize_user, get_current_user,
     generate_secure_token, hash_token, MAX_LOGIN_ATTEMPTS,
 )
 from app.core.audit import write_audit
@@ -279,7 +279,12 @@ def setup_password(payload: SetupPasswordRequest):
     )
 
     updated = db.users.find_one({"id": user["id"]}, {"_id": 0})
-    return {"token": create_access_token(updated), "user": serialize_user(updated)}
+    # Rager users need a rager token (with rager_id claim) so their portal works
+    if updated.get("role") == "rager" and updated.get("rager_id"):
+        token = create_rager_token(updated, updated["rager_id"])
+    else:
+        token = create_access_token(updated)
+    return {"token": token, "user": serialize_user(updated)}
 
 
 # ── Forgot password ───────────────────────────────────────────────────────────
@@ -358,4 +363,9 @@ def reset_password(payload: ResetPasswordRequest):
     )
 
     updated = db.users.find_one({"id": user["id"]}, {"_id": 0})
-    return {"token": create_access_token(updated), "user": serialize_user(updated)}
+    # Rager users need a rager token (with rager_id claim) so their portal works
+    if updated.get("role") == "rager" and updated.get("rager_id"):
+        token = create_rager_token(updated, updated["rager_id"])
+    else:
+        token = create_access_token(updated)
+    return {"token": token, "user": serialize_user(updated)}

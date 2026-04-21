@@ -156,22 +156,33 @@ def _score_rager(rager_id: str) -> tuple:
             }
 
     # 4. Advisory sessions (as advisor/member in Closed Table)
+    #    Exclude allocations whose enquiry is archived — testing/junk must not distort scores.
     allocs     = list(db.allocations.find({"member_id": rager_id}, {"_id": 0}))
     conf_count = 0
     if allocs:
+        enq_ids_for_allocs = [a.get("enquiry_id") for a in allocs if a.get("enquiry_id")]
+        if enq_ids_for_allocs:
+            archived_enq_ids = {
+                e["id"] for e in db.enquiries.find(
+                    {"id": {"$in": enq_ids_for_allocs}, "is_archived": True},
+                    {"id": 1, "_id": 0},
+                )
+            }
+            allocs = [a for a in allocs if a.get("enquiry_id") not in archived_enq_ids]
         conf_count = sum(1 for a in allocs if a.get("status") == "confirmed")
-        adv_pts    = min(conf_count * 8, 24)
-        rel        = conf_count / len(allocs)
-        rel_pts    = round(rel * 8)
-        score     += adv_pts + rel_pts
-        breakdown["advisory"] = {
-            "offered":     len(allocs),
-            "confirmed":   conf_count,
-            "reliability": round(rel, 2),
-            "points":      adv_pts + rel_pts,
-        }
-        if conf_count:
-            signals.append("advisory_confirmed")
+        if allocs:
+            adv_pts = min(conf_count * 8, 24)
+            rel     = conf_count / len(allocs)
+            rel_pts = round(rel * 8)
+            score  += adv_pts + rel_pts
+            breakdown["advisory"] = {
+                "offered":     len(allocs),
+                "confirmed":   conf_count,
+                "reliability": round(rel, 2),
+                "points":      adv_pts + rel_pts,
+            }
+            if conf_count:
+                signals.append("advisory_confirmed")
 
     # 5. Cross-module engagement bonus
     if dinner_count >= 2 and conf_count >= 1:
@@ -233,11 +244,11 @@ def _extract_topics(rager: dict, invite_ids: list) -> list:
                 if any(kw in theme for kw in kws):
                     votes.append(cat)
 
-    # Advisory enquiry topics
+    # Advisory enquiry topics (archived enquiries excluded — must not pollute topic scores)
     allocs = list(db.allocations.find({"member_id": rager["id"]}, {"enquiry_id": 1, "_id": 0}))
     if allocs:
         enq_ids = [a["enquiry_id"] for a in allocs]
-        for enq in db.enquiries.find({"id": {"$in": enq_ids}}, {"_id": 0}):
+        for enq in db.enquiries.find({"id": {"$in": enq_ids}, "is_archived": {"$ne": True}}, {"_id": 0}):
             for field in ["topic", "description", "category", "tags"]:
                 val = enq.get(field)
                 if not val:
@@ -442,11 +453,17 @@ def get_candidate(candidate_id: str, admin=Depends(require_admin)):
         for inv in dinner_invites
     ]
 
-    # Advisory history
+    # Advisory history — exclude allocations linked to archived enquiries
     allocs = list(db.allocations.find({"member_id": rager_id}, {"_id": 0}))
     advisory_history = []
     for a in allocs:
-        enq  = db.enquiries.find_one({"id": a.get("enquiry_id")}, {"_id": 0}) or {}
+        enq = db.enquiries.find_one(
+            {"id": a.get("enquiry_id"), "is_archived": {"$ne": True}},
+            {"_id": 0},
+        ) or {}
+        if not enq and a.get("enquiry_id"):
+            # enquiry is archived or missing — skip from advisory history view
+            continue
         topic = enq.get("topic") or enq.get("category") or enq.get("description", "")[:60] or "—"
         advisory_history.append({"status": a.get("status"), "topic": topic})
 

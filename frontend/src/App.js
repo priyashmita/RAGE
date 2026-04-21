@@ -25,9 +25,12 @@ import MatchingPanel from '@/pages/admin/MatchingPanel';
 import AdminContactsPage from '@/pages/admin/AdminContactsPage';
 import AdminSettingsPage from '@/pages/admin/AdminSettingsPage';
 import AdminLayout from '@/components/AdminLayout';
+import RagerLayout from '@/components/RagerLayout';
 import EventsPage from '@/pages/EventsPage';
 import RagerLoginPage from '@/pages/RagerLoginPage';
 import RagerDashboard from '@/pages/RagerDashboard';
+import RagerProfilePage from '@/pages/RagerProfilePage';
+import RagerChangePasswordPage from '@/pages/RagerChangePasswordPage';
 import SetupAccountPage from '@/pages/SetupAccountPage';
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage';
 import ResetPasswordPage from '@/pages/ResetPasswordPage';
@@ -77,7 +80,7 @@ function DashboardRouter() {
   if (!user) return <Navigate to="/rager-login" replace />;
 
   if (user.role === 'admin') return <Navigate to="/admin" replace />;
-  if (user.role === 'rager') return <Navigate to="/rager-dashboard" replace />;
+  if (user.role === 'rager') return <Navigate to="/rager/dashboard" replace />;
   if (user.role === 'founder') return <FounderDashboard />;
 
   return <Navigate to="/rager-login" replace />;
@@ -116,7 +119,8 @@ function App() {
 
           <Route path="/admin-login" element={<AdminLoginPage />} />
           <Route path="/rager-login" element={<RagerLoginPage />} />
-          <Route path="/rager-dashboard" element={<RagerDashboard />} />
+          {/* Legacy redirect — keeps old email links working */}
+          <Route path="/rager-dashboard" element={<Navigate to="/rager/dashboard" replace />} />
           <Route path="/setup-account" element={<SetupAccountPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -125,6 +129,13 @@ function App() {
           <Route path="/rsvp/:token" element={<RSVPPage />} />
           <Route path="/preread/:token" element={<PrereadFormPage />} />
           <Route path="/preread-view/:token" element={<PrereadViewPage />} />
+
+          {/* Rager portal — auth handled inside RagerLayout */}
+          <Route path="/rager" element={<RagerLayout />}>
+            <Route path="dashboard" element={<RagerDashboard />} />
+            <Route path="profile" element={<RagerProfilePage />} />
+            <Route path="change-password" element={<RagerChangePasswordPage />} />
+          </Route>
 
           <Route
             element={

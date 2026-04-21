@@ -6,12 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { setRagerToken } from '@/lib/ragerAuth';
 
 const LOGO_URL = '/logo.png';
 
 function redirectByRole(role, navigate) {
   if (role === 'admin') navigate('/admin', { replace: true });
-  else if (role === 'rager') navigate('/rager-dashboard', { replace: true });
+  else if (role === 'rager') navigate('/rager/dashboard', { replace: true });
   else navigate('/dashboard', { replace: true });
 }
 
@@ -54,10 +55,16 @@ export default function SetupAccountPage() {
         password: form.password,
         confirm_password: form.confirm_password,
       });
-      loginWithData(res.data.token, res.data.user);
-      redirectByRole(res.data.user.role, navigate);
+      if (res.data.user.role === 'rager') {
+        // Rager tokens must go to rage_rager_token, not the shared rage_token
+        setRagerToken(res.data.token, true);
+        navigate('/rager/dashboard', { replace: true });
+      } else {
+        loginWithData(res.data.token, res.data.user);
+        redirectByRole(res.data.user.role, navigate);
+      }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Setup failed. Please try again.');
+      setError(err.response?.data?.detail || 'Setup failed. Please try again or request a new invite link.');
       setStatus('valid');
     }
   };
