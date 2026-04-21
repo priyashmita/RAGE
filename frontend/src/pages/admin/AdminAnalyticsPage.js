@@ -421,7 +421,7 @@ export default function AdminAnalyticsPage() {
               <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">
                 Internal Notes <span className="normal-case tracking-normal text-[#52525B]">— full structured analysis, never published</span>
               </Label>
-              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Full structured analysis: Context / Key Themes / Differing Perspectives / Critical Insights / Recommended Action / One-Line Takeaway" className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[120px]" />
+              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Full structured analysis: Context / Key Themes / Differing Perspectives / Critical Insights / Recommended Action / One-Line Takeaway" className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-xs font-mono min-h-[280px] whitespace-pre leading-relaxed" />
             </div>
             <div className="flex items-center justify-between p-3 bg-[#050505] border border-white/8">
               <div>

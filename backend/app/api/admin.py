@@ -333,15 +333,47 @@ def email_report(report_id: str, data: EmailReportRequest, admin=Depends(require
 _REQUIRED_GENERATE_FIELDS = {"title", "internal_summary", "founder_summary", "public_insight"}
 
 
+_INTERNAL_SUMMARY_SECTIONS = [
+    "CONTEXT", "KEY THEMES", "DIFFERING PERSPECTIVES",
+    "CRITICAL INSIGHTS", "RECOMMENDED ACTION", "ONE-LINE TAKEAWAY",
+]
+
+
 def _build_generate_prompt(transcript: str, context_block: str) -> str:
+    # Show Gemini the exact internal_summary layout it must produce.
+    # Real \n characters in this Python string become \n in the JSON value.
+    example_internal = (
+        "CONTEXT\n"
+        "[2–3 sentences on the situation and core dilemma — specific to this session]\n"
+        "\n"
+        "KEY THEMES\n"
+        "- [specific theme 1]\n"
+        "- [specific theme 2]\n"
+        "- [specific theme 3]\n"
+        "\n"
+        "DIFFERING PERSPECTIVES\n"
+        "[3–5 sentences per viewpoint. Label each: e.g. 'Operator view:'. "
+        "Include any tension or disagreement.]\n"
+        "\n"
+        "CRITICAL INSIGHTS\n"
+        "- [concrete insight 1 — actionable, not generic]\n"
+        "- [concrete insight 2]\n"
+        "- [concrete insight 3]\n"
+        "\n"
+        "RECOMMENDED ACTION\n"
+        "[1–3 sentences on the specific direction the discussion pointed towards]\n"
+        "\n"
+        "ONE-LINE TAKEAWAY\n"
+        "[one sharp, memorable sentence]"
+    )
+
     return f"""You are a report writer for R.A.G.E. (Radical Alliance for Gender Equity).
 
 Chatham House Rule applies: no individual, company, or session may be identified.{context_block}
 
-Analyse the transcript and return a JSON object with EXACTLY these seven keys.
-Each key's value must be fully self-contained — do not reference other keys or continue across keys.
+Return a JSON object with EXACTLY these seven keys. Every value is self-contained.
 
-KEY DEFINITIONS:
+---
 
 "title": string — concise title, max 8 words.
 
@@ -349,30 +381,26 @@ KEY DEFINITIONS:
 
 "themes": array of 3–6 short strings — topic tags only, e.g. ["Fundraising", "GTM", "Hiring"].
 
-"data_points": array of 3–6 strings — anonymised observations, e.g. "Multiple founders cited difficulty accessing Series A outside metros".
+"data_points": array of 3–6 strings — anonymised observations without session identifiers.
 
-"internal_summary": string — a complete structured analysis written as a single plain-text string.
-  The string must contain these six labelled sections in order, each on its own line:
-  CONTEXT: [2–3 sentences on the situation and core dilemma]
-  KEY THEMES: [3–5 bullet points specific to this discussion]
-  DIFFERING PERSPECTIVES: [3–5 sentences per viewpoint — operator, investor, expert, etc. — including any tension]
-  CRITICAL INSIGHTS: [4–6 concrete, actionable insights]
-  RECOMMENDED ACTION: [1–3 sentences on what the discussion pointed towards]
-  ONE-LINE TAKEAWAY: [one sharp, memorable sentence]
-  Do not add any content outside these six sections. Do not use markdown.
+"internal_summary": string — structured analysis. COPY THIS FORMAT EXACTLY, including blank lines between sections. Section headers have NO colon. Content starts on the line after the header:
 
-"founder_summary": string — a private advisory note for the founder, 200–300 words.
-  Rules: no attribution, no "the investor said", no "who said what".
-  Retain all specific insights and the recommendation.
-  Write as a direct advisory note. This field must contain ONLY the advisory note — nothing else.
+{example_internal}
 
-"public_insight": string — a generalised learning for public publication, 100–150 words.
-  Rules: strip all specificity (no stage, sector, numbers, or session details).
-  Generalise so no session can be identified.
-  Write as editorial fact, not a meeting summary. No "a founder" or "a participant".
-  This field must contain ONLY the public insight — nothing else.
+"founder_summary": string — STRICT LIMIT: 2 short paragraphs, maximum 100 words total.
+  Paragraph 1 (1–2 sentences): name the core issue clearly and specifically.
+  Paragraph 2 (2–3 sentences): state the recommendation and why it matters.
+  Rules: no attribution, no role labels, no "the investor said". Direct advisory tone only.
+  Do NOT exceed 2 paragraphs. Do NOT pad or repeat. Stop after the second paragraph.
 
-Return ONLY the JSON object. No preamble, no explanation, no markdown fences.
+"public_insight": string — 80–120 words, generalised for public publication.
+  Strip all specificity: no stage, sector, numbers, or session details.
+  Write as editorial fact. No "a founder" or "a participant".
+  This field must contain ONLY the public insight.
+
+---
+
+Return ONLY the JSON object. No preamble, no markdown fences.
 
 TRANSCRIPT:
 {transcript[:12000]}"""
@@ -406,14 +434,34 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
         try:
             response = model.generate_content(prompt)
             raw_text = response.text.strip().strip("```json").strip("```").strip()
-            print(f"[generate attempt {attempt + 1}] raw (first 500): {raw_text[:500]}", flush=True)
+            print(f"[generate attempt {attempt + 1}] raw (first 600): {raw_text[:600]}", flush=True)
             parsed = _json.loads(raw_text)
+
+            # Required field check
             missing = _REQUIRED_GENERATE_FIELDS - set(parsed.keys())
             if missing:
-                last_err = f"Missing fields in response: {sorted(missing)}"
+                last_err = f"Missing required fields: {sorted(missing)}"
                 print(f"[generate attempt {attempt + 1}] {last_err}", flush=True)
                 parsed = None
                 continue
+
+            # internal_summary must contain all six section headers
+            internal = parsed.get("internal_summary", "")
+            missing_sections = [s for s in _INTERNAL_SUMMARY_SECTIONS if s not in internal]
+            if missing_sections:
+                last_err = f"internal_summary missing sections: {missing_sections}"
+                print(f"[generate attempt {attempt + 1}] {last_err}", flush=True)
+                parsed = None
+                continue
+
+            # founder_summary soft length check (log, don't fail)
+            word_count = len(parsed.get("founder_summary", "").split())
+            if word_count > 130:
+                print(f"[generate attempt {attempt + 1}] founder_summary is {word_count} words (target ≤100) — retrying", flush=True)
+                last_err = f"founder_summary too long ({word_count} words)"
+                parsed = None
+                continue
+
             break
         except Exception as e:
             last_err = str(e)
