@@ -14,7 +14,6 @@ const D = {
   cta:            { title: '', body: '' },
 };
 
-/* Shared container — max 1200px, consistent margins */
 const WRAP = 'max-w-[1200px] mx-auto px-6 lg:px-8';
 
 export default function AboutPage() {
@@ -23,7 +22,7 @@ export default function AboutPage() {
   return (
     <div data-testid="about-page">
 
-      {/* ── HERO ─────────────────────────────────────────────────────────────── */}
+      {/* ── HERO ──────────────────────────────────────────────────────────── */}
       {c.hero.title && (
         <section className="py-16 border-b border-gray-100">
           <div className={WRAP}>
@@ -42,42 +41,42 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── MISSION / WHY RAGE EXISTS ─────────────────────────────────────────
-          Layout: 12-col grid — left 4 cols (hook), right 8 cols (body)
-          Columns top-aligned. Gap: 64px.
-      ──────────────────────────────────────────────────────────────────────── */}
+      {/* ── WHY RAGE EXISTS ───────────────────────────────────────────────
+          12-col grid: left 4 cols (headline), right 8 cols (body)
+          Top-aligned. Gap 64px. No vertical offset between columns.
+      ──────────────────────────────────────────────────────────────────── */}
       {c.mission.title && (
         <section className="py-20 border-b border-gray-100">
           <div className={WRAP}>
             <div className="grid grid-cols-12 gap-16 items-start">
 
-              {/* Left — 4 cols: headline + italic pull quote */}
+              {/* Left — 4/12: headline only, acts as section anchor */}
               <div className="col-span-12 lg:col-span-4">
                 <h2
-                  className="text-3xl font-normal tracking-tight text-gray-900 leading-snug mb-0"
+                  className="text-3xl font-normal tracking-tight text-gray-900 leading-snug"
                   style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
                 >
                   {c.mission.title}
                 </h2>
               </div>
 
-              {/* Right — 8 cols: pull quote + body paragraphs */}
-              <div className="col-span-12 lg:col-span-8">
+              {/* Right — 8/12: pull quote then body, each a discrete block */}
+              <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
                 {c.mission.quote && (
                   <p
-                    className="text-xl text-gray-700 leading-[1.65] font-light mb-6"
+                    className="text-xl text-gray-700 leading-[1.65] font-light"
                     style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
                   >
                     {c.mission.quote}
                   </p>
                 )}
                 {c.mission.body && (
-                  <p className="text-base text-gray-600 leading-relaxed mb-4 max-w-[580px]">
+                  <p className="text-base text-gray-600 leading-relaxed max-w-[560px]">
                     {c.mission.body}
                   </p>
                 )}
                 {c.mission.body2 && (
-                  <p className="text-base text-gray-600 leading-relaxed max-w-[580px]">
+                  <p className="text-base text-gray-600 leading-relaxed max-w-[560px]">
                     {c.mission.body2}
                   </p>
                 )}
@@ -88,15 +87,13 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── BUSINESS FIRST ────────────────────────────────────────────────────
-          Layout: centered header block (max 760px), then full-width 3-col grid.
-          Visual break from the narrative flow above.
-      ──────────────────────────────────────────────────────────────────────── */}
+      {/* ── BUSINESS FIRST ────────────────────────────────────────────────
+          Centred header (max 760px), then full-width 3-col pillar grid.
+      ──────────────────────────────────────────────────────────────────── */}
       {c.business_first.title && (
         <section className="py-20 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
 
-            {/* Centered header */}
             <div className="max-w-[760px] mx-auto text-center mb-12">
               {c.business_first.overline && (
                 <p className="rage-overline mb-4">{c.business_first.overline}</p>
@@ -114,14 +111,13 @@ export default function AboutPage() {
               )}
             </div>
 
-            {/* 3 equal pillars */}
             {c.business_first.items.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-gray-200">
                 {c.business_first.items.map(d => (
-                  <div key={d.num} className="bg-white px-8 py-8">
+                  <div key={d.num} className="bg-white px-8 py-8 flex flex-col gap-3">
                     <span className="text-[#DC143C] font-mono text-sm">{d.num}</span>
                     <h3
-                      className="text-lg font-medium text-gray-900 mt-3 mb-3 leading-snug"
+                      className="text-lg font-medium text-gray-900 leading-snug"
                       style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
                     >
                       {d.title}
@@ -136,16 +132,15 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── NETWORK ───────────────────────────────────────────────────────────
-          Layout: left-aligned block — overline, headline, body, bullets, then stats.
-          If an image is present, render as 2-col with content on right.
-          Stats: 3 equal columns, tight gap.
-      ──────────────────────────────────────────────────────────────────────── */}
+      {/* ── NETWORK ───────────────────────────────────────────────────────
+          Left-aligned single block. Overline → headline → body → bullets
+          → stats, each element discrete with consistent spacing.
+          Stats: border-top treatment, tight 24px gap.
+      ──────────────────────────────────────────────────────────────────── */}
       {c.community.title && (
         <section className="py-20 border-b border-gray-100">
           <div className={WRAP}>
             {c.community.image_url ? (
-              /* Two-column when image exists */
               <div className="grid grid-cols-12 gap-16 items-start">
                 <div className="col-span-12 lg:col-span-5">
                   <img
@@ -159,8 +154,7 @@ export default function AboutPage() {
                 </div>
               </div>
             ) : (
-              /* Single-column left-aligned when no image */
-              <div className="max-w-[720px]">
+              <div className="max-w-[680px]">
                 <NetworkContent c={c} />
               </div>
             )}
@@ -168,7 +162,7 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── FOCUS AREAS ───────────────────────────────────────────────────── */}
+      {/* ── FOCUS AREAS ───────────────────────────────────────────────── */}
       {c.focus_areas.title && (
         <section className="py-20 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
@@ -207,7 +201,7 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── TEAM ──────────────────────────────────────────────────────────── */}
+      {/* ── TEAM ──────────────────────────────────────────────────────── */}
       {c.team?.length > 0 && c.team[0].name && (
         <section className="py-20 border-b border-gray-100">
           <div className={WRAP}>
@@ -215,21 +209,15 @@ export default function AboutPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {c.team.map((m, i) =>
                 m.name ? (
-                  <div key={i} className="bg-white border border-gray-200 px-8 py-8">
+                  <div key={i} className="bg-white border border-gray-200 px-8 py-8 flex flex-col gap-1">
                     {m.photo_url && (
-                      <img
-                        src={m.photo_url}
-                        alt={m.name}
-                        className="w-16 h-16 object-cover rounded-full mb-4"
-                      />
+                      <img src={m.photo_url} alt={m.name} className="w-16 h-16 object-cover rounded-full mb-3" />
                     )}
-                    <h3 className="text-base font-semibold text-gray-900 mb-1">{m.name}</h3>
+                    <h3 className="text-base font-semibold text-gray-900">{m.name}</h3>
                     {m.title && (
-                      <p className="text-xs text-[#DC143C] uppercase tracking-wider mb-3">
-                        {m.title}
-                      </p>
+                      <p className="text-xs text-[#DC143C] uppercase tracking-wider">{m.title}</p>
                     )}
-                    {m.bio && <p className="text-sm text-gray-500">{m.bio}</p>}
+                    {m.bio && <p className="text-sm text-gray-500 mt-2">{m.bio}</p>}
                   </div>
                 ) : null
               )}
@@ -238,13 +226,11 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── CTA ───────────────────────────────────────────────────────────── */}
+      {/* ── CTA ───────────────────────────────────────────────────────── */}
       {c.cta.title && (
         <section className="py-20">
           <div className={`${WRAP} text-center`}>
-            <h2
-              className="text-3xl md:text-4xl font-light tracking-tighter text-gray-900 mb-4 leading-snug"
-            >
+            <h2 className="text-3xl md:text-4xl font-light tracking-tighter text-gray-900 mb-4 leading-snug">
               {c.cta.title}
             </h2>
             {c.cta.body && (
@@ -283,31 +269,32 @@ export default function AboutPage() {
   );
 }
 
-/* ── NetworkContent ────────────────────────────────────────────────────────────
-   Extracted so the same markup works inside both the single-col and two-col
-   Network layouts without duplication.
+/* ── NetworkContent ───────────────────────────────────────────────────────────
+   Used in both image and no-image layout paths.
+   Each element is a discrete block. Bullets → stats: 24px max.
+   Stats: border-top treatment, no box background, tight gap.
 ──────────────────────────────────────────────────────────────────────────────── */
 function NetworkContent({ c }) {
   return (
-    <>
+    <div className="flex flex-col gap-4">
       {c.community.overline && (
-        <p className="rage-overline mb-4">{c.community.overline}</p>
+        <p className="rage-overline">{c.community.overline}</p>
       )}
       <h2
-        className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-4 leading-snug"
+        className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug"
         style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
       >
         {c.community.title}
       </h2>
       {c.community.body && (
-        <p className="text-base text-gray-600 leading-relaxed mb-4">
+        <p className="text-base text-gray-600 leading-relaxed">
           {c.community.body}
         </p>
       )}
 
-      {/* Bullet highlights */}
+      {/* Bullet highlights — discrete list items */}
       {c.community.highlights?.length > 0 && (
-        <ul className="space-y-2 mb-8">
+        <ul className="flex flex-col gap-2">
           {c.community.highlights.map((h, i) => (
             <li key={i} className="flex items-start gap-2">
               <span className="w-1 h-1 bg-[#DC143C] rounded-full mt-[7px] shrink-0" />
@@ -317,11 +304,11 @@ function NetworkContent({ c }) {
         </ul>
       )}
 
-      {/* Stats — 3 columns, tight gap */}
+      {/* Stats — 24px gap, border-top only, no background box */}
       {c.community.stats.length > 0 && (
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-3 gap-6 pt-2">
           {c.community.stats.map(s => (
-            <div key={s.label} className="border-t-2 border-gray-200 pt-4">
+            <div key={s.label} className="border-t border-gray-200 pt-3">
               <p className="text-2xl font-light text-gray-900 font-mono leading-none mb-1">
                 {s.value}
               </p>
@@ -332,6 +319,6 @@ function NetworkContent({ c }) {
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }
