@@ -372,10 +372,21 @@ RECOMMENDED ACTION
 ONE-LINE TAKEAWAY
 [one sharp sentence]
 
-"founder_summary": EXACTLY 2 paragraphs, maximum 100 words total. No attribution.
-  Para 1: the core issue (1-2 sentences).
-  Para 2: the recommendation and why it matters (2-3 sentences).
-  Stop after paragraph 2. Do not add more.
+"founder_summary": ready-to-send note for email or WhatsApp. Use EXACTLY this layout — four labelled sections, each on its own line, content on the lines below. Use bullet points under "What to do next". Max 150 words total. No attribution, no role labels.
+
+What's happening
+[1-2 sentences: the core situation, specific to this founder]
+
+What this means
+[1-2 sentences: the implication or risk if left unaddressed]
+
+What to do next
+- [concrete action 1]
+- [concrete action 2]
+- [concrete action 3 if needed]
+
+Bottom line
+[one sharp sentence: the single most important takeaway]
 
 "public_insight": 80-120 words. Generalised — no session identifiers, no specifics. Editorial fact, not a recap.
 
@@ -431,10 +442,18 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
                 parsed = None
                 continue
 
-            # founder_summary soft length check (log, don't fail)
-            word_count = len(parsed.get("founder_summary", "").split())
-            if word_count > 130:
-                print(f"[generate attempt {attempt + 1}] founder_summary is {word_count} words (target ≤100) — retrying", flush=True)
+            # founder_summary: check sections present + length
+            fs = parsed.get("founder_summary", "")
+            fs_sections = ["What's happening", "What this means", "What to do next", "Bottom line"]
+            missing_fs = [s for s in fs_sections if s not in fs]
+            if missing_fs:
+                last_err = f"founder_summary missing sections: {missing_fs}"
+                print(f"[generate attempt {attempt + 1}] {last_err}", flush=True)
+                parsed = None
+                continue
+            word_count = len(fs.split())
+            if word_count > 200:
+                print(f"[generate attempt {attempt + 1}] founder_summary is {word_count} words (target ≤150) — retrying", flush=True)
                 last_err = f"founder_summary too long ({word_count} words)"
                 parsed = None
                 continue

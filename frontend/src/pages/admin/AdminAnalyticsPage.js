@@ -376,7 +376,7 @@ export default function AdminAnalyticsPage() {
               <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">
                 Founder Summary <span className="normal-case tracking-normal text-[#52525B]">— private advisory note, send to founder only</span>
               </Label>
-              <Textarea value={form.founder_summary} onChange={e => setForm(f => ({ ...f, founder_summary: e.target.value }))} placeholder="Advisory note for the founder who was in this session. Not published." className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[100px]" />
+              <Textarea value={form.founder_summary} onChange={e => setForm(f => ({ ...f, founder_summary: e.target.value }))} placeholder={"What's happening\n[situation]\n\nWhat this means\n[implication]\n\nWhat to do next\n- action\n\nBottom line\n[takeaway]"} className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-xs font-mono min-h-[200px] whitespace-pre leading-relaxed" />
             </div>
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">
