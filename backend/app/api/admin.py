@@ -42,10 +42,11 @@ class BulkRestoreRequest(BaseModel):
 class ReportIn(BaseModel):
     title: str
     period: Optional[str] = ""
-    summary: str
+    summary: Optional[str] = ""          # public_insight — shown on /insights
+    founder_summary: Optional[str] = ""  # advisory note for the founder only
     themes: Optional[List[str]] = []
     data_points: Optional[List[str]] = []
-    notes: Optional[str] = ""
+    notes: Optional[str] = ""            # internal_summary — full structured analysis
     is_public: Optional[bool] = False
 
 
@@ -257,6 +258,11 @@ def toggle_publish(report_id: str, admin=Depends(require_admin)):
     if not doc:
         raise HTTPException(status_code=404, detail="Report not found")
     new_state = not doc.get("is_public", False)
+    if new_state and not (doc.get("summary") or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot publish: Public Insight (summary) is empty. Add public-safe content before publishing."
+        )
     db.reports.update_one({"id": report_id}, {"$set": {"is_public": new_state}})
     return {"is_public": new_state}
 
@@ -338,7 +344,7 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
 
         context_block = f"\nAdditional context: {data.context}" if data.context else ""
 
-        prompt = f"""You are producing two versions of a Chatham House Rule report for R.A.G.E. (Radical Alliance for Gender Equity), a curated platform for women founders in India.
+        prompt = f"""You are producing three versions of a Chatham House Rule report for R.A.G.E. (Radical Alliance for Gender Equity), a curated platform for women founders in India.
 
 Chatham House Rule: information may be shared but NO individual, company, or session is identified or attributed.{context_block}
 
@@ -348,32 +354,43 @@ From the transcript below, produce the following:
 2. PERIOD — e.g. "Q1 2025" or leave blank if unclear
 3. THEMES — 3–6 short topic tags (e.g. "Fundraising", "Hiring", "GTM")
 4. DATA_POINTS — 3–6 anonymised observations (e.g. "Multiple founders cited difficulty accessing Series A capital in non-metro markets")
-5. INTERNAL_SUMMARY — a full structured analysis for internal use only, written in this exact format (use plain text with section headers, no markdown):
+
+5. INTERNAL_SUMMARY — full structured analysis, for internal use only. Plain text, no markdown. Use these exact section headers:
 
 CONTEXT
-[2–3 sentences: the situation and core dilemma being discussed]
+[2–3 sentences: the situation and core dilemma]
 
 KEY THEMES
-[3–5 bullet points — specific to this discussion, not generic]
+[3–5 specific bullet points — not generic]
 
 DIFFERING PERSPECTIVES
-[Summarise how different viewpoints approached the problem — e.g. operator, investor, expert. Note any tension or disagreement. If roles are not explicit, describe viewpoints as they emerged. 3–5 sentences per perspective.]
+[How different viewpoints (operator, investor, expert, etc.) approached the problem. Note any tension or disagreement. 3–5 sentences per viewpoint.]
 
 CRITICAL INSIGHTS
-[4–6 concrete, actionable insights — specific enough that someone can act on them, not generic statements]
+[4–6 concrete, actionable insights specific enough to act on]
 
 RECOMMENDED ACTION
-[1–3 sentences: what direction the discussion clearly pointed towards]
+[1–3 sentences: what the discussion clearly pointed towards]
 
 ONE-LINE TAKEAWAY
 [A single sharp, memorable sentence]
 
-6. FOUNDER_SUMMARY — a tighter advisory note version of the same content, written for the founder who was in the session. Rules:
-- No attribution (no "the investor said", "the expert noted" — just the insight itself)
-- No "who said what"
-- Keep all insights and recommendations
-- Tighter language — read like an advisory note, not a meeting recap
+6. FOUNDER_SUMMARY — a private advisory note for the founder who was in the session:
+- No attribution — no "the investor said", no "the expert noted"
+- No "who said what" framing
+- Retain all insights and the specific recommendation
+- Tighter language — read as advisory note, not meeting recap
 - 200–300 words maximum
+- This is PRIVATE — it may reference specifics of the founder's situation
+
+7. PUBLIC_INSIGHT — a high-level learning suitable for public publication on the RAGE platform:
+- Strip ALL specificity: no company stage, no sector, no numbers, no identifying details
+- Remove all timing or context clues that could identify the session
+- Generalise the scenario so it could apply to any founder facing a similar challenge
+- Convert into a universal principle or editorial insight
+- Do NOT reference "a founder" or "a participant" — write as editorial fact
+- 100–150 words maximum
+- Tone: clear, useful, publishable — not a summary of what happened
 
 Return ONLY valid JSON in this exact format:
 {{
@@ -382,7 +399,8 @@ Return ONLY valid JSON in this exact format:
   "themes": ["...", "..."],
   "data_points": ["...", "..."],
   "internal_summary": "...",
-  "founder_summary": "..."
+  "founder_summary": "...",
+  "public_insight": "..."
 }}
 
 TRANSCRIPT:
@@ -393,12 +411,13 @@ TRANSCRIPT:
         import json
         parsed = json.loads(text)
         return {
-            "title":             parsed.get("title", ""),
-            "period":            parsed.get("period", ""),
-            "themes":            parsed.get("themes", []),
-            "data_points":       parsed.get("data_points", []),
-            "internal_summary":  parsed.get("internal_summary", ""),
-            "founder_summary":   parsed.get("founder_summary", ""),
+            "title":            parsed.get("title", ""),
+            "period":           parsed.get("period", ""),
+            "themes":           parsed.get("themes", []),
+            "data_points":      parsed.get("data_points", []),
+            "internal_summary": parsed.get("internal_summary", ""),
+            "founder_summary":  parsed.get("founder_summary", ""),
+            "public_insight":   parsed.get("public_insight", ""),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
@@ -411,7 +430,7 @@ def public_reports():
     return list(
         db.reports.find(
             {"is_public": True},
-            {"_id": 0, "notes": 0, "created_by": 0}
+            {"_id": 0, "notes": 0, "founder_summary": 0, "created_by": 0}
         ).sort("created_at", -1)
     )
 

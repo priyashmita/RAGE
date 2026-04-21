@@ -40,7 +40,7 @@ function SectionBlock({ title, children }) {
   );
 }
 
-const EMPTY_REPORT = { title: '', period: '', summary: '', themes: [], data_points: [], notes: '', is_public: false };
+const EMPTY_REPORT = { title: '', period: '', founder_summary: '', summary: '', themes: [], data_points: [], notes: '', is_public: false };
 
 export default function AdminAnalyticsPage() {
   const [analytics, setAnalytics] = useState(null);
@@ -89,7 +89,7 @@ export default function AdminAnalyticsPage() {
   const openEdit = (r) => { setForm({ ...EMPTY_REPORT, ...r }); setEditId(r.id); setThemeInput(''); setDpInput(''); setDialogOpen(true); };
 
   const handleSave = async () => {
-    if (!form.title.trim() || !form.summary.trim()) { toast.error('Title and summary required'); return; }
+    if (!form.title.trim()) { toast.error('Title is required'); return; }
     setSaving(true);
     try {
       if (editId) {
@@ -143,14 +143,13 @@ export default function AdminAnalyticsPage() {
       const d = res.data;
       setForm({
         ...EMPTY_REPORT,
-        title:       d.title       || '',
-        period:      d.period      || '',
-        themes:      d.themes      || [],
-        data_points: d.data_points || [],
-        // founder_summary → public-facing summary field
-        summary:     d.founder_summary || '',
-        // internal_summary → internal notes field (not published)
-        notes:       d.internal_summary || '',
+        title:            d.title            || '',
+        period:           d.period           || '',
+        themes:           d.themes           || [],
+        data_points:      d.data_points      || [],
+        founder_summary:  d.founder_summary  || '',   // private — send to founder only
+        notes:            d.internal_summary || '',   // internal — full structured analysis
+        summary:          d.public_insight   || '',   // public — shown on /insights only when published
       });
       setEditId(null);
       setAiDialogOpen(false);
@@ -374,8 +373,19 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
             <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">Summary * <span className="normal-case tracking-normal text-[#52525B]">(founder-facing — published)</span></Label>
-              <Textarea value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} placeholder="Aggregate summary. No individual attribution." className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[100px]" />
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">
+                Founder Summary <span className="normal-case tracking-normal text-[#52525B]">— private advisory note, send to founder only</span>
+              </Label>
+              <Textarea value={form.founder_summary} onChange={e => setForm(f => ({ ...f, founder_summary: e.target.value }))} placeholder="Advisory note for the founder who was in this session. Not published." className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[100px]" />
+            </div>
+            <div>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">
+                Public Insight <span className="normal-case tracking-normal text-[#52525B]">— shown on /insights only when explicitly published</span>
+              </Label>
+              <Textarea value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} placeholder="Generalised learning with no session-identifiable details. Leave blank until ready to publish." className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[100px]" />
+              {!form.summary.trim() && form.is_public && (
+                <p className="text-[10px] text-amber-500 mt-1">Warning: is_public is on but Public Insight is empty — publishing will be blocked.</p>
+              )}
             </div>
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">Themes (Enter to add)</Label>
@@ -408,8 +418,10 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
             <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">Internal Notes <span className="normal-case tracking-normal text-[#52525B]">(full structured analysis — not published)</span></Label>
-              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Context, methodology, caveats — not shared externally" className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[120px]" />
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">
+                Internal Notes <span className="normal-case tracking-normal text-[#52525B]">— full structured analysis, never published</span>
+              </Label>
+              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Full structured analysis: Context / Key Themes / Differing Perspectives / Critical Insights / Recommended Action / One-Line Takeaway" className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[120px]" />
             </div>
             <div className="flex items-center justify-between p-3 bg-[#050505] border border-white/8">
               <div>
