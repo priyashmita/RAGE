@@ -43,10 +43,6 @@ def _is_legacy_sections(sections: dict) -> bool:
 @app.on_event("startup")
 def auto_seed_content():
     """On every deploy: upsert any page that is missing or has legacy flat format."""
-    # ── Temp env-var diagnostics (remove after verification) ────────────────
-    print("GEMINI KEY PRESENT:", bool(os.getenv("GEMINI_API_KEY")), flush=True)
-    print("RESEND KEY PRESENT:", bool(os.getenv("RESEND_API_KEY")),  flush=True)
-
     for item in DEFAULT_CONTENT:
         existing = db.content.find_one({"page": item["page"]}, {"_id": 0})
         existing_sections = existing.get("sections", {}) if existing else {}
@@ -123,10 +119,6 @@ def health():
         "ragers":               db.ragers.count_documents({}),
         "users":                db.users.count_documents({}),
         "contacts":             db.contacts.count_documents({"is_deleted": False}),
-        # Temporary env-var diagnostics — remove after Gemini is verified
-        "gemini_key_present":   bool(os.getenv("GEMINI_API_KEY")),
-        "gemini_model":         os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
-        "resend_key_present":   bool(os.getenv("RESEND_API_KEY")),
     }
 
 
