@@ -5,13 +5,13 @@ import { ArrowRight, Lock, Clock, Users, Repeat } from 'lucide-react';
 
 const RI = [Lock, Clock, Users, Repeat];
 const D = {
-  hero:       { overline: '', title: '', body: '' },
+  hero:         { overline: '', title: '', body: '' },
   how_it_works: { title: '', steps: [] },
-  rules:      { title: '', items: [] },
-  tiers:      [],
-  precedents: { overline: '', title: '', body: '', items: [] },
-  faqs:       [],
-  cta:        { title: '', body: '' },
+  rules:        { title: '', items: [] },
+  tiers:        [],
+  precedents:   { overline: '', title: '', body: '', items: [] },
+  faqs:         [],
+  cta:          { title: '', body: '' },
 };
 
 const WRAP = 'max-w-[1200px] mx-auto px-6 lg:px-8';
@@ -22,9 +22,9 @@ export default function ClosedTablePage() {
   return (
     <div data-testid="closed-table-page">
 
-      {/* ── HERO ──────────────────────────────────────────────────────── */}
+      {/* ── HERO — py-12 (48px) ───────────────────────────────────────── */}
       {c.hero.title && (
-        <section className="py-16 border-b border-gray-100">
+        <section className="py-12 border-b border-gray-100">
           <div className={WRAP}>
             {c.hero.overline && (
               <p className="rage-overline mb-4">{c.hero.overline}</p>
@@ -33,7 +33,7 @@ export default function ClosedTablePage() {
               {c.hero.title}
             </h1>
             {c.hero.body && (
-              <p className="mt-5 text-lg text-gray-600 max-w-xl leading-relaxed">
+              <p className="mt-4 text-lg text-gray-600 max-w-xl leading-relaxed">
                 {c.hero.body}
               </p>
             )}
@@ -41,25 +41,27 @@ export default function ClosedTablePage() {
         </section>
       )}
 
-      {/* ── HOW IT WORKS ──────────────────────────────────────────────── */}
+      {/* ── HOW IT WORKS — py-14 (56px) ───────────────────────────────────
+          Heading → grid: 24px. Step inner padding: 24px. Step gap: 8px.
+      ──────────────────────────────────────────────────────────────────── */}
       {c.how_it_works.title && (
-        <section className="py-20 border-b border-gray-100">
+        <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
-            <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-10">
+            <h2 className="text-3xl font-normal tracking-tight text-gray-900 mb-6">
               {c.how_it_works.title}
             </h2>
             {c.how_it_works.steps.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-4 gap-px bg-gray-200">
                 {c.how_it_works.steps.map(s => (
-                  <div key={s.step} className="bg-white p-8 flex flex-col gap-3">
+                  <div key={s.step} className="bg-white p-6 flex flex-col gap-2">
                     <span className="text-[#DC143C] font-mono text-sm">{s.step}</span>
                     <h3
-                      className="text-lg font-medium text-gray-900 leading-snug"
+                      className="text-base font-medium text-gray-900 leading-snug"
                       style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
                     >
                       {s.label}
                     </h3>
-                    <p className="text-sm text-gray-600 leading-relaxed">{s.desc}</p>
+                    <p className="text-sm text-gray-500 leading-relaxed">{s.desc}</p>
                   </div>
                 ))}
               </div>
@@ -68,30 +70,30 @@ export default function ClosedTablePage() {
         </section>
       )}
 
-      {/* ── RULES + PRICING ───────────────────────────────────────────────
-          Two-column: Rules left, Pricing right.
-          Pricing cards stack title → price → description vertically.
-          No text concatenation — each field is a discrete element.
+      {/* ── RULES + PRICING — py-14 (56px) ───────────────────────────────
+          Column gap: 48px. Heading → content: 24px.
+          Rules items: 16px gap. Pricing label → cards: 16px.
+          Cards: p-5 (20px), gap-3 (12px) between cards.
       ──────────────────────────────────────────────────────────────────── */}
       {(c.rules.title || c.tiers.length > 0) && (
-        <section className="py-20 bg-gray-50 border-b border-gray-100">
+        <section className="py-14 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
 
               {/* Rules */}
               {c.rules.title && (
                 <div>
-                  <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-8">
+                  <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-6">
                     {c.rules.title}
                   </h2>
                   {c.rules.items.length > 0 && (
-                    <div className="flex flex-col gap-5">
+                    <div className="flex flex-col gap-4">
                       {c.rules.items.map((r, i) => {
                         const Icon = RI[i] || Lock;
                         return (
-                          <div key={r.title} className="flex items-start gap-4">
-                            <div className="w-9 h-9 bg-[#DC143C]/10 flex items-center justify-center shrink-0">
-                              <Icon className="w-4 h-4 text-[#DC143C]" />
+                          <div key={r.title} className="flex items-start gap-3">
+                            <div className="w-8 h-8 bg-[#DC143C]/10 flex items-center justify-center shrink-0">
+                              <Icon className="w-3.5 h-3.5 text-[#DC143C]" />
                             </div>
                             <div className="flex flex-col gap-1">
                               <p
@@ -110,26 +112,23 @@ export default function ClosedTablePage() {
                 </div>
               )}
 
-              {/* Pricing — CRITICAL: stack [Title] / [Price] / [Description] */}
+              {/* Pricing — [Title] / [Price] / [Description] stacked */}
               {c.tiers.length > 0 && (
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-gray-400 font-semibold mb-6">
+                  <p className="text-xs uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
                     Pricing
                   </p>
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3">
                     {c.tiers.map(t => (
-                      <div key={t.name} className="bg-white border border-gray-200 p-6 flex flex-col gap-2">
-                        {/* Title */}
+                      <div key={t.name} className="bg-white border border-gray-200 p-5 flex flex-col gap-2">
                         <h4
-                          className="text-base font-semibold text-gray-900 leading-snug"
+                          className="text-sm font-semibold text-gray-900 leading-snug"
                           style={{ fontFamily: 'Manrope, sans-serif' }}
                         >
                           {t.name}
                         </h4>
-                        {/* Price — own line, mono, subdued */}
-                        <p className="text-base font-mono text-gray-700">{t.price}</p>
-                        {/* Description */}
-                        <p className="text-sm text-gray-500 leading-relaxed">{t.desc}</p>
+                        <p className="text-sm font-mono text-gray-700">{t.price}</p>
+                        <p className="text-xs text-gray-500 leading-relaxed">{t.desc}</p>
                       </div>
                     ))}
                   </div>
@@ -141,17 +140,16 @@ export default function ClosedTablePage() {
         </section>
       )}
 
-      {/* ── WHAT FOUNDERS BRING ───────────────────────────────────────────
-          Reduced padding so it reads as connected to surrounding sections,
-          not floating. No bottom margin on body — section padding handles it.
+      {/* ── WHAT FOUNDERS BRING — py-12 (48px) ───────────────────────────
+          Heading → body: 12px. Tight, connected to sections above/below.
       ──────────────────────────────────────────────────────────────────── */}
       {c.precedents.title && (
-        <section className="py-16 border-b border-gray-100">
+        <section className="py-12 border-b border-gray-100">
           <div className={WRAP}>
             {c.precedents.overline && (
-              <p className="rage-overline mb-4">{c.precedents.overline}</p>
+              <p className="rage-overline mb-3">{c.precedents.overline}</p>
             )}
-            <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-4">
+            <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-3">
               {c.precedents.title}
             </h2>
             {c.precedents.body && (
@@ -163,17 +161,17 @@ export default function ClosedTablePage() {
         </section>
       )}
 
-      {/* ── FAQs ──────────────────────────────────────────────────────────
-          Single heading ("FAQs"). Section title → first item: 24px.
-          Question → answer: 8px. Between questions: 24px.
+      {/* ── FAQs — py-12 (48px) ───────────────────────────────────────────
+          Title → first item: 20px. Question → answer: 8px.
+          Between items: 20px.
       ──────────────────────────────────────────────────────────────────── */}
       {c.faqs?.length > 0 && (
-        <section className="py-16 bg-gray-50 border-b border-gray-100">
+        <section className="py-12 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
-            <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-6">
+            <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-5">
               FAQs
             </h2>
-            <div className="flex flex-col gap-6 max-w-2xl">
+            <div className="flex flex-col gap-5 max-w-2xl">
               {c.faqs.map((f, i) => (
                 <div key={i} className="flex flex-col gap-2">
                   <p
@@ -190,11 +188,11 @@ export default function ClosedTablePage() {
         </section>
       )}
 
-      {/* ── CTA ───────────────────────────────────────────────────────── */}
+      {/* ── CTA — py-16 (64px) ────────────────────────────────────────── */}
       {c.cta.title && (
-        <section className="py-20">
+        <section className="py-16">
           <div className={`${WRAP} text-center`}>
-            <h2 className="text-3xl md:text-4xl font-light tracking-tighter text-gray-900 mb-4">
+            <h2 className="text-3xl font-light tracking-tighter text-gray-900 mb-3">
               {c.cta.title}
             </h2>
             {c.cta.body && (
