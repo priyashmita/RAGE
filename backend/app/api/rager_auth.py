@@ -96,12 +96,80 @@ def rager_me(rager: dict = Depends(require_rager)):
     return {k: v for k, v in rager.items() if k not in ("password_hash", "phone")}
 
 
+# Statuses where offer session details have been disclosed to the rager
+# (reconfirmation email includes format/timing/budget/venue)
+_OFFER_DISCLOSED = {
+    "reconfirmation_pending", "reconfirmed_for_offer",
+    "offer_sent_to_founder", "selected_by_founder",
+    "final_disclosure_sent", "rager_final_confirmed",
+    "confirmed_ready_to_schedule", "reconfirmation_declined",
+    "not_selected_by_founder",
+    # backward-compat statuses from earlier workflow version:
+    "pending_founder", "confirmed", "founder_declined",
+}
+
+# Statuses where founder identity has been revealed to the rager
+# (final disclosure email is the first time founder name/email are shared)
+_FOUNDER_DISCLOSED = {
+    "final_disclosure_sent", "rager_final_confirmed",
+    "confirmed_ready_to_schedule",
+    # backward compat:
+    "confirmed",
+}
+
+
 @router.get("/rager/allocations")
 def rager_allocations(rager: dict = Depends(require_rager)):
     allocations = list(db.allocations.find({"rager_id": rager["id"]}, {"_id": 0}))
     result = []
     for alloc in allocations:
+        status = alloc.get("status", "")
         enq = db.enquiries.find_one({"id": alloc["enquiry_id"]}, {"_id": 0}) or {}
+
+        # Always: anonymised brief data (disclosed in initial outreach email)
+        brief_data = None
+        if alloc.get("brief_id"):
+            bdoc = db.anonymised_briefs.find_one(
+                {"brief_id": alloc["brief_id"]}, {"_id": 0}
+            )
+            if bdoc:
+                bd = bdoc.get("brief_data", {})
+                brief_data = {
+                    "situation":      bd.get("situation", ""),
+                    "what_they_need": bd.get("what_they_need", ""),
+                    "help_items":     bd.get("help_items", []),
+                    "decision_label": bd.get("decision_label", ""),
+                    "stage_label":    bd.get("stage_label", ""),
+                    "format_label":   bd.get("format_label", ""),
+                    "urgency_label":  bd.get("urgency_label", ""),
+                }
+
+        # Reconfirmation stage+: session details from the offer
+        # (format, timing, budget, venue — founder identity still withheld)
+        offer_data = None
+        if status in _OFFER_DISCLOSED:
+            offer = db.founder_offers.find_one(
+                {"enquiry_id": alloc["enquiry_id"]},
+                {"_id": 0},
+                sort=[("created_at", -1)],
+            )
+            if offer:
+                offer_data = {
+                    "format_type":    offer.get("format_type", ""),
+                    "duration_text":  offer.get("duration_text", ""),
+                    "budget_text":    offer.get("budget_text", ""),
+                    "venue":          offer.get("venue", ""),
+                    "optional_dates": offer.get("optional_dates", ""),
+                }
+
+        # Final disclosure stage+: founder identity revealed
+        founder_data = None
+        if status in _FOUNDER_DISCLOSED:
+            founder_data = {
+                "name":  enq.get("name", ""),
+                "email": enq.get("email", ""),
+            }
+
         result.append({
             **alloc,
             "enquiry": {
@@ -109,7 +177,10 @@ def rager_allocations(rager: dict = Depends(require_rager)):
                 "challenge":  enq.get("challenge") or enq.get("message", ""),
                 "categories": enq.get("categories", []),
                 "created_at": enq.get("created_at", ""),
-            }
+            },
+            "brief_data":   brief_data,
+            "offer_data":   offer_data,
+            "founder_data": founder_data,
         })
     result.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return result
