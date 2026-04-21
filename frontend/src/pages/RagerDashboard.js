@@ -3,8 +3,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
 import {
-  Loader2, CheckCircle, XCircle, Mail,
-  Clock, AlertCircle, ChevronRight,
+  Loader2, CheckCircle, XCircle, Mail, ChevronRight,
 } from 'lucide-react';
 import { ragerAuthHeader, clearRagerToken } from '@/lib/ragerAuth';
 
