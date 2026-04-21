@@ -22,9 +22,9 @@ export default function AboutPage() {
   return (
     <div data-testid="about-page">
 
-      {/* ── HERO ──────────────────────────────────────────────────────────── */}
+      {/* ── HERO — py-12 (48px) ────────────────────────────────────────────── */}
       {c.hero.title && (
-        <section className="py-16 border-b border-gray-100">
+        <section className="py-12 border-b border-gray-100">
           <div className={WRAP}>
             {c.hero.overline && (
               <p className="rage-overline mb-4">{c.hero.overline}</p>
@@ -41,12 +41,12 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── WHY RAGE EXISTS ───────────────────────────────────────────────
+      {/* ── WHY RAGE EXISTS — py-14 (56px) ────────────────────────────────────
           12-col grid: left 4 cols (headline), right 8 cols (body)
           Top-aligned. Gap 64px. No vertical offset between columns.
-      ──────────────────────────────────────────────────────────────────── */}
+      ──────────────────────────────────────────────────────────────────────── */}
       {c.mission.title && (
-        <section className="py-20 border-b border-gray-100">
+        <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
             <div className="grid grid-cols-12 gap-16 items-start">
 
@@ -87,14 +87,14 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── BUSINESS FIRST ────────────────────────────────────────────────
-          Centred header (max 760px), then full-width 3-col pillar grid.
-      ──────────────────────────────────────────────────────────────────── */}
+      {/* ── BUSINESS FIRST — py-14 (56px) ─────────────────────────────────────
+          Centred header (max 760px) mb-8 → full-width 3-col pillar grid.
+      ──────────────────────────────────────────────────────────────────────── */}
       {c.business_first.title && (
-        <section className="py-20 bg-gray-50 border-b border-gray-100">
+        <section className="py-14 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
 
-            <div className="max-w-[760px] mx-auto text-center mb-12">
+            <div className="max-w-[760px] mx-auto text-center mb-8">
               {c.business_first.overline && (
                 <p className="rage-overline mb-4">{c.business_first.overline}</p>
               )}
@@ -132,13 +132,13 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── NETWORK ───────────────────────────────────────────────────────
+      {/* ── NETWORK — py-14 (56px) ─────────────────────────────────────────────
           Left-aligned single block. Overline → headline → body → bullets
           → stats, each element discrete with consistent spacing.
           Stats: border-top treatment, tight 24px gap.
-      ──────────────────────────────────────────────────────────────────── */}
+      ──────────────────────────────────────────────────────────────────────── */}
       {c.community.title && (
-        <section className="py-20 border-b border-gray-100">
+        <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
             {c.community.image_url ? (
               <div className="grid grid-cols-12 gap-16 items-start">
@@ -162,15 +162,15 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── FOCUS AREAS ───────────────────────────────────────────────── */}
+      {/* ── FOCUS AREAS — py-14 (56px) ─────────────────────────────────────── */}
       {c.focus_areas.title && (
-        <section className="py-20 bg-gray-50 border-b border-gray-100">
+        <section className="py-14 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
             {c.focus_areas.overline && (
               <p className="rage-overline mb-4">{c.focus_areas.overline}</p>
             )}
             <h2
-              className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-10 max-w-xl leading-snug"
+              className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-6 max-w-xl leading-snug"
               style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
             >
               {c.focus_areas.title}
@@ -201,9 +201,9 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── TEAM ──────────────────────────────────────────────────────── */}
+      {/* ── TEAM — py-14 (56px) ────────────────────────────────────────────── */}
       {c.team?.length > 0 && c.team[0].name && (
-        <section className="py-20 border-b border-gray-100">
+        <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
             <p className="rage-overline mb-4">The Team</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -226,15 +226,15 @@ export default function AboutPage() {
         </section>
       )}
 
-      {/* ── CTA ───────────────────────────────────────────────────────── */}
+      {/* ── CTA — py-14 (56px) ─────────────────────────────────────────────── */}
       {c.cta.title && (
-        <section className="py-20">
+        <section className="py-14">
           <div className={`${WRAP} text-center`}>
             <h2 className="text-3xl md:text-4xl font-light tracking-tighter text-gray-900 mb-4 leading-snug">
               {c.cta.title}
             </h2>
             {c.cta.body && (
-              <p className="text-base text-gray-600 mb-8 max-w-md mx-auto">
+              <p className="text-base text-gray-600 mb-6 max-w-md mx-auto">
                 {c.cta.body}
               </p>
             )}

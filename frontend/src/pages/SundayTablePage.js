@@ -21,7 +21,7 @@ export default function SundayTablePage() {
     <div data-testid="sunday-table-page">
 
       {/* ── HERO ──────────────────────────────────────────────────────── */}
-      <section className="py-16 border-b border-gray-100">
+      <section className="py-12 border-b border-gray-100">
         <div className={WRAP}>
           {c.hero.overline && (
             <p className="rage-overline mb-4">{c.hero.overline}</p>
@@ -42,7 +42,7 @@ export default function SundayTablePage() {
           Body paragraphs: each a discrete block, consistent text-base size.
           Between paragraphs: 16px gap (not margin — use flex gap).
       ──────────────────────────────────────────────────────────────────── */}
-      <section className="py-20 border-b border-gray-100">
+      <section className="py-14 border-b border-gray-100">
         <div className={WRAP}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
@@ -113,9 +113,9 @@ export default function SundayTablePage() {
 
       {/* ── PRODUCTION & DISTRIBUTION ─────────────────────────────────── */}
       {c.production.length > 0 && (
-        <section className="py-20 bg-gray-50 border-b border-gray-100">
+        <section className="py-14 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
-            <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-10">
+            <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-6">
               Production & Distribution
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -134,7 +134,7 @@ export default function SundayTablePage() {
 
       {/* ── SPONSORSHIP ───────────────────────────────────────────────── */}
       {c.sponsorship.title && (
-        <section className="py-20 border-b border-gray-100">
+        <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
             <div className="max-w-[680px]">
               {c.sponsorship.overline && (
@@ -164,13 +164,13 @@ export default function SundayTablePage() {
       )}
 
       {/* ── CTA ───────────────────────────────────────────────────────── */}
-      <section className="py-20">
+      <section className="py-14">
         <div className={`${WRAP} text-center`}>
           <h2 className="text-3xl md:text-4xl font-light tracking-tighter text-gray-900 mb-4">
             {c.cta.title}
           </h2>
           {c.cta.body && (
-            <p className="text-base text-gray-600 mb-8 max-w-md mx-auto">
+            <p className="text-base text-gray-600 mb-6 max-w-md mx-auto">
               {c.cta.body}
             </p>
           )}
