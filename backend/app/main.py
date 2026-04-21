@@ -123,8 +123,9 @@ def health():
         "ragers":               db.ragers.count_documents({}),
         "users":                db.users.count_documents({}),
         "contacts":             db.contacts.count_documents({"is_deleted": False}),
-        # Temporary env-var diagnostics — remove after GEMINI_API_KEY is verified
+        # Temporary env-var diagnostics — remove after Gemini is verified
         "gemini_key_present":   bool(os.getenv("GEMINI_API_KEY")),
+        "gemini_model":         os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
         "resend_key_present":   bool(os.getenv("RESEND_API_KEY")),
     }
 

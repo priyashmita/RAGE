@@ -334,7 +334,7 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
     try:
         import google.generativeai as genai
         genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
 
         context_block = f"\nAdditional context: {data.context}" if data.context else ""
 
