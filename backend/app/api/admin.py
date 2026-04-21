@@ -388,11 +388,11 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
     if not gemini_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured on Railway")
 
+    # Pass config as plain dict — compatible with google-generativeai 0.8.x
     genai.configure(api_key=gemini_key)
-    generation_config = genai.GenerationConfig(response_mime_type="application/json")
     model = genai.GenerativeModel(
         os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        generation_config=generation_config,
+        generation_config={"response_mime_type": "application/json"},
     )
 
     context_block = f"\nAdditional context: {data.context}" if data.context else ""
@@ -406,17 +406,18 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
         try:
             response = model.generate_content(prompt)
             raw_text = response.text.strip().strip("```json").strip("```").strip()
-            print(f"[generate attempt {attempt + 1}] raw response (first 500 chars): {raw_text[:500]}", flush=True)
+            print(f"[generate attempt {attempt + 1}] raw (first 500): {raw_text[:500]}", flush=True)
             parsed = _json.loads(raw_text)
             missing = _REQUIRED_GENERATE_FIELDS - set(parsed.keys())
             if missing:
-                last_err = f"Missing fields: {missing}"
+                last_err = f"Missing fields in response: {sorted(missing)}"
+                print(f"[generate attempt {attempt + 1}] {last_err}", flush=True)
                 parsed = None
                 continue
             break
         except Exception as e:
             last_err = str(e)
-            print(f"[generate attempt {attempt + 1}] failed: {last_err}", flush=True)
+            print(f"[generate attempt {attempt + 1}] exception: {last_err}", flush=True)
 
     if parsed is None:
         raise HTTPException(
