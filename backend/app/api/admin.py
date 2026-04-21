@@ -340,70 +340,49 @@ _INTERNAL_SUMMARY_SECTIONS = [
 
 
 def _build_generate_prompt(transcript: str, context_block: str) -> str:
-    # Show Gemini the exact internal_summary layout it must produce.
-    # Real \n characters in this Python string become \n in the JSON value.
-    example_internal = (
-        "CONTEXT\n"
-        "[2–3 sentences on the situation and core dilemma — specific to this session]\n"
-        "\n"
-        "KEY THEMES\n"
-        "- [specific theme 1]\n"
-        "- [specific theme 2]\n"
-        "- [specific theme 3]\n"
-        "\n"
-        "DIFFERING PERSPECTIVES\n"
-        "[3–5 sentences per viewpoint. Label each: e.g. 'Operator view:'. "
-        "Include any tension or disagreement.]\n"
-        "\n"
-        "CRITICAL INSIGHTS\n"
-        "- [concrete insight 1 — actionable, not generic]\n"
-        "- [concrete insight 2]\n"
-        "- [concrete insight 3]\n"
-        "\n"
-        "RECOMMENDED ACTION\n"
-        "[1–3 sentences on the specific direction the discussion pointed towards]\n"
-        "\n"
-        "ONE-LINE TAKEAWAY\n"
-        "[one sharp, memorable sentence]"
-    )
+    return f"""Report writer for R.A.G.E. (Radical Alliance for Gender Equity).
+Chatham House Rule: no individual, company, or session identified.{context_block}
 
-    return f"""You are a report writer for R.A.G.E. (Radical Alliance for Gender Equity).
+Return a JSON object with exactly these 7 keys:
 
-Chatham House Rule applies: no individual, company, or session may be identified.{context_block}
+"title": max 8 words.
+"period": e.g. "Q1 2025" or "".
+"themes": array of 3-6 topic tag strings.
+"data_points": array of 3-6 anonymised observation strings.
 
-Return a JSON object with EXACTLY these seven keys. Every value is self-contained.
+"internal_summary": plain-text string. Use EXACTLY this layout — each header on its own line, blank line before each section, content on the lines below the header. No colons after headers.
 
----
+CONTEXT
+[2-3 sentences on the situation and dilemma]
 
-"title": string — concise title, max 8 words.
+KEY THEMES
+- [specific theme]
+- [specific theme]
 
-"period": string — e.g. "Q1 2025". Empty string if unclear.
+DIFFERING PERSPECTIVES
+[Viewpoint A label: 2-3 sentences. Viewpoint B label: 2-3 sentences. Note tensions.]
 
-"themes": array of 3–6 short strings — topic tags only, e.g. ["Fundraising", "GTM", "Hiring"].
+CRITICAL INSIGHTS
+- [actionable insight]
+- [actionable insight]
 
-"data_points": array of 3–6 strings — anonymised observations without session identifiers.
+RECOMMENDED ACTION
+[1-2 sentences: what the discussion pointed towards]
 
-"internal_summary": string — structured analysis. COPY THIS FORMAT EXACTLY, including blank lines between sections. Section headers have NO colon. Content starts on the line after the header:
+ONE-LINE TAKEAWAY
+[one sharp sentence]
 
-{example_internal}
+"founder_summary": EXACTLY 2 paragraphs, maximum 100 words total. No attribution.
+  Para 1: the core issue (1-2 sentences).
+  Para 2: the recommendation and why it matters (2-3 sentences).
+  Stop after paragraph 2. Do not add more.
 
-"founder_summary": string — STRICT LIMIT: 2 short paragraphs, maximum 100 words total.
-  Paragraph 1 (1–2 sentences): name the core issue clearly and specifically.
-  Paragraph 2 (2–3 sentences): state the recommendation and why it matters.
-  Rules: no attribution, no role labels, no "the investor said". Direct advisory tone only.
-  Do NOT exceed 2 paragraphs. Do NOT pad or repeat. Stop after the second paragraph.
+"public_insight": 80-120 words. Generalised — no session identifiers, no specifics. Editorial fact, not a recap.
 
-"public_insight": string — 80–120 words, generalised for public publication.
-  Strip all specificity: no stage, sector, numbers, or session details.
-  Write as editorial fact. No "a founder" or "a participant".
-  This field must contain ONLY the public insight.
-
----
-
-Return ONLY the JSON object. No preamble, no markdown fences.
+Return ONLY the JSON object. No preamble. No markdown fences.
 
 TRANSCRIPT:
-{transcript[:12000]}"""
+{transcript[:8000]}"""
 
 
 @router.post("/admin/reports/generate")
@@ -416,12 +395,10 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
     if not gemini_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured on Railway")
 
-    # Pass config as plain dict — compatible with google-generativeai 0.8.x
+    # Prompt instructs JSON output; no response_mime_type to avoid schema
+    # validation overhead which slows generation on complex multi-field prompts.
     genai.configure(api_key=gemini_key)
-    model = genai.GenerativeModel(
-        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        generation_config={"response_mime_type": "application/json"},
-    )
+    model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 
     context_block = f"\nAdditional context: {data.context}" if data.context else ""
     prompt = _build_generate_prompt(data.transcript, context_block)
