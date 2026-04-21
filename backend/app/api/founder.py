@@ -27,9 +27,12 @@ def get_founder_enquiries(user: dict = Depends(get_current_user)):
     user_id = user.get("id", "")
 
     enquiries = list(db.enquiries.find(
-        {"$or": [
-            {"user_id": user_id},
-            {"email": {"$regex": f"^{email}$", "$options": "i"}},
+        {"$and": [
+            {"is_archived": {"$ne": True}},
+            {"$or": [
+                {"user_id": user_id},
+                {"email": {"$regex": f"^{email}$", "$options": "i"}},
+            ]},
         ]},
         {"_id": 0},
     ).sort("created_at", -1))
