@@ -453,19 +453,23 @@ def get_candidate(candidate_id: str, admin=Depends(require_admin)):
         for inv in dinner_invites
     ]
 
-    # Advisory history — exclude allocations linked to archived enquiries
+    # Advisory history — batch-fetch enquiries to avoid N+1 queries
     allocs = list(db.allocations.find({"member_id": rager_id}, {"_id": 0}))
     advisory_history = []
-    for a in allocs:
-        enq = db.enquiries.find_one(
-            {"id": a.get("enquiry_id"), "is_archived": {"$ne": True}},
-            {"_id": 0},
-        ) or {}
-        if not enq and a.get("enquiry_id"):
-            # enquiry is archived or missing — skip from advisory history view
-            continue
-        topic = enq.get("topic") or enq.get("category") or enq.get("description", "")[:60] or "—"
-        advisory_history.append({"status": a.get("status"), "topic": topic})
+    if allocs:
+        enq_ids = [a["enquiry_id"] for a in allocs if a.get("enquiry_id")]
+        enq_map = {
+            e["id"]: e for e in db.enquiries.find(
+                {"id": {"$in": enq_ids}, "is_archived": {"$ne": True}},
+                {"_id": 0, "id": 1, "topic": 1, "category": 1, "description": 1},
+            )
+        } if enq_ids else {}
+        for a in allocs:
+            enq = enq_map.get(a.get("enquiry_id"))
+            if not enq:
+                continue  # archived or missing — exclude from advisory history
+            topic = enq.get("topic") or enq.get("category") or (enq.get("description") or "")[:60] or "—"
+            advisory_history.append({"status": a.get("status"), "topic": topic})
 
     # Decision log
     decisions = list(

@@ -49,29 +49,58 @@ def auto_seed_content():
         if not existing or not existing_sections or _is_legacy_sections(existing_sections):
             db.content.replace_one({"page": item["page"]}, item, upsert=True)
 
-    # Ensure uniqueness indexes (idempotent — safe to run on every deploy)
+    # ── Core uniqueness indexes ──────────────────────────────────────────────
     db.users.create_index("email", unique=True, background=True)
     db.users.create_index("id",    unique=True, background=True)
     db.ragers.create_index("id",   unique=True, background=True)
 
-    # Private Table indexes
+    # ── Enquiries ────────────────────────────────────────────────────────────
+    # is_archived used on every list query; compound covers filter+sort together
+    db.enquiries.create_index("id",         unique=True, sparse=True, background=True)
+    db.enquiries.create_index("is_archived",                          background=True)
+    db.enquiries.create_index([("is_archived", 1), ("created_at", -1)], background=True)
+
+    # ── Allocations ──────────────────────────────────────────────────────────
+    # enquiry_id: matching workflow & rager dashboard lookups
+    # member_id / rager_id: podcast scoring & rager portal
+    # status: pending-queue counts in stats
+    db.allocations.create_index("id",         unique=True, sparse=True, background=True)
+    db.allocations.create_index("enquiry_id",               background=True)
+    db.allocations.create_index("member_id",                background=True)
+    db.allocations.create_index("rager_id",                 background=True)
+    db.allocations.create_index("status",                   background=True)
+    db.allocations.create_index([("enquiry_id", 1), ("status", 1)], background=True)
+
+    # ── Private Table ────────────────────────────────────────────────────────
     db.events.create_index("id",         unique=True, background=True)
     db.invites.create_index("id",        unique=True, background=True)
     db.invites.create_index("token",     unique=True, sparse=True, background=True)
     db.invites.create_index("event_id",  background=True)
-    db.prereads.create_index("id",       unique=True, sparse=True, background=True)
+    # rager_id is the hottest lookup — scored per-rager in every candidate refresh
+    db.invites.create_index("rager_id",  background=True)
+    db.invites.create_index([("rager_id", 1), ("rsvp_status",  1)], background=True)
+    db.invites.create_index([("rager_id", 1), ("invite_sent",  1)], background=True)
+    db.prereads.create_index("id",        unique=True, sparse=True, background=True)
     db.prereads.create_index("invite_id", unique=True, sparse=True, background=True)
-    db.seatings.create_index("id",       unique=True, background=True)
-    db.seatings.create_index("event_id", background=True)
+    db.seatings.create_index("id",        unique=True, background=True)
+    db.seatings.create_index("event_id",  background=True)
 
-    # Podcast Intelligence indexes
+    # ── Podcast Intelligence ─────────────────────────────────────────────────
     db.podcast_candidates.create_index("id",        unique=True, background=True)
     db.podcast_candidates.create_index("person_id", unique=True, background=True)
-    db.podcast_candidates.create_index("score",     background=True)
-    db.podcast_pairs.create_index("id",             unique=True, background=True)
-    db.podcast_panels.create_index("id",            unique=True, background=True)
-    db.podcast_invite_decisions.create_index("id",  unique=True, background=True)
-    db.podcast_topic_signals.create_index("id",     unique=True, background=True)
+    db.podcast_candidates.create_index("score",                  background=True)
+    # pairs: sorted by score, and looked up by either person
+    db.podcast_pairs.create_index("id",                   unique=True, background=True)
+    db.podcast_pairs.create_index("compatibility_score",            background=True)
+    db.podcast_pairs.create_index("person_1_id",                    background=True)
+    db.podcast_pairs.create_index("person_2_id",                    background=True)
+    # panels
+    db.podcast_panels.create_index("id",    unique=True, background=True)
+    db.podcast_panels.create_index("score",             background=True)
+    # decisions: looked up per candidate in detail view
+    db.podcast_invite_decisions.create_index("id",           unique=True, background=True)
+    db.podcast_invite_decisions.create_index("candidate_id",            background=True)
+    db.podcast_topic_signals.create_index("id",              unique=True, background=True)
 
 
 @app.get("/")

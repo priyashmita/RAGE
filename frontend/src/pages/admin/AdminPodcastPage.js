@@ -485,12 +485,15 @@ function CandidatesTab() {
 
 // ─── Pairs Tab ────────────────────────────────────────────────────────────────
 
+const PAIRS_PAGE_SIZE = 30;
+
 function PairsTab() {
   const [pairs, setPairs]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [generating, setGen]      = useState(false);
   const [filter, setFilter]       = useState('all');
   const [updating, setUpdating]   = useState(null);
+  const [page, setPage]           = useState(1);
 
   const load = useCallback(async () => {
     try {
@@ -522,7 +525,9 @@ function PairsTab() {
     finally { setUpdating(null); }
   }
 
-  const filtered = filter === 'all' ? pairs : pairs.filter(p => p.status === filter);
+  const filtered   = filter === 'all' ? pairs : pairs.filter(p => p.status === filter);
+  const pairPages  = Math.ceil(filtered.length / PAIRS_PAGE_SIZE);
+  const pagedPairs = filtered.slice((page - 1) * PAIRS_PAGE_SIZE, page * PAIRS_PAGE_SIZE);
 
   return (
     <div>
@@ -531,7 +536,7 @@ function PairsTab() {
           {['all', 'suggested', 'shortlisted', 'rejected', 'invited', 'booked'].map(s => (
             <button
               key={s}
-              onClick={() => setFilter(s)}
+              onClick={() => { setFilter(s); setPage(1); }}
               className={`text-[10px] uppercase tracking-wider px-3 py-1.5 border transition-colors ${
                 filter === s ? 'border-[#DC143C]/40 text-[#DC143C]' : 'border-white/8 text-[#52525B] hover:text-[#A1A1AA]'
               }`}
@@ -555,7 +560,7 @@ function PairsTab() {
         <EmptyState icon={ArrowLeftRight} text="No pairs yet" sub="Generate pairs after refreshing candidates" />
       ) : (
         <div className="space-y-2">
-          {filtered.map(pair => (
+          {pagedPairs.map(pair => (
             <div key={pair.id} className="bg-[#080808] border border-white/8 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
@@ -609,6 +614,26 @@ function PairsTab() {
               </div>
             </div>
           ))}
+
+          {/* Pairs pagination */}
+          {pairPages > 1 && (
+            <div className="flex items-center justify-between pt-3 border-t border-white/5">
+              <span className="text-[10px] text-[#52525B]">
+                {(page - 1) * PAIRS_PAGE_SIZE + 1}–{Math.min(page * PAIRS_PAGE_SIZE, filtered.length)} of {filtered.length}
+              </span>
+              <div className="flex gap-1">
+                <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+                  className="text-[10px] px-3 py-1 border border-white/8 text-[#52525B] hover:text-[#A1A1AA] disabled:opacity-30 transition-colors">
+                  Prev
+                </button>
+                <span className="text-[10px] text-[#52525B] px-2 py-1">{page}/{pairPages}</span>
+                <button disabled={page === pairPages} onClick={() => setPage(p => p + 1)}
+                  className="text-[10px] px-3 py-1 border border-white/8 text-[#52525B] hover:text-[#A1A1AA] disabled:opacity-30 transition-colors">
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

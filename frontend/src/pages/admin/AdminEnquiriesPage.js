@@ -32,6 +32,8 @@ export default function AdminEnquiriesPage() {
   const [bulkReason, setBulkReason]         = useState('testing');
   const [archiveTarget, setArchiveTarget]   = useState(null); // { id, reason }
   const [acting, setActing]                 = useState(false);
+  const [page, setPage]                     = useState(1);
+  const PAGE_SIZE                           = 25;
 
   const load = useCallback(() => {
     setLoading(true);
@@ -125,7 +127,9 @@ export default function AdminEnquiriesPage() {
         : new Set(enquiries.map(e => e.id))
     );
 
-  const sorted = [...enquiries].reverse();
+  const sorted    = [...enquiries].reverse();
+  const pageCount = Math.ceil(sorted.length / PAGE_SIZE);
+  const paged     = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -145,7 +149,7 @@ export default function AdminEnquiriesPage() {
         {['active', 'archived', 'all'].map(f => (
           <button
             key={f}
-            onClick={() => { setFilter(f); setExpanded(null); }}
+            onClick={() => { setFilter(f); setExpanded(null); setPage(1); }}
             className={`px-5 py-2 text-xs uppercase tracking-wider transition-colors border-b-2 -mb-px ${
               filter === f
                 ? 'border-[#DC143C] text-[#F5F5F0]'
@@ -224,7 +228,7 @@ export default function AdminEnquiriesPage() {
             </div>
           )}
 
-          {sorted.map(enq => {
+          {paged.map(enq => {
             const isArchived      = !!enq.is_archived;
             const isArchivingThis = archiveTarget?.id === enq.id;
             const isExpanded      = expanded === enq.id;
@@ -446,6 +450,56 @@ export default function AdminEnquiriesPage() {
               </div>
             );
           })}
+
+          {/* Pagination */}
+          {pageCount > 1 && (
+            <div className="flex items-center justify-between pt-4 border-t border-white/5">
+              <span className="text-[10px] text-[#52525B]">
+                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} of {sorted.length}
+              </span>
+              <div className="flex gap-1">
+                <button
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                  className="text-[10px] uppercase tracking-wider px-3 py-1 border border-white/8 text-[#52525B] hover:text-[#A1A1AA] hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Prev
+                </button>
+                {Array.from({ length: pageCount }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === pageCount || Math.abs(p - page) <= 1)
+                  .reduce((acc, p, idx, arr) => {
+                    if (idx > 0 && p - arr[idx - 1] > 1) acc.push('…');
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((p, i) =>
+                    p === '…' ? (
+                      <span key={`ellipsis-${i}`} className="text-[10px] text-[#3F3F46] px-2 py-1">…</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`text-[10px] px-3 py-1 border transition-colors ${
+                          page === p
+                            ? 'border-[#DC143C]/40 text-[#DC143C]'
+                            : 'border-white/8 text-[#52525B] hover:text-[#A1A1AA] hover:border-white/20'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  disabled={page === pageCount}
+                  onClick={() => setPage(p => p + 1)}
+                  className="text-[10px] uppercase tracking-wider px-3 py-1 border border-white/8 text-[#52525B] hover:text-[#A1A1AA] hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
     </div>
