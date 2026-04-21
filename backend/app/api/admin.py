@@ -338,24 +338,51 @@ def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(requi
 
         context_block = f"\nAdditional context: {data.context}" if data.context else ""
 
-        prompt = f"""You are producing a Chatham House Rule report for R.A.G.E. (Radical Alliance for Gender Equity), a curated platform for women founders in India.
+        prompt = f"""You are producing two versions of a Chatham House Rule report for R.A.G.E. (Radical Alliance for Gender Equity), a curated platform for women founders in India.
 
 Chatham House Rule: information may be shared but NO individual, company, or session is identified or attributed.{context_block}
 
-From the transcript below, extract:
-1. A concise TITLE (max 8 words)
-2. A PERIOD (e.g. "Q1 2025" or leave blank if unclear)
-3. A SUMMARY (2–4 sentences, aggregate themes only, no attribution)
-4. THEMES (3–6 short topic tags, e.g. "Fundraising", "Hiring", "GTM")
-5. DATA_POINTS (3–6 anonymised observations, e.g. "Multiple founders cited difficulty accessing Series A capital in non-metro markets")
+From the transcript below, produce the following:
+
+1. TITLE — concise, max 8 words
+2. PERIOD — e.g. "Q1 2025" or leave blank if unclear
+3. THEMES — 3–6 short topic tags (e.g. "Fundraising", "Hiring", "GTM")
+4. DATA_POINTS — 3–6 anonymised observations (e.g. "Multiple founders cited difficulty accessing Series A capital in non-metro markets")
+5. INTERNAL_SUMMARY — a full structured analysis for internal use only, written in this exact format (use plain text with section headers, no markdown):
+
+CONTEXT
+[2–3 sentences: the situation and core dilemma being discussed]
+
+KEY THEMES
+[3–5 bullet points — specific to this discussion, not generic]
+
+DIFFERING PERSPECTIVES
+[Summarise how different viewpoints approached the problem — e.g. operator, investor, expert. Note any tension or disagreement. If roles are not explicit, describe viewpoints as they emerged. 3–5 sentences per perspective.]
+
+CRITICAL INSIGHTS
+[4–6 concrete, actionable insights — specific enough that someone can act on them, not generic statements]
+
+RECOMMENDED ACTION
+[1–3 sentences: what direction the discussion clearly pointed towards]
+
+ONE-LINE TAKEAWAY
+[A single sharp, memorable sentence]
+
+6. FOUNDER_SUMMARY — a tighter advisory note version of the same content, written for the founder who was in the session. Rules:
+- No attribution (no "the investor said", "the expert noted" — just the insight itself)
+- No "who said what"
+- Keep all insights and recommendations
+- Tighter language — read like an advisory note, not a meeting recap
+- 200–300 words maximum
 
 Return ONLY valid JSON in this exact format:
 {{
   "title": "...",
   "period": "...",
-  "summary": "...",
   "themes": ["...", "..."],
-  "data_points": ["...", "..."]
+  "data_points": ["...", "..."],
+  "internal_summary": "...",
+  "founder_summary": "..."
 }}
 
 TRANSCRIPT:
@@ -366,12 +393,12 @@ TRANSCRIPT:
         import json
         parsed = json.loads(text)
         return {
-            "title": parsed.get("title", ""),
-            "period": parsed.get("period", ""),
-            "summary": parsed.get("summary", ""),
-            "themes": parsed.get("themes", []),
-            "data_points": parsed.get("data_points", []),
-            "notes": "Generated from transcript via AI. Review before publishing.",
+            "title":             parsed.get("title", ""),
+            "period":            parsed.get("period", ""),
+            "themes":            parsed.get("themes", []),
+            "data_points":       parsed.get("data_points", []),
+            "internal_summary":  parsed.get("internal_summary", ""),
+            "founder_summary":   parsed.get("founder_summary", ""),
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")

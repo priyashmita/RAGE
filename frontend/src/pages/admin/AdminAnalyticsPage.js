@@ -140,7 +140,18 @@ export default function AdminAnalyticsPage() {
     setGenerating(true);
     try {
       const res = await api.post('/admin/reports/generate', { transcript, context: aiContext });
-      setForm({ ...EMPTY_REPORT, ...res.data });
+      const d = res.data;
+      setForm({
+        ...EMPTY_REPORT,
+        title:       d.title       || '',
+        period:      d.period      || '',
+        themes:      d.themes      || [],
+        data_points: d.data_points || [],
+        // founder_summary → public-facing summary field
+        summary:     d.founder_summary || '',
+        // internal_summary → internal notes field (not published)
+        notes:       d.internal_summary || '',
+      });
       setEditId(null);
       setAiDialogOpen(false);
       setTranscript('');
@@ -363,7 +374,7 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
             <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">Summary *</Label>
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">Summary * <span className="normal-case tracking-normal text-[#52525B]">(founder-facing — published)</span></Label>
               <Textarea value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} placeholder="Aggregate summary. No individual attribution." className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[100px]" />
             </div>
             <div>
@@ -397,8 +408,8 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
             <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">Internal Notes (not published)</Label>
-              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Context, methodology, caveats — not shared externally" className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[60px]" />
+              <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1.5 block">Internal Notes <span className="normal-case tracking-normal text-[#52525B]">(full structured analysis — not published)</span></Label>
+              <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Context, methodology, caveats — not shared externally" className="bg-[#050505] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[120px]" />
             </div>
             <div className="flex items-center justify-between p-3 bg-[#050505] border border-white/8">
               <div>
