@@ -71,7 +71,7 @@ const STATUS_META = {
     badge:    'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     section:  'progress',
     terminal: false,
-    next:     'You've confirmed. RAGE will coordinate scheduling with you and the founder.',
+    next:     "You've confirmed. RAGE will coordinate scheduling with you and the founder.",
   },
   confirmed_ready_to_schedule: {
     label:    'Ready to schedule',
