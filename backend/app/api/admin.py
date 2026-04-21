@@ -330,97 +330,109 @@ def email_report(report_id: str, data: EmailReportRequest, admin=Depends(require
     return {"status": "sent", "recipients": len(data.recipients)}
 
 
+_REQUIRED_GENERATE_FIELDS = {"title", "internal_summary", "founder_summary", "public_insight"}
+
+
+def _build_generate_prompt(transcript: str, context_block: str) -> str:
+    return f"""You are a report writer for R.A.G.E. (Radical Alliance for Gender Equity).
+
+Chatham House Rule applies: no individual, company, or session may be identified.{context_block}
+
+Analyse the transcript and return a JSON object with EXACTLY these seven keys.
+Each key's value must be fully self-contained — do not reference other keys or continue across keys.
+
+KEY DEFINITIONS:
+
+"title": string — concise title, max 8 words.
+
+"period": string — e.g. "Q1 2025". Empty string if unclear.
+
+"themes": array of 3–6 short strings — topic tags only, e.g. ["Fundraising", "GTM", "Hiring"].
+
+"data_points": array of 3–6 strings — anonymised observations, e.g. "Multiple founders cited difficulty accessing Series A outside metros".
+
+"internal_summary": string — a complete structured analysis written as a single plain-text string.
+  The string must contain these six labelled sections in order, each on its own line:
+  CONTEXT: [2–3 sentences on the situation and core dilemma]
+  KEY THEMES: [3–5 bullet points specific to this discussion]
+  DIFFERING PERSPECTIVES: [3–5 sentences per viewpoint — operator, investor, expert, etc. — including any tension]
+  CRITICAL INSIGHTS: [4–6 concrete, actionable insights]
+  RECOMMENDED ACTION: [1–3 sentences on what the discussion pointed towards]
+  ONE-LINE TAKEAWAY: [one sharp, memorable sentence]
+  Do not add any content outside these six sections. Do not use markdown.
+
+"founder_summary": string — a private advisory note for the founder, 200–300 words.
+  Rules: no attribution, no "the investor said", no "who said what".
+  Retain all specific insights and the recommendation.
+  Write as a direct advisory note. This field must contain ONLY the advisory note — nothing else.
+
+"public_insight": string — a generalised learning for public publication, 100–150 words.
+  Rules: strip all specificity (no stage, sector, numbers, or session details).
+  Generalise so no session can be identified.
+  Write as editorial fact, not a meeting summary. No "a founder" or "a participant".
+  This field must contain ONLY the public insight — nothing else.
+
+Return ONLY the JSON object. No preamble, no explanation, no markdown fences.
+
+TRANSCRIPT:
+{transcript[:12000]}"""
+
+
 @router.post("/admin/reports/generate")
 def generate_report_from_transcript(data: TranscriptRequest, admin=Depends(require_admin)):
     """Use Gemini to generate a Chatham House report from a transcript."""
+    import json as _json
+    import google.generativeai as genai
+
     gemini_key = os.getenv("GEMINI_API_KEY", "")
     if not gemini_key:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured on Railway")
 
-    try:
-        import google.generativeai as genai
-        genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    genai.configure(api_key=gemini_key)
+    generation_config = genai.GenerationConfig(response_mime_type="application/json")
+    model = genai.GenerativeModel(
+        os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+        generation_config=generation_config,
+    )
 
-        context_block = f"\nAdditional context: {data.context}" if data.context else ""
+    context_block = f"\nAdditional context: {data.context}" if data.context else ""
+    prompt = _build_generate_prompt(data.transcript, context_block)
 
-        prompt = f"""You are producing three versions of a Chatham House Rule report for R.A.G.E. (Radical Alliance for Gender Equity), a curated platform for women founders in India.
+    raw_text = ""
+    parsed = None
+    last_err = ""
 
-Chatham House Rule: information may be shared but NO individual, company, or session is identified or attributed.{context_block}
+    for attempt in range(2):
+        try:
+            response = model.generate_content(prompt)
+            raw_text = response.text.strip().strip("```json").strip("```").strip()
+            print(f"[generate attempt {attempt + 1}] raw response (first 500 chars): {raw_text[:500]}", flush=True)
+            parsed = _json.loads(raw_text)
+            missing = _REQUIRED_GENERATE_FIELDS - set(parsed.keys())
+            if missing:
+                last_err = f"Missing fields: {missing}"
+                parsed = None
+                continue
+            break
+        except Exception as e:
+            last_err = str(e)
+            print(f"[generate attempt {attempt + 1}] failed: {last_err}", flush=True)
 
-From the transcript below, produce the following:
+    if parsed is None:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Generation failed after 2 attempts: {last_err}. Raw: {raw_text[:300]}",
+        )
 
-1. TITLE — concise, max 8 words
-2. PERIOD — e.g. "Q1 2025" or leave blank if unclear
-3. THEMES — 3–6 short topic tags (e.g. "Fundraising", "Hiring", "GTM")
-4. DATA_POINTS — 3–6 anonymised observations (e.g. "Multiple founders cited difficulty accessing Series A capital in non-metro markets")
-
-5. INTERNAL_SUMMARY — full structured analysis, for internal use only. Plain text, no markdown. Use these exact section headers:
-
-CONTEXT
-[2–3 sentences: the situation and core dilemma]
-
-KEY THEMES
-[3–5 specific bullet points — not generic]
-
-DIFFERING PERSPECTIVES
-[How different viewpoints (operator, investor, expert, etc.) approached the problem. Note any tension or disagreement. 3–5 sentences per viewpoint.]
-
-CRITICAL INSIGHTS
-[4–6 concrete, actionable insights specific enough to act on]
-
-RECOMMENDED ACTION
-[1–3 sentences: what the discussion clearly pointed towards]
-
-ONE-LINE TAKEAWAY
-[A single sharp, memorable sentence]
-
-6. FOUNDER_SUMMARY — a private advisory note for the founder who was in the session:
-- No attribution — no "the investor said", no "the expert noted"
-- No "who said what" framing
-- Retain all insights and the specific recommendation
-- Tighter language — read as advisory note, not meeting recap
-- 200–300 words maximum
-- This is PRIVATE — it may reference specifics of the founder's situation
-
-7. PUBLIC_INSIGHT — a high-level learning suitable for public publication on the RAGE platform:
-- Strip ALL specificity: no company stage, no sector, no numbers, no identifying details
-- Remove all timing or context clues that could identify the session
-- Generalise the scenario so it could apply to any founder facing a similar challenge
-- Convert into a universal principle or editorial insight
-- Do NOT reference "a founder" or "a participant" — write as editorial fact
-- 100–150 words maximum
-- Tone: clear, useful, publishable — not a summary of what happened
-
-Return ONLY valid JSON in this exact format:
-{{
-  "title": "...",
-  "period": "...",
-  "themes": ["...", "..."],
-  "data_points": ["...", "..."],
-  "internal_summary": "...",
-  "founder_summary": "...",
-  "public_insight": "..."
-}}
-
-TRANSCRIPT:
-{data.transcript[:12000]}"""
-
-        response = model.generate_content(prompt)
-        text = response.text.strip().strip("```json").strip("```").strip()
-        import json
-        parsed = json.loads(text)
-        return {
-            "title":            parsed.get("title", ""),
-            "period":           parsed.get("period", ""),
-            "themes":           parsed.get("themes", []),
-            "data_points":      parsed.get("data_points", []),
-            "internal_summary": parsed.get("internal_summary", ""),
-            "founder_summary":  parsed.get("founder_summary", ""),
-            "public_insight":   parsed.get("public_insight", ""),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+    return {
+        "title":            parsed.get("title", ""),
+        "period":           parsed.get("period", ""),
+        "themes":           parsed.get("themes", []),
+        "data_points":      parsed.get("data_points", []),
+        "internal_summary": parsed.get("internal_summary", ""),
+        "founder_summary":  parsed.get("founder_summary", ""),
+        "public_insight":   parsed.get("public_insight", ""),
+    }
 
 
 # ── Public reports (no auth) ─────────────────────────────────────────────────
