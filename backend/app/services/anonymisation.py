@@ -83,7 +83,7 @@ def _ai_structure(problem_text: str, decision_label: str, stage_label: str, help
     try:
         import google.generativeai as genai
         genai.configure(api_key=key)
-        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
+        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 
         help_text = "; ".join(help_items) if help_items else ""
         help_line = f"\nSpecifically they need help with: {help_text}" if help_text else ""

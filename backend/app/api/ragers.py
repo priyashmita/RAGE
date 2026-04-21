@@ -73,7 +73,7 @@ def _ai_categorize(name: str, title: str, bio: str, expertise: list) -> List[str
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
+        model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
 
         prompt = f"""Categorize this advisor for a women founders network in India.
 
