@@ -78,7 +78,7 @@ export default function PrivateTablePage() {
         </section>
       )}
 
-      {c.economics.stats.length > 0 && (
+      {c.economics.stats.some(s => s.value) && (
         <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-gray-200 mb-6">{c.economics.stats.map(s => (<div key={s.label} className="bg-white p-8"><p className="text-3xl font-light text-gray-900 font-mono mb-1">{s.value}</p><p className="text-xs text-gray-400 uppercase tracking-wider">{s.label}</p></div>))}</div>
