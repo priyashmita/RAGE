@@ -22,7 +22,7 @@ export default function PublicLayout() {
   return (
     <div className="min-h-screen bg-white" data-testid="public-layout">
       <header className="fixed top-0 left-0 right-0 z-50 h-20 bg-white/90 backdrop-blur-md border-b border-gray-100" data-testid="public-header">
-        <div className="h-full max-w-[1400px] mx-auto px-6 flex items-center justify-between">
+        <div className="h-full max-w-[1200px] mx-auto px-6 flex items-center justify-between">
           <Link to="/" className="shrink-0" data-testid="public-logo-link">
             <img src={LOGO_URL} alt="RAGE" className="h-20 w-auto" />
           </Link>
@@ -60,7 +60,7 @@ export default function PublicLayout() {
       </header>
       <main className="pt-20"><Outlet /></main>
       <footer className="border-t border-gray-100 bg-gray-50" data-testid="public-footer">
-        <div className="max-w-[1400px] mx-auto px-6 py-16">
+        <div className="max-w-[1200px] mx-auto px-6 py-16">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
               <img src={LOGO_URL} alt="RAGE" className="h-8 w-auto mb-4" />

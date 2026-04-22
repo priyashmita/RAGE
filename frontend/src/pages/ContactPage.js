@@ -10,14 +10,14 @@ export default function ContactPage() {
     <div data-testid="contact-page">
 
       {c.hero.title && (
-        <section className="py-16 border-b border-gray-100"><div className="max-w-[1400px] mx-auto px-6">
+        <section className="py-12 border-b border-gray-100"><div className="max-w-[1200px] mx-auto px-6 lg:px-8">
           {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl">{c.hero.title}</h1>
-          {c.hero.body && <p className="mt-8 text-lg text-gray-600 max-w-xl leading-relaxed">{c.hero.body}</p>}
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl leading-[1.05]">{c.hero.title}</h1>
+          {c.hero.body && <p className="mt-5 text-lg text-gray-600 max-w-xl leading-relaxed">{c.hero.body}</p>}
         </div></section>
       )}
 
-      <section className="py-20"><div className="max-w-[1400px] mx-auto px-6"><div className="grid grid-cols-1 lg:grid-cols-2 gap-16">
+      <section className="py-14"><div className="max-w-[1200px] mx-auto px-6 lg:px-8"><div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div>
           <div className="bg-gray-50 border border-gray-200 p-8 mb-6">
             <div className="flex items-center gap-3 mb-4"><Mail className="w-5 h-5 text-[#DC143C]" /><p className="text-xs uppercase tracking-[0.2em] text-gray-400 font-semibold">Email</p></div>

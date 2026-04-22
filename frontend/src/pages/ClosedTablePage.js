@@ -153,7 +153,7 @@ export default function ClosedTablePage() {
               {c.precedents.title}
             </h2>
             {c.precedents.body && (
-              <p className="text-base text-gray-600 leading-relaxed max-w-xl">
+              <p className="text-base text-gray-600 leading-relaxed">
                 {c.precedents.body}
               </p>
             )}

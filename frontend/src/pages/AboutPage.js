@@ -71,12 +71,12 @@ export default function AboutPage() {
                   </p>
                 )}
                 {c.mission.body && (
-                  <p className="text-base text-gray-600 leading-relaxed max-w-[560px]">
+                  <p className="text-base text-gray-600 leading-relaxed">
                     {c.mission.body}
                   </p>
                 )}
                 {c.mission.body2 && (
-                  <p className="text-base text-gray-600 leading-relaxed max-w-[560px]">
+                  <p className="text-base text-gray-600 leading-relaxed">
                     {c.mission.body2}
                   </p>
                 )}

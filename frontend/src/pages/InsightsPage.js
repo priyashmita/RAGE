@@ -18,8 +18,8 @@ export default function InsightsPage() {
   return (
     <div className="min-h-screen bg-white pt-16">
       {/* Header */}
-      <section className="py-20 border-b border-gray-100">
-        <div className="max-w-[1400px] mx-auto px-6">
+      <section className="py-12 border-b border-gray-100">
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-8">
           <p className="rage-overline mb-4">Insights</p>
           <h1 className="text-5xl md:text-6xl font-light tracking-tighter text-gray-900 max-w-3xl leading-tight">
             What we're seeing across the network.
@@ -35,8 +35,8 @@ export default function InsightsPage() {
       </section>
 
       {/* Reports */}
-      <section className="py-16">
-        <div className="max-w-[1400px] mx-auto px-6">
+      <section className="py-14">
+        <div className="max-w-[1200px] mx-auto px-6 lg:px-8">
           {loading ? (
             <div className="flex items-center gap-3 text-gray-400 py-20">
               <div className="w-4 h-4 border-2 border-gray-200 border-t-[#DC143C] rounded-full animate-spin" />
