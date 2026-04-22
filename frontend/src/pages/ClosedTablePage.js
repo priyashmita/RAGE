@@ -171,7 +171,7 @@ export default function ClosedTablePage() {
             <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-5">
               FAQs
             </h2>
-            <div className="flex flex-col gap-5 max-w-2xl">
+            <div className="flex flex-col gap-5">
               {c.faqs.map((f, i) => (
                 <div key={i} className="flex flex-col gap-2">
                   <p
