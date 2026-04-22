@@ -1,12 +1,28 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Upload, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ragerAuthHeader } from '@/lib/ragerAuth';
+
+const IMGBB_KEY = process.env.REACT_APP_IMGBB_API_KEY;
+
+async function uploadToImgbb(file) {
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+  const form = new FormData();
+  form.append('key', IMGBB_KEY);
+  form.append('image', base64);
+  const res = await axios.post('https://api.imgbb.com/1/upload', form);
+  return res.data.data.url;
+}
 
 const BACKEND = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
@@ -65,6 +81,8 @@ export default function RagerProfilePage() {
     categories:   rager.categories   || [],
   });
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef();
 
   const set = (field) => (e) =>
     setForm(f => ({ ...f, [field]: e.target.value }));
@@ -172,21 +190,65 @@ export default function RagerProfilePage() {
         </div>
 
         <div>
-          <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-1 block">Photo URL</Label>
-          <Input
-            value={form.photo_url}
-            onChange={set('photo_url')}
-            placeholder="Paste a direct image URL"
-            className="bg-[#0A0A0A] border-white/10 text-[#F5F5F0] h-9 rounded-none text-sm"
-          />
-          {form.photo_url && (
-            <img
-              src={form.photo_url}
-              alt="Preview"
-              className="mt-2 w-12 h-12 object-cover border border-white/10"
-              onError={e => { e.target.style.display = 'none'; }}
-            />
-          )}
+          <Label className="text-[10px] uppercase tracking-wider text-[#71717A] mb-2 block">Photo</Label>
+          <div className="flex items-center gap-4">
+            {/* Preview */}
+            <div className="w-14 h-14 border border-white/10 shrink-0 overflow-hidden bg-[#0A0A0A] flex items-center justify-center">
+              {form.photo_url ? (
+                <img
+                  src={form.photo_url}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                  onError={e => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <span className="text-[#3F3F46] text-xs">No photo</span>
+              )}
+            </div>
+            {/* Buttons */}
+            <div className="flex flex-col gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (!IMGBB_KEY) { toast.error('Image upload not configured'); return; }
+                  setUploading(true);
+                  try {
+                    const url = await uploadToImgbb(file);
+                    setForm(f => ({ ...f, photo_url: url }));
+                    toast.success('Photo uploaded');
+                  } catch {
+                    toast.error('Upload failed — try again');
+                  } finally {
+                    setUploading(false);
+                    e.target.value = '';
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#A1A1AA] border border-white/10 hover:border-white/25 hover:text-[#F5F5F0] transition-colors disabled:opacity-50"
+              >
+                {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+                {uploading ? 'Uploading…' : 'Upload photo'}
+              </button>
+              {form.photo_url && (
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, photo_url: '' }))}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs text-[#71717A] hover:text-[#DC143C] transition-colors"
+                >
+                  <X className="w-3 h-3" /> Remove
+                </button>
+              )}
+            </div>
+          </div>
         </div>
 
         <div>
