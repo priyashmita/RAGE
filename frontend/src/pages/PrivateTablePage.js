@@ -63,7 +63,7 @@ export default function PrivateTablePage() {
             {c.flow.overline && <p className="rage-overline mb-4">{c.flow.overline}</p>}
             <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-8">{c.flow.title}</h2>
             {c.flow.steps.length > 0 && (
-              <div className="max-w-2xl">{c.flow.steps.map((s, i) => (<div key={i} className="flex items-start gap-6 py-5 border-b border-gray-200"><div className="w-20 shrink-0"><span className="text-xs font-mono text-[#DC143C]">{s.time}</span></div><div><p className="text-sm font-semibold text-gray-900" style={{fontFamily:'Manrope'}}>{s.label}</p><p className="text-xs text-gray-500 mt-1">{s.desc}</p></div></div>))}</div>
+              <div>{c.flow.steps.map((s, i) => (<div key={i} className="flex items-start gap-6 py-5 border-b border-gray-200"><div className="w-20 shrink-0"><span className="text-xs font-mono text-[#DC143C]">{s.time}</span></div><div><p className="text-sm font-semibold text-gray-900" style={{fontFamily:'Manrope'}}>{s.label}</p><p className="text-xs text-gray-500 mt-1">{s.desc}</p></div></div>))}</div>
             )}
           </div>
         </section>
@@ -91,7 +91,7 @@ export default function PrivateTablePage() {
         <section className="py-14 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
             <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-5">FAQs</h2>
-            <div className="flex flex-col gap-5 max-w-2xl">{c.faqs.map((f, i) => (<div key={i} className="flex flex-col gap-2"><p className="text-sm font-semibold text-gray-900">{f.q}</p><p className="text-sm text-gray-600 leading-relaxed">{f.a}</p></div>))}</div>
+            <div className="flex flex-col gap-5">{c.faqs.map((f, i) => (<div key={i} className="flex flex-col gap-2"><p className="text-sm font-semibold text-gray-900">{f.q}</p><p className="text-sm text-gray-600 leading-relaxed">{f.a}</p></div>))}</div>
           </div>
         </section>
       )}
