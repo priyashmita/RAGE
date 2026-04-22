@@ -69,7 +69,7 @@ export default function PrivateTablePage() {
         </section>
       )}
 
-      {c.upcoming?.length > 0 && c.upcoming[0].title && (
+      {c.upcoming?.some(u => u.title) && (
         <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
             <p className="rage-overline mb-6">Upcoming Tables</p>
@@ -87,7 +87,7 @@ export default function PrivateTablePage() {
         </section>
       )}
 
-      {c.faqs?.length > 0 && (
+      {c.faqs?.some(f => f.q) && (
         <section className="py-14 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
             <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-5">FAQs</h2>
