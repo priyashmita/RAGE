@@ -1028,45 +1028,217 @@ def refresh_candidates(admin=Depends(require_admin)):
     """
     Rescore all active podcast_people and upsert podcast_candidates.
     Existing status / admin_notes / admin_boost are preserved.
-    Works with zero activity data.
+    Fully batched — O(10) queries regardless of pool size.
     """
-    people  = list(db.podcast_people.find({"status": "active"}, {"_id": 0}))
+    from pymongo import UpdateOne, InsertOne
+
+    people = list(db.podcast_people.find({"status": "active"}, {"_id": 0}))
+    if not people:
+        return {"created": 0, "updated": 0, "total": 0}
+
+    person_ids   = [p["id"] for p in people]
+    person_id_set = set(person_ids)
+
+    # ── Batch 1: rager identity ───────────────────────────────────────────────
+    rager_ids  = [p["rager_id"] for p in people if p.get("rager_id")]
+    ragers_map = {}
+    if rager_ids:
+        for r in db.ragers.find({"id": {"$in": rager_ids}}, {"_id": 0, "phone": 0}):
+            ragers_map[r["id"]] = r
+
+    # ── Batch 2: topics — build person→[topic_ids] and topic→name maps ───────
+    all_topics    = list(db.podcast_topics.find({"merged_into": None}, {"_id": 0}))
+    topic_name    = {t["id"]: t["name"] for t in all_topics}
+    person_topics: dict = {}   # person_id → [topic_id]
+    for t in all_topics:
+        for pid in (t.get("people_ids") or []):
+            if pid in person_id_set:
+                person_topics.setdefault(pid, []).append(t["id"])
+
+    # ── Batch 3: content grouped by person_id ─────────────────────────────────
+    content_by_person: dict = {}
+    for doc in db.podcast_content.find(
+        {"person_id": {"$in": person_ids}}, {"_id": 0}
+    ):
+        content_by_person.setdefault(doc["person_id"], []).append(doc)
+
+    # ── Batch 4: activity (rager-linked only) ─────────────────────────────────
+    dinner_count_map: dict = {}
+    allocs_by_rager:  dict = {}
+    archived_enq_ids: set  = set()
+
+    if rager_ids:
+        for inv in db.invites.find(
+            {"rager_id": {"$in": rager_ids}, "rsvp_status": "yes"},
+            {"rager_id": 1, "_id": 0}
+        ):
+            rid = inv["rager_id"]
+            dinner_count_map[rid] = dinner_count_map.get(rid, 0) + 1
+
+        for alloc in db.allocations.find(
+            {"member_id": {"$in": rager_ids}}, {"_id": 0}
+        ):
+            allocs_by_rager.setdefault(alloc["member_id"], []).append(alloc)
+
+        all_enq_ids = list({
+            a.get("enquiry_id")
+            for allocs in allocs_by_rager.values()
+            for a in allocs
+            if a.get("enquiry_id")
+        })
+        if all_enq_ids:
+            archived_enq_ids = {
+                e["id"] for e in db.enquiries.find(
+                    {"id": {"$in": all_enq_ids}, "is_archived": True},
+                    {"id": 1, "_id": 0}
+                )
+            }
+
+    # ── Batch 5: existing candidates ─────────────────────────────────────────
+    existing_cands = {
+        c["person_id"]: c
+        for c in db.podcast_candidates.find(
+            {"person_id": {"$in": person_ids}}, {"_id": 0}
+        )
+    }
+
+    # ── Score each person entirely in Python ─────────────────────────────────
+    ops     = []
     created = updated = 0
+    now     = _NOW()
 
     for pp in people:
         person_id = pp["id"]
-        resolved  = _resolve_person(pp)
+        rager_id  = pp.get("rager_id")
 
-        raw_score, breakdown, topic_ids, signals, activity_bonus, content_count = _score_person(person_id)
+        # Resolve identity
+        resolved = dict(pp)
+        if rager_id and rager_id in ragers_map:
+            r = ragers_map[rager_id]
+            resolved.update({
+                "name":      r.get("name",     pp.get("name",     "")),
+                "title":     r.get("title",    pp.get("title",    "")),
+                "company":   r.get("company",  pp.get("company",  "")),
+                "bio":       r.get("bio",      pp.get("bio",      "")),
+                "linkedin":  r.get("linkedin", pp.get("linkedin", "")),
+                "location":  r.get("location", pp.get("location", "")),
+                "expertise": pp.get("expertise") or r.get("expertise") or [],
+            })
 
-        existing    = db.podcast_candidates.find_one({"person_id": person_id}, {"_id": 0})
+        # Topic relevance
+        topic_ids       = person_topics.get(person_id, [])
+        topic_relevance = min(len(topic_ids) * 8, 40)
+
+        # Content
+        content_docs     = content_by_person.get(person_id, [])
+        content_count    = len(content_docs)
+        content_quantity = min(content_count * 5, 15)
+        total_signals    = 0
+        for c in content_docs:
+            ext = c.get("extracted") or {}
+            total_signals += len(ext.get("topics",    []))
+            total_signals += len(ext.get("viewpoints", []))
+            total_signals += len(ext.get("keywords",   []))
+            total_signals += len(ext.get("subtopics",  []))
+        content_quality = min(total_signals, 15)
+
+        # Role
+        role        = pp.get("role", "other")
+        role_weight = ROLE_WEIGHT.get(role, 4)
+
+        # Bio completeness
+        bio           = resolved.get("bio", "") or ""
+        linkedin      = resolved.get("linkedin", "") or ""
+        known_for     = pp.get("known_for", "") or ""
+        current_focus = pp.get("current_focus", "") or ""
+        bio_completeness = min(
+            (3 if bio else 0) + (2 if len(bio) > 200 else 0) +
+            (2 if linkedin else 0) + (2 if known_for else 0) +
+            (1 if current_focus else 0),
+            10
+        )
+
+        # Tag richness
+        all_tags     = list(set((pp.get("tags") or []) + (resolved.get("expertise") or [])))
+        tag_richness = min(len(all_tags) * 2, 10)
+
+        # Inline viewpoints
+        inline_vp = len(pp.get("viewpoints") or [])
+        if inline_vp:
+            content_quality = min(content_quality + min(inline_vp * 2, 6), 15)
+
+        raw_score = (
+            topic_relevance + content_quantity + content_quality +
+            role_weight + bio_completeness + tag_richness
+        )
+
+        breakdown = {
+            "topic_relevance":  {"topics":  len(topic_ids),  "points": topic_relevance},
+            "content_quantity": {"pieces":  content_count,   "points": content_quantity},
+            "content_quality":  {"signals": total_signals + inline_vp, "points": content_quality},
+            "role_weight":      {"role":    role,             "points": role_weight},
+            "bio_completeness": {                             "points": bio_completeness},
+            "tag_richness":     {"tags":    len(all_tags),   "points": tag_richness},
+        }
+
+        # Activity layer
+        activity_bonus     = 0
+        activity_breakdown = {}
+        d_count = conf_count = 0
+
+        if rager_id:
+            d_count = dinner_count_map.get(rager_id, 0)
+            if d_count:
+                d_pts = min(d_count * 5, 20)
+                activity_bonus += d_pts
+                activity_breakdown["dinner_attendance"] = {"count": d_count, "points": d_pts}
+
+            allocs = [
+                a for a in allocs_by_rager.get(rager_id, [])
+                if a.get("enquiry_id") not in archived_enq_ids
+            ]
+            if allocs:
+                conf_count = sum(1 for a in allocs if a.get("status") == "confirmed")
+                adv_pts    = min(conf_count * 8, 24)
+                activity_bonus += adv_pts
+                activity_breakdown["advisory"] = {"confirmed": conf_count, "points": adv_pts}
+
+            if d_count >= 2 and conf_count >= 1:
+                activity_bonus += 10
+                activity_breakdown["cross_module"] = {"points": 10}
+
+        if activity_breakdown:
+            breakdown["activity"] = activity_breakdown
+
+        signals = []
+        if topic_ids:  signals.append("has_topics")
+        if content_count: signals.append("has_content")
+        if activity_breakdown.get("dinner_attendance"):   signals.append("dinner_attendance")
+        if activity_breakdown.get("advisory"):            signals.append("advisory_confirmed")
+        if d_count >= 2 and conf_count >= 1:              signals.append("cross_module_engagement")
+
+        existing    = existing_cands.get(person_id)
         admin_boost = (existing or {}).get("admin_boost", pp.get("admin_boost", 0)) or 0
         final_score = raw_score + admin_boost + activity_bonus
 
         patch = {
-            "person_id":       person_id,
-            "name":            resolved.get("name", ""),
-            "company":         resolved.get("company", ""),
-            "role":            pp.get("role", "other"),
-            "score":           final_score,
-            "raw_score":       raw_score,
-            "score_breakdown": breakdown,
-            "source_signals":  signals,
-            "topic_ids":       topic_ids,
-            "content_count":   content_count,
-            "activity_bonus":  activity_bonus,
-            "updated_at":      _NOW(),
-            # suggested_topics: names of assigned topics (for display)
-            "suggested_topics": [
-                t["name"]
-                for t in db.podcast_topics.find(
-                    {"id": {"$in": topic_ids}}, {"name": 1, "_id": 0}
-                )
-            ],
+            "person_id":        person_id,
+            "name":             resolved.get("name", ""),
+            "company":          resolved.get("company", ""),
+            "role":             role,
+            "score":            final_score,
+            "raw_score":        raw_score,
+            "score_breakdown":  breakdown,
+            "source_signals":   signals,
+            "topic_ids":        topic_ids,
+            "content_count":    content_count,
+            "activity_bonus":   activity_bonus,
+            "updated_at":       now,
+            "suggested_topics": [topic_name[tid] for tid in topic_ids if tid in topic_name],
         }
 
         if existing:
-            db.podcast_candidates.update_one({"person_id": person_id}, {"$set": patch})
+            ops.append(UpdateOne({"person_id": person_id}, {"$set": patch}))
             updated += 1
         else:
             patch.update({
@@ -1075,10 +1247,13 @@ def refresh_candidates(admin=Depends(require_admin)):
                 "admin_boost":      admin_boost,
                 "admin_notes":      "",
                 "last_reviewed_at": None,
-                "created_at":       _NOW(),
+                "created_at":       now,
             })
-            db.podcast_candidates.insert_one(patch)
+            ops.append(InsertOne(patch))
             created += 1
+
+    if ops:
+        db.podcast_candidates.bulk_write(ops, ordered=False)
 
     return {
         "created": created,

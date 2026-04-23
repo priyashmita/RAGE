@@ -1695,12 +1695,10 @@ function PairsTab() {
   async function generate() {
     setGen(true);
     try {
-      // Refresh candidates first so topic_ids are current before pairing
-      await api.post('/admin/podcast/candidates/refresh');
       const { data } = await api.post('/admin/podcast/pairs/generate');
       toast.success(data.pairs_created > 0
         ? `${data.pairs_created} pairs generated`
-        : 'No pairs generated — candidates need shared topics assigned');
+        : 'No pairs generated — make sure candidates share topics (refresh candidates first if topics changed)');
       load();
     } catch (err) { toast.error(err?.response?.data?.detail || 'Failed — need 2+ candidates'); }
     finally { setGen(false); }
@@ -1838,12 +1836,10 @@ function TablesTab() {
   async function generate() {
     setGen(true);
     try {
-      // Always refresh candidates first so topic_ids are current
-      await api.post('/admin/podcast/candidates/refresh');
       const { data } = await api.post('/admin/podcast/tables/generate');
       toast.success(data.tables_created > 0
         ? `${data.tables_created} tables generated`
-        : 'No tables generated — assign topics to at least 4 people per topic, with 2+ distinct roles');
+        : 'No tables generated — assign topics to 4+ people with 2+ distinct roles, then refresh candidates');
       load();
     } catch (err) { toast.error(err?.response?.data?.detail || 'Failed — need 4+ candidates with topics assigned'); }
     finally { setGen(false); }
