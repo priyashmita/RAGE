@@ -293,24 +293,33 @@ def _score_person(person_id: str):
 
 # ── Pair compatibility ────────────────────────────────────────────────────────
 
-def _pair_compat(ca: dict, cb: dict):
+def _pair_compat(ca: dict, cb: dict, topics_map: dict = None, viewpoints_map: dict = None):
     """
     Returns (score, reasons, primary_topic_name, role_pairing_str).
     ca / cb are podcast_candidate docs (with topic_ids, role, company, content_count).
+
+    topics_map     : {topic_id: topic_doc}  — pre-loaded by caller; falls back to DB if None
+    viewpoints_map : {person_id: set[str]}  — pre-loaded by caller; falls back to DB if None
     """
     score   = 0
     reasons = []
+
+    def _topic(tid):
+        if topics_map is not None:
+            return topics_map.get(tid)
+        return db.podcast_topics.find_one({"id": tid}, {"name": 1, "people_ids": 1, "_id": 0})
+
+    def _views(person_id):
+        if viewpoints_map is not None:
+            return viewpoints_map.get(person_id, set())
+        return _get_person_viewpoints(person_id)
 
     # Topic overlap
     shared = set(ca.get("topic_ids") or []) & set(cb.get("topic_ids") or [])
     if shared:
         pts = min(len(shared) * 8, 24)
         score += pts
-        names = []
-        for tid in list(shared)[:3]:
-            t = db.podcast_topics.find_one({"id": tid}, {"name": 1, "_id": 0})
-            if t:
-                names.append(t["name"])
+        names = [t["name"] for tid in list(shared)[:3] if (t := _topic(tid))]
         reasons.append(f"Shared topics: {', '.join(names)}" if names else "Shared topics")
     else:
         score -= 5
@@ -327,8 +336,8 @@ def _pair_compat(ca: dict, cb: dict):
         reasons.append(f"Complementary roles: {ra.title()} + {rb.title()}")
 
     # Viewpoint contrast
-    views_a = _get_person_viewpoints(ca["person_id"])
-    views_b = _get_person_viewpoints(cb["person_id"])
+    views_a = _views(ca["person_id"])
+    views_b = _views(cb["person_id"])
     if views_a & views_b:
         score += min(len(views_a & views_b) * 4, 12)
         reasons.append("Common thematic ground")
@@ -350,12 +359,12 @@ def _pair_compat(ca: dict, cb: dict):
     elif co_a and co_b:
         score += 5
 
-    # Primary topic (highest people_count in shared set)
+    # Primary topic (largest people_count among shared)
     primary_topic = ""
     if shared:
         best, best_n = "", -1
         for tid in shared:
-            t = db.podcast_topics.find_one({"id": tid}, {"name": 1, "people_ids": 1, "_id": 0})
+            t = _topic(tid)
             if t and len(t.get("people_ids") or []) > best_n:
                 best   = t["name"]
                 best_n = len(t.get("people_ids") or [])
@@ -367,11 +376,19 @@ def _pair_compat(ca: dict, cb: dict):
 
 # ── Table scoring ─────────────────────────────────────────────────────────────
 
-def _table_score(combo: list, topic_id: str):
+def _table_score(combo: list, topic_id: str, topics_map: dict = None, viewpoints_map: dict = None):
     """
     Returns (total, breakdown, reasons, why_it_works, role_composition).
     combo = list of 4 podcast_candidate dicts.
+
+    topics_map     : {topic_id: topic_doc}  — pre-loaded by caller
+    viewpoints_map : {person_id: set[str]}  — pre-loaded by caller
     """
+    def _views(person_id):
+        if viewpoints_map is not None:
+            return viewpoints_map.get(person_id, set())
+        return _get_person_viewpoints(person_id)
+
     # Topic coherence
     on_topic        = sum(1 for m in combo if topic_id in (m.get("topic_ids") or []))
     topic_coherence = round((on_topic / 4) * 30)
@@ -379,7 +396,7 @@ def _table_score(combo: list, topic_id: str):
     # Perspective diversity
     all_views = set()
     for m in combo:
-        all_views |= _get_person_viewpoints(m["person_id"])
+        all_views |= _views(m["person_id"])
     perspective_diversity = min(len(all_views) * 2, 20)
 
     # Role diversity
@@ -435,7 +452,7 @@ def _table_score(combo: list, topic_id: str):
         role_comp[r] = role_comp.get(r, 0) + 1
 
     # why_it_works
-    t_doc      = db.podcast_topics.find_one({"id": topic_id}, {"name": 1, "_id": 0})
+    t_doc      = (topics_map or {}).get(topic_id) or db.podcast_topics.find_one({"id": topic_id}, {"name": 1, "_id": 0})
     topic_name = t_doc["name"] if t_doc else "shared topic"
     why        = f"{topic_name} focus"
     if len(unique_roles) >= 3:
@@ -1238,11 +1255,34 @@ def generate_pairs(admin=Depends(require_admin)):
     if len(candidates) < 2:
         raise HTTPException(400, "Need at least 2 candidates to generate pairs")
 
+    # ── Pre-load shared data — eliminates N+1 inside the combo loop ──────────
+    topics_map: dict = {
+        t["id"]: t
+        for t in db.podcast_topics.find({"merged_into": None}, {"_id": 0})
+    }
+
+    person_ids      = [c["person_id"] for c in candidates]
+    viewpoints_map: dict = {}
+    for pp in db.podcast_people.find(
+        {"id": {"$in": person_ids}}, {"id": 1, "viewpoints": 1, "_id": 0}
+    ):
+        viewpoints_map[pp["id"]] = set(
+            v.lower().strip() for v in (pp.get("viewpoints") or [])
+        )
+    for doc in db.podcast_content.find(
+        {"person_id": {"$in": person_ids}},
+        {"person_id": 1, "extracted.viewpoints": 1, "_id": 0}
+    ):
+        pid = doc["person_id"]
+        for v in (doc.get("extracted") or {}).get("viewpoints", []):
+            viewpoints_map.setdefault(pid, set()).add(v.lower().strip())
+    # ─────────────────────────────────────────────────────────────────────────
+
     db.podcast_pairs.delete_many({"source": "auto"})
 
     created = 0
     for ca, cb in combinations(candidates, 2):
-        score, reasons, primary_topic, role_pairing = _pair_compat(ca, cb)
+        score, reasons, primary_topic, role_pairing = _pair_compat(ca, cb, topics_map, viewpoints_map)
         if score <= 0:
             continue
         db.podcast_pairs.insert_one({
@@ -1319,6 +1359,29 @@ def generate_tables(admin=Depends(require_admin)):
     if len(candidates) < 4:
         raise HTTPException(400, "Need at least 4 candidates to generate tables")
 
+    # ── Pre-load shared data — eliminates N+1 inside the combo loops ─────────
+    topics_map: dict = {
+        t["id"]: t
+        for t in db.podcast_topics.find({"merged_into": None}, {"_id": 0})
+    }
+
+    person_ids       = [c["person_id"] for c in candidates]
+    viewpoints_map: dict = {}
+    for pp in db.podcast_people.find(
+        {"id": {"$in": person_ids}}, {"id": 1, "viewpoints": 1, "_id": 0}
+    ):
+        viewpoints_map[pp["id"]] = set(
+            v.lower().strip() for v in (pp.get("viewpoints") or [])
+        )
+    for doc in db.podcast_content.find(
+        {"person_id": {"$in": person_ids}},
+        {"person_id": 1, "extracted.viewpoints": 1, "_id": 0}
+    ):
+        pid = doc["person_id"]
+        for v in (doc.get("extracted") or {}).get("viewpoints", []):
+            viewpoints_map.setdefault(pid, set()).add(v.lower().strip())
+    # ─────────────────────────────────────────────────────────────────────────
+
     db.podcast_tables.delete_many({"source": "auto"})
 
     # Group candidates by topic_id
@@ -1355,7 +1418,9 @@ def generate_tables(admin=Depends(require_admin)):
             if on_topic < 2:
                 continue
 
-            score, breakdown, reasons, why, role_comp = _table_score(list(combo), topic_id)
+            score, breakdown, reasons, why, role_comp = _table_score(
+                list(combo), topic_id, topics_map, viewpoints_map
+            )
             if score < 25:
                 continue
 
@@ -1364,8 +1429,7 @@ def generate_tables(admin=Depends(require_admin)):
 
         # Keep top 5 for this topic
         best_for_topic.sort(key=lambda x: x[0], reverse=True)
-        t_doc      = db.podcast_topics.find_one({"id": topic_id}, {"name": 1, "_id": 0})
-        topic_name = t_doc["name"] if t_doc else topic_id
+        topic_name = (topics_map.get(topic_id) or {}).get("name", topic_id)
 
         for score, breakdown, reasons, why, role_comp, combo in best_for_topic[:5]:
             db.podcast_tables.insert_one({
