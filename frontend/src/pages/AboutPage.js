@@ -154,8 +154,43 @@ export default function AboutPage() {
                 </div>
               </div>
             ) : (
-              <div className="max-w-[680px]">
-                <NetworkContent c={c} />
+              <div className="grid grid-cols-12 gap-16 items-start">
+                <div className="col-span-12 lg:col-span-4">
+                  {c.community.overline && (
+                    <p className="rage-overline mb-4">{c.community.overline}</p>
+                  )}
+                  <h2
+                    className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug"
+                    style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+                  >
+                    {c.community.title}
+                  </h2>
+                </div>
+                <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
+                  {c.community.body && (
+                    <p className="text-base text-gray-600 leading-relaxed">{c.community.body}</p>
+                  )}
+                  {c.community.highlights?.length > 0 && (
+                    <ul className="flex flex-col gap-2">
+                      {c.community.highlights.map((h, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="w-1 h-1 bg-[#DC143C] rounded-full mt-[7px] shrink-0" />
+                          <span className="text-sm text-gray-600 leading-relaxed">{h}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {c.community.stats.length > 0 && (
+                    <div className="grid grid-cols-3 gap-6 pt-2">
+                      {c.community.stats.map(s => (
+                        <div key={s.label} className="border-t border-gray-200 pt-3">
+                          <p className="text-2xl font-light text-gray-900 font-mono leading-none mb-1">{s.value}</p>
+                          <p className="text-[10px] uppercase tracking-widest text-gray-400">{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
