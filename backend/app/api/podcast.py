@@ -922,13 +922,23 @@ def list_topics(admin=Depends(require_admin)):
 
 @router.post("/admin/podcast/topics")
 def create_topic(data: TopicIn, admin=Depends(require_admin)):
-    if not data.name.strip():
+    import re as _re
+    name = data.name.strip()
+    if not name:
         raise HTTPException(400, "Topic name is required")
-    if db.podcast_topics.find_one({"name": {"$regex": f"^{data.name.strip()}$", "$options": "i"}, "merged_into": None}):
-        raise HTTPException(409, "A topic with this name already exists")
+    if db.podcast_topics.find_one({"name": {"$regex": f"^{name}$", "$options": "i"}, "merged_into": None}):
+        raise HTTPException(409, f'A topic named "{name}" already exists')
+
+    # Generate a URL-safe slug; append 4 chars of a UUID if the slug already exists
+    base_slug = _re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    slug = base_slug
+    if db.podcast_topics.find_one({"slug": slug}):
+        slug = f"{base_slug}-{str(uuid.uuid4())[:4]}"
+
     doc = {
         "id":          str(uuid.uuid4()),
-        "name":        data.name.strip(),
+        "name":        name,
+        "slug":        slug,
         "subtopics":   data.subtopics or [],
         "source":      "manual",
         "people_ids":  [],

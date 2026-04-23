@@ -95,8 +95,13 @@ def auto_seed_content():
     db.podcast_content.create_index("person_id",            background=True)
     db.podcast_content.create_index("topic_ids",            background=True)
     # topics: looked up by slug, sorted by name
+    # slug index must be sparse — docs created before slug was generated have no slug field
     db.podcast_topics.create_index("id",   unique=True, background=True)
-    db.podcast_topics.create_index("slug", unique=True, background=True)
+    try:
+        db.podcast_topics.drop_index("slug_1")
+    except Exception:
+        pass
+    db.podcast_topics.create_index("slug", unique=True, sparse=True, background=True)
     # candidates: primary sort key is score
     db.podcast_candidates.create_index("id",        unique=True, background=True)
     db.podcast_candidates.create_index("person_id", unique=True, background=True)

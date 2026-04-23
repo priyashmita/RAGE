@@ -1194,7 +1194,10 @@ function TopicsTab() {
       setNewName('');
       load();
       toast.success('Topic created');
-    } catch (err) { toast.error(err?.response?.data?.detail || 'Failed'); }
+    } catch (err) {
+      const msg = err?.response?.data?.detail;
+      toast.error(msg || 'Failed to create topic');
+    }
     finally { setAdding(false); }
   }
 
