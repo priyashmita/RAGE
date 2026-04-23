@@ -362,16 +362,136 @@ function PersonDetailDialog({ personId, allTopics, onClose, onSaved }) {
   );
 }
 
+// ─── Select Ragers Dialog ─────────────────────────────────────────────────────
+
+function SelectRagersDialog({ alreadyImportedIds, onClose, onImported }) {
+  const [allRagers, setAllRagers]   = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [search, setSearch]         = useState('');
+  const [selected, setSelected]     = useState(new Set());
+  const [importing, setImporting]   = useState(false);
+
+  useEffect(() => {
+    api.get('/admin/ragers')
+      .then(r => setAllRagers(r.data))
+      .catch(() => toast.error('Failed to load ragers'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const available = allRagers.filter(r => !alreadyImportedIds.has(r.id));
+  const searchLower = search.toLowerCase();
+  const shown = searchLower
+    ? available.filter(r =>
+        (r.name || '').toLowerCase().includes(searchLower) ||
+        (r.company || '').toLowerCase().includes(searchLower) ||
+        (r.title || '').toLowerCase().includes(searchLower)
+      )
+    : available;
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() { setSelected(new Set(shown.map(r => r.id))); }
+  function clearAll()  { setSelected(new Set()); }
+
+  async function importSelected() {
+    if (selected.size === 0) return;
+    setImporting(true);
+    let ok = 0, fail = 0;
+    for (const ragerId of selected) {
+      try {
+        await api.post('/admin/podcast/people', { rager_id: ragerId, role: 'other', source: 'rager' });
+        ok++;
+      } catch { fail++; }
+    }
+    if (ok > 0)   toast.success(`Added ${ok} rager${ok !== 1 ? 's' : ''} to the pool`);
+    if (fail > 0) toast.error(`${fail} failed (may already be in pool)`);
+    setImporting(false);
+    onImported();
+    onClose();
+  }
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-xl max-h-[85vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="text-[#F5F5F0] font-medium">Select Ragers to Add</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col flex-1 min-h-0 gap-3 mt-3">
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name, company, title…"
+            className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm shrink-0"
+          />
+
+          <div className="flex items-center justify-between text-[10px] text-[#52525B] shrink-0">
+            <span>{shown.length} available · {selected.size} selected</span>
+            <div className="flex gap-3">
+              <button onClick={selectAll} className="hover:text-[#A1A1AA] transition-colors">Select all shown</button>
+              <button onClick={clearAll}  className="hover:text-[#A1A1AA] transition-colors">Clear</button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+            {loading ? (
+              <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
+            ) : shown.length === 0 ? (
+              <p className="text-xs text-[#3F3F46] text-center py-8">
+                {available.length === 0 ? 'All ragers are already in the pool' : 'No results'}
+              </p>
+            ) : shown.map(r => (
+              <label key={r.id}
+                className={`flex items-start gap-3 cursor-pointer px-3 py-2.5 border transition-colors ${
+                  selected.has(r.id) ? 'border-[#DC143C]/30 bg-[#DC143C]/5' : 'border-white/8 hover:border-white/15'
+                }`}>
+                <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
+                  className="accent-[#DC143C] mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-[#F5F5F0] truncate">{r.name}</p>
+                  <p className="text-xs text-[#52525B] truncate">
+                    {[r.title, r.company].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          <div className="flex gap-2 shrink-0 pt-2 border-t border-white/8">
+            <Button
+              onClick={importSelected}
+              disabled={importing || selected.size === 0}
+              className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-5 text-sm"
+            >
+              {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Add ${selected.size > 0 ? selected.size : ''} to Pool`}
+            </Button>
+            <button onClick={onClose} className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3">Cancel</button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function PeopleTab() {
-  const [people, setPeople]       = useState([]);
-  const [topics, setTopics]       = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [importing, setImporting] = useState(false);
-  const [selected, setSelected]   = useState(null);
-  const [showAdd, setShowAdd]     = useState(false);
-  const [filter, setFilter]       = useState('all');
-  const [addForm, setAddForm]     = useState({ name: '', role: 'other', company: '', bio: '', linkedin: '', tags: '' });
-  const [adding, setAdding]       = useState(false);
+  const [people, setPeople]           = useState([]);
+  const [topics, setTopics]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [importing, setImporting]     = useState(false);
+  const [selected, setSelected]       = useState(null);
+  const [showAdd, setShowAdd]         = useState(false);
+  const [showSelect, setShowSelect]   = useState(false);
+  const [filter, setFilter]           = useState('all');
+  const [addForm, setAddForm]         = useState({ name: '', role: 'other', company: '', bio: '', linkedin: '', tags: '' });
+  const [adding, setAdding]           = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -387,7 +507,7 @@ function PeopleTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function importRagers() {
+  async function importAll() {
     setImporting(true);
     try {
       const { data } = await api.post('/admin/podcast/people/import-ragers');
@@ -417,6 +537,7 @@ function PeopleTab() {
     finally { setAdding(false); }
   }
 
+  const alreadyImportedIds = new Set(people.filter(p => p.rager_id).map(p => p.rager_id));
   const filtered = filter === 'all' ? people : people.filter(p => p.role === filter);
 
   return (
@@ -440,13 +561,26 @@ function PeopleTab() {
             <Plus className="w-3.5 h-3.5" />
             Add Manual
           </button>
-          <button onClick={importRagers} disabled={importing}
+          <button onClick={() => setShowSelect(true)}
+            className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 transition-colors">
+            <Users className="w-3.5 h-3.5" />
+            Select Ragers
+          </button>
+          <button onClick={importAll} disabled={importing}
             className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 transition-colors">
             {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            Import Ragers
+            Import All
           </button>
         </div>
       </div>
+
+      {showSelect && (
+        <SelectRagersDialog
+          alreadyImportedIds={alreadyImportedIds}
+          onClose={() => setShowSelect(false)}
+          onImported={load}
+        />
+      )}
 
       {/* Add manual form */}
       {showAdd && (
