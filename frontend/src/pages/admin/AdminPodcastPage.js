@@ -1165,12 +1165,95 @@ function ContentTab() {
 // MODULE 3 — TOPICS TAB
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Assign People to a Topic ─────────────────────────────────────────────────
+function AssignPeopleDialog({ topic, onClose, onSaved }) {
+  const [people, setPeople]     = useState([]);
+  const [assigned, setAssigned] = useState(new Set());
+  const [loading, setLoading]   = useState(true);
+  const [saving, setSaving]     = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/admin/podcast/people'),
+      api.get(`/admin/podcast/topics`),
+    ]).then(([pRes, tRes]) => {
+      setPeople(pRes.data);
+      const t = tRes.data.find(x => x.id === topic.id);
+      setAssigned(new Set(t?.people_ids || []));
+    }).catch(() => toast.error('Failed to load'))
+      .finally(() => setLoading(false));
+  }, [topic.id]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      // Get current state from API to diff
+      const { data: fresh } = await api.get('/admin/podcast/topics');
+      const current = new Set((fresh.find(x => x.id === topic.id)?.people_ids) || []);
+      const toAssign   = [...assigned].filter(id => !current.has(id));
+      const toUnassign = [...current].filter(id => !assigned.has(id));
+      await Promise.all([
+        ...toAssign.map(pid => api.post(`/admin/podcast/people/${pid}/topics/${topic.id}`)),
+        ...toUnassign.map(pid => api.delete(`/admin/podcast/people/${pid}/topics/${topic.id}`)),
+      ]);
+      toast.success(`Saved — ${assigned.size} people assigned to "${topic.name}"`);
+      onSaved();
+      onClose();
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Save failed'); }
+    finally { setSaving(false); }
+  }
+
+  function toggle(id) {
+    setAssigned(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+  }
+
+  return (
+    <Dialog open onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-md max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="text-[#F5F5F0] font-medium text-sm">
+            Assign people to "{topic.name}"
+          </DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
+        ) : (
+          <>
+            <p className="text-[10px] text-[#52525B] mb-2">{assigned.size} selected</p>
+            <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
+              {people.map(p => (
+                <label key={p.id} className={`flex items-center gap-3 cursor-pointer px-3 py-2.5 border transition-colors ${
+                  assigned.has(p.id) ? 'border-[#DC143C]/30 bg-[#DC143C]/5' : 'border-white/8 hover:border-white/15'}`}>
+                  <input type="checkbox" checked={assigned.has(p.id)} onChange={() => toggle(p.id)}
+                    className="accent-[#DC143C] shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-sm text-[#F5F5F0] truncate">{p.name || '(unnamed)'}</p>
+                    <p className="text-xs text-[#52525B] truncate">{[p.title, p.company].filter(Boolean).join(' · ')}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-3 border-t border-white/8 shrink-0">
+              <Button onClick={save} disabled={saving}
+                className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-5 text-sm">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+              </Button>
+              <button onClick={onClose} className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3">Cancel</button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function TopicsTab() {
   const [topics, setTopics]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [newName, setNewName]       = useState('');
   const [adding, setAdding]         = useState(false);
   const [deleting, setDeleting]     = useState(null);
+  const [assigning, setAssigning]   = useState(null);   // topic being assigned
   const [showMerge, setShowMerge]   = useState(false);
   const [keepId, setKeepId]         = useState('');
   const [absorbIds, setAbsorbIds]   = useState([]);
@@ -1312,7 +1395,13 @@ function TopicsTab() {
                   </div>
                 )}
               </div>
-              <span className="text-xs font-mono text-[#71717A] tabular-nums shrink-0">{t.people_count} people</span>
+              <span className="text-xs font-mono text-[#71717A] tabular-nums shrink-0 w-16 text-right">
+                {t.people_count} {t.people_count === 1 ? 'person' : 'people'}
+              </span>
+              <button onClick={() => setAssigning(t)}
+                className="text-[10px] text-[#52525B] hover:text-[#A1A1AA] border border-white/10 px-2.5 py-1 transition-colors shrink-0">
+                Assign People
+              </button>
               {t.people_count === 0 && (
                 <button onClick={() => deleteTopic(t.id)} disabled={deleting === t.id}
                   className="text-[#3F3F46] hover:text-red-400 transition-colors shrink-0">
@@ -1322,6 +1411,14 @@ function TopicsTab() {
             </div>
           ))}
         </div>
+      )}
+
+      {assigning && (
+        <AssignPeopleDialog
+          topic={assigning}
+          onClose={() => setAssigning(null)}
+          onSaved={load}
+        />
       )}
     </div>
   );
@@ -1715,7 +1812,7 @@ function PairsTab() {
     try {
       await api.patch(`/admin/podcast/pairs/${id}`, { status });
       load();
-    } catch { toast.error('Failed'); }
+    } catch (err) { toast.error(err?.response?.data?.detail || `Failed to set ${status}`); }
     finally { setUpdating(null); }
   }
 
@@ -1856,7 +1953,7 @@ function TablesTab() {
     try {
       await api.patch(`/admin/podcast/tables/${id}`, { status });
       load();
-    } catch { toast.error('Failed'); }
+    } catch (err) { toast.error(err?.response?.data?.detail || `Failed to set ${status}`); }
     finally { setUpdating(null); }
   }
 
