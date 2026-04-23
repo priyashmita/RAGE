@@ -546,10 +546,33 @@ def list_people(
     q["status"] = status or "active"
     pps      = list(db.podcast_people.find(q, {"_id": 0}))
     resolved = _resolve_many(pps)
-    # Attach topic count per person
+    if not resolved:
+        return resolved
+
+    person_ids     = [p["id"] for p in resolved]
+    person_id_set  = set(person_ids)
+
+    # Batch topic counts — 1 query, count memberships in Python
+    topic_counts: dict = {}
+    for t in db.podcast_topics.find(
+        {"people_ids": {"$in": person_ids}, "merged_into": None},
+        {"people_ids": 1, "_id": 0}
+    ):
+        for pid in (t.get("people_ids") or []):
+            if pid in person_id_set:
+                topic_counts[pid] = topic_counts.get(pid, 0) + 1
+
+    # Batch content counts — 1 aggregation
+    content_counts: dict = {}
+    for row in db.podcast_content.aggregate([
+        {"$match":  {"person_id": {"$in": person_ids}}},
+        {"$group":  {"_id": "$person_id", "n": {"$sum": 1}}},
+    ]):
+        content_counts[row["_id"]] = row["n"]
+
     for p in resolved:
-        p["topic_count"]   = db.podcast_topics.count_documents({"people_ids": p["id"], "merged_into": None})
-        p["content_count"] = db.podcast_content.count_documents({"person_id": p["id"]})
+        p["topic_count"]   = topic_counts.get(p["id"], 0)
+        p["content_count"] = content_counts.get(p["id"], 0)
     return resolved
 
 
