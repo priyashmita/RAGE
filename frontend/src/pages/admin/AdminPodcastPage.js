@@ -1691,9 +1691,17 @@ function PairsTab() {
     setGen(true);
     try {
       const { data } = await api.post('/admin/podcast/pairs/generate');
-      toast.success(data.pairs_created > 0
-        ? `${data.pairs_created} pairs generated`
-        : 'No pairs generated — make sure candidates share topics (refresh candidates first if topics changed)');
+      if (data.pairs_created > 0) {
+        toast.success(`${data.pairs_created} pairs generated from ${data.candidates_in_pool} candidates`);
+      } else {
+        const hint = data.rejection_hint;
+        const msg = hint === 'no_topics_assigned'
+          ? 'No pairs generated. Assign topics to candidates to surface stronger matches.'
+          : hint === 'all_roles_other'
+          ? 'No strong pairs. Set specific roles (founder, investor, operator…) on people to unlock role-based scoring.'
+          : `No strong pairs. ${data.combos_evaluated} combinations evaluated, avg score ${data.avg_combo_score}. Try enriching profiles or assigning topics.`;
+        toast.error(msg);
+      }
       load();
     } catch (err) { toast.error(err?.response?.data?.detail || 'Failed — need 2+ candidates'); }
     finally { setGen(false); }

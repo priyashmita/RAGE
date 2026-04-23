@@ -1455,10 +1455,17 @@ def generate_pairs(admin=Depends(require_admin)):
 
     db.podcast_pairs.delete_many({"source": "auto"})
 
-    created = 0
+    created        = 0
+    evaluated      = 0
+    below_threshold = 0
+    score_sum      = 0
+
     for ca, cb in combinations(candidates, 2):
+        evaluated += 1
         score, reasons, primary_topic, role_pairing = _pair_compat(ca, cb, topics_map, viewpoints_map)
+        score_sum += score
         if score < 5:
+            below_threshold += 1
             continue
         db.podcast_pairs.insert_one({
             "id":                  str(uuid.uuid4()),
@@ -1481,7 +1488,24 @@ def generate_pairs(admin=Depends(require_admin)):
         })
         created += 1
 
-    return {"pairs_created": created}
+    avg_score = round(score_sum / evaluated, 1) if evaluated else 0
+    rejection_hint = None
+    if created == 0:
+        if not any(c.get("topic_ids") for c in candidates):
+            rejection_hint = "no_topics_assigned"
+        elif not any(c.get("role") != "other" for c in candidates):
+            rejection_hint = "all_roles_other"
+        else:
+            rejection_hint = "scores_below_threshold"
+
+    return {
+        "pairs_created":      created,
+        "candidates_in_pool": len(candidates),
+        "combos_evaluated":   evaluated,
+        "below_threshold":    below_threshold,
+        "avg_combo_score":    avg_score,
+        "rejection_hint":     rejection_hint,
+    }
 
 
 @router.patch("/admin/podcast/pairs/{pair_id}")
