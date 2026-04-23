@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Loader2, Plus, ChevronRight, ChevronLeft, Users, Mic,
-  X, Check, RefreshCw, Download, Trash2,
+  X, Check, RefreshCw, Download, Trash2, Sparkles,
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -160,11 +160,190 @@ function CreateSeasonDialog({ open, onClose, onCreated }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// AI SUGGEST SEASONS DIALOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+function AISuggestDialog({ open, onClose, onCreated }) {
+  const [text,     setText]     = useState('');
+  const [loading,  setLoading]  = useState(false);
+  const [result,   setResult]   = useState(null);   // { seasons: [...] }
+  const [selected, setSelected] = useState({});     // { "season:0": true, "ep:0:1": true, ... }
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    if (open) { setText(''); setResult(null); setSelected({}); }
+  }, [open]);
+
+  async function generate() {
+    if (!text.trim()) { toast.error('Paste some content first'); return; }
+    setLoading(true);
+    setResult(null);
+    try {
+      const { data } = await api.post('/admin/podcast/suggest-seasons', { text });
+      setResult(data);
+      // Pre-select all
+      const sel = {};
+      (data.seasons || []).forEach((s, si) => {
+        sel[`s:${si}`] = true;
+        (s.episodes || []).forEach((_, ei) => { sel[`e:${si}:${ei}`] = true; });
+      });
+      setSelected(sel);
+    } catch (err) { toast.error(err?.response?.data?.detail || 'AI failed'); }
+    finally { setLoading(false); }
+  }
+
+  async function createSelected() {
+    if (!result) return;
+    setCreating(true);
+    const created = [];
+    try {
+      for (let si = 0; si < result.seasons.length; si++) {
+        if (!selected[`s:${si}`]) continue;
+        const s = result.seasons[si];
+        const { data: season } = await api.post('/admin/podcast/seasons', {
+          name: s.name, theme: s.theme,
+        });
+        created.push(season);
+        for (let ei = 0; ei < (s.episodes || []).length; ei++) {
+          if (!selected[`e:${si}:${ei}`]) continue;
+          await api.post(`/admin/podcast/seasons/${season.id}/episodes`, {
+            topic: s.episodes[ei].topic,
+          });
+        }
+      }
+      toast.success(`Created ${created.length} season${created.length !== 1 ? 's' : ''}`);
+      onCreated();
+      onClose();
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Failed to create'); }
+    finally { setCreating(false); }
+  }
+
+  function toggleSeason(si) {
+    const on = !selected[`s:${si}`];
+    setSelected(prev => {
+      const next = { ...prev, [`s:${si}`]: on };
+      // toggle all episodes of this season too
+      (result?.seasons[si]?.episodes || []).forEach((_, ei) => {
+        next[`e:${si}:${ei}`] = on;
+      });
+      return next;
+    });
+  }
+
+  function toggleEp(si, ei) {
+    setSelected(prev => ({ ...prev, [`e:${si}:${ei}`]: !prev[`e:${si}:${ei}`] }));
+  }
+
+  const anySelected = result &&
+    result.seasons.some((s, si) => selected[`s:${si}`]);
+
+  return (
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-[#F5F5F0] font-medium flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-[#DC143C]" /> Generate Seasons with AI
+          </DialogTitle>
+        </DialogHeader>
+
+        {!result ? (
+          <div className="space-y-4 mt-2">
+            <p className="text-xs text-[#52525B] leading-relaxed">
+              Paste notes from dinners, closed table sessions, interviews, articles, or any content
+              about the women you work with. AI will suggest season themes and episode topics.
+            </p>
+            <Textarea
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Paste your content here — dinner notes, interview transcripts, article excerpts, ideas..."
+              className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] rounded-none text-sm min-h-[220px] resize-none"
+            />
+            <div className="flex gap-3 pt-2 border-t border-white/8">
+              <Button onClick={generate} disabled={loading || !text.trim()}
+                className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-9 px-6 text-sm flex items-center gap-2">
+                {loading
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating...</>
+                  : <><Sparkles className="w-3.5 h-3.5" /> Generate</>}
+              </Button>
+              <button onClick={onClose} className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3 transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-4">
+            <p className="text-xs text-[#52525B]">
+              Check the seasons and episodes you want to create, then click Create.
+            </p>
+
+            {result.seasons.map((s, si) => (
+              <div key={si} className="border border-white/10 bg-[#080808]">
+                {/* Season header */}
+                <button
+                  onClick={() => toggleSeason(si)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/3 transition-colors">
+                  <span className={`w-4 h-4 border flex-shrink-0 flex items-center justify-center transition-colors ${
+                    selected[`s:${si}`] ? 'border-[#DC143C] bg-[#DC143C]' : 'border-white/20'
+                  }`}>
+                    {selected[`s:${si}`] && <Check className="w-2.5 h-2.5 text-white" />}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-[#F5F5F0] tracking-wide">{s.name}</p>
+                    {s.theme && <p className="text-xs text-[#52525B] mt-0.5">{s.theme}</p>}
+                  </div>
+                </button>
+
+                {/* Episode list */}
+                <div className="border-t border-white/8 px-4 py-2 space-y-1">
+                  {(s.episodes || []).map((ep, ei) => (
+                    <button
+                      key={ei}
+                      onClick={() => toggleEp(si, ei)}
+                      className="w-full flex items-center gap-3 py-1.5 text-left hover:text-[#F5F5F0] transition-colors group">
+                      <span className={`w-3.5 h-3.5 border flex-shrink-0 flex items-center justify-center transition-colors ${
+                        selected[`e:${si}:${ei}`] ? 'border-[#DC143C] bg-[#DC143C]' : 'border-white/15'
+                      }`}>
+                        {selected[`e:${si}:${ei}`] && <Check className="w-2 h-2 text-white" />}
+                      </span>
+                      <span className="text-[10px] text-[#3F3F46] font-mono w-6 shrink-0">E{ei + 1}</span>
+                      <span className="text-xs text-[#A1A1AA] group-hover:text-[#F5F5F0] transition-colors">{ep.topic}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <div className="flex gap-3 pt-3 border-t border-white/8">
+              <Button onClick={createSelected} disabled={creating || !anySelected}
+                className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-9 px-6 text-sm flex items-center gap-2">
+                {creating
+                  ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Creating...</>
+                  : 'Create Selected'}
+              </Button>
+              <button onClick={() => setResult(null)}
+                className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3 transition-colors">
+                ← Back
+              </button>
+              <button onClick={onClose}
+                className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3 transition-colors ml-auto">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 function SeasonsList({ onSelectSeason }) {
-  const [seasons, setSeasons]   = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [seasons, setSeasons]     = useState([]);
+  const [loading, setLoading]     = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [deleting, setDeleting] = useState(null);
+  const [showAI,    setShowAI]    = useState(false);
+  const [deleting, setDeleting]   = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -195,14 +374,22 @@ function SeasonsList({ onSelectSeason }) {
             ? `${seasons.length} season${seasons.length !== 1 ? 's' : ''}`
             : 'No seasons yet'}
         </p>
-        <button onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 transition-colors">
-          <Plus className="w-3.5 h-3.5" /> New Season
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowAI(true)}
+            className="flex items-center gap-2 text-xs px-4 py-2 border border-white/10 text-[#71717A] hover:text-[#DC143C] hover:border-[#DC143C]/30 transition-colors">
+            <Sparkles className="w-3.5 h-3.5" /> Generate with AI
+          </button>
+          <button onClick={() => setShowCreate(true)}
+            className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 transition-colors">
+            <Plus className="w-3.5 h-3.5" /> New Season
+          </button>
+        </div>
       </div>
 
       <CreateSeasonDialog open={showCreate} onClose={() => setShowCreate(false)}
         onCreated={s => setSeasons(prev => [...prev, s])} />
+      <AISuggestDialog open={showAI} onClose={() => setShowAI(false)}
+        onCreated={() => load()} />
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>

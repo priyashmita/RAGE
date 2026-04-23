@@ -1354,6 +1354,87 @@ def add_decision(data: DecisionIn, admin=Depends(require_admin)):
 # MODULE 5 — SEASONS & EPISODES
 # ─────────────────────────────────────────────────────────────────────────────
 
+_SUGGEST_SEASONS_PROMPT = """
+You are a creative producer for "Sunday Table", a documentary podcast series by RAGE (Radical Alliance for Gender Equity) featuring women founders and leaders in India.
+
+Below is raw content from our internal notes, dinner conversations, interviews, or external articles:
+
+---
+{text}
+---
+
+Based on this content, suggest 1 to 3 compelling documentary season themes, each with 4 to 6 specific episode topics that could be filmed as intimate 4-person conversations.
+
+Return ONLY valid JSON in this exact shape — no markdown, no explanation:
+{{
+  "seasons": [
+    {{
+      "name": "SHORT SEASON NAME IN CAPS",
+      "theme": "One sentence describing the season's emotional or thematic arc",
+      "episodes": [
+        {{"topic": "Episode topic — specific and evocative, not generic"}},
+        {{"topic": "..."}},
+        {{"topic": "..."}},
+        {{"topic": "..."}},
+        {{"topic": "..."}},
+        {{"topic": "..."}}
+      ]
+    }}
+  ]
+}}
+
+Rules:
+- Season names are short, powerful, all-caps (e.g. BECOMING, INHERITANCE, FRICTION)
+- Episode topics should be specific conversation starters, not generic categories
+- Ground suggestions in the actual content provided — don't invent unrelated themes
+- If content is thin, return 1 season with 4 episodes rather than padding
+"""
+
+class SuggestFromContentIn(BaseModel):
+    text: str
+
+@router.post("/admin/podcast/suggest-seasons")
+def suggest_seasons(data: SuggestFromContentIn, admin=Depends(require_admin)):
+    text = data.text.strip()
+    if len(text) < 50:
+        raise HTTPException(400, "Please provide more content (at least 50 characters)")
+
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if not gemini_key:
+        raise HTTPException(500, "GEMINI_API_KEY not configured")
+
+    import google.generativeai as genai
+    import json as _json
+    genai.configure(api_key=gemini_key)
+    model = genai.GenerativeModel(os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+    prompt = _SUGGEST_SEASONS_PROMPT.format(text=text[:12000])
+
+    for attempt in range(2):
+        try:
+            response = model.generate_content(prompt)
+            raw = response.text.strip().strip("```json").strip("```").strip()
+            parsed = _json.loads(raw)
+            seasons = parsed.get("seasons") or []
+            # Validate and sanitise
+            result = []
+            for s in seasons[:3]:
+                name = str(s.get("name", "")).strip().upper()
+                theme = str(s.get("theme", "")).strip()
+                episodes = [
+                    {"topic": str(e.get("topic", "")).strip()}
+                    for e in (s.get("episodes") or [])
+                    if str(e.get("topic", "")).strip()
+                ][:6]
+                if name and episodes:
+                    result.append({"name": name, "theme": theme, "episodes": episodes})
+            if result:
+                return {"seasons": result}
+        except Exception as e:
+            if attempt == 1:
+                raise HTTPException(500, f"AI suggestion failed: {str(e)}")
+    raise HTTPException(500, "AI returned no usable suggestions — try with more content")
+
+
 # ── Seasons ───────────────────────────────────────────────────────────────────
 
 @router.get("/admin/podcast/seasons")
