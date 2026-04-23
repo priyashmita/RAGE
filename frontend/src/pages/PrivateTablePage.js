@@ -36,23 +36,42 @@ export default function PrivateTablePage() {
       {(c.what.title || c.table_types.length > 0) && (
         <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              {c.what.title && (
-                <div>
-                  <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-6">{c.what.title}</h2>
-                  {c.what.body && <p className="text-base text-gray-600 leading-relaxed mb-6">{c.what.body}</p>}
+
+            {/* Description — 12-col grid: title left, body + rules right */}
+            {c.what.title && (
+              <div className="grid grid-cols-12 gap-16 items-start">
+                <div className="col-span-12 lg:col-span-4">
+                  <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug">{c.what.title}</h2>
+                </div>
+                <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
+                  {c.what.body && <p className="text-base text-gray-600 leading-relaxed">{c.what.body}</p>}
                   {c.what.rules.length > 0 && (
-                    <div className="space-y-3">{c.what.rules.map((r, i) => { const Icon = RI[i]||Shield; return (<div key={i} className="flex items-start gap-3"><Icon className="w-4 h-4 text-[#DC143C] mt-0.5 shrink-0" /><p className="text-sm text-gray-600">{r}</p></div>);})}</div>
+                    <div className="flex flex-col gap-3">
+                      {c.what.rules.map((r, i) => { const Icon = RI[i] || Shield; return (<div key={i} className="flex items-start gap-3"><Icon className="w-4 h-4 text-[#DC143C] mt-0.5 shrink-0" /><p className="text-sm text-gray-600">{r}</p></div>); })}
+                    </div>
                   )}
                 </div>
-              )}
-              {c.table_types.length > 0 && (
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">Table Types</p>
-                  <div className="space-y-3">{c.table_types.map(t => (<div key={t.name} className="bg-gray-50 border border-gray-200 p-5 flex items-center justify-between"><div><p className="text-sm font-semibold text-gray-900" style={{fontFamily:'Manrope'}}>{t.name}</p><p className="text-xs text-gray-500 mt-0.5">{t.desc}</p></div><span className="text-sm font-mono text-gray-900 shrink-0 ml-4">{t.fee}</span></div>))}</div>
+              </div>
+            )}
+
+            {/* Table types — full-width 2-col grid, no height imbalance */}
+            {c.table_types.length > 0 && (
+              <div className={c.what.title ? 'mt-10' : ''}>
+                <p className="text-xs uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">Table Types</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-gray-200">
+                  {c.table_types.map(t => (
+                    <div key={t.name} className="bg-white p-5 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900" style={{fontFamily:'Manrope'}}>{t.name}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{t.desc}</p>
+                      </div>
+                      <span className="text-sm font-mono text-gray-900 shrink-0 ml-4">{t.fee}</span>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+
           </div>
         </section>
       )}
