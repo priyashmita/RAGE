@@ -1033,12 +1033,12 @@ def list_candidates(
     return list(db.podcast_candidates.find(q, {"_id": 0}).sort("score", -1))
 
 
-@router.post("/admin/podcast/candidates/refresh")
-def refresh_candidates(admin=Depends(require_admin)):
+def _run_refresh() -> dict:
     """
     Rescore all active podcast_people and upsert podcast_candidates.
     Existing status / admin_notes / admin_boost are preserved.
     Fully batched — O(10) queries regardless of pool size.
+    Called by refresh_candidates endpoint AND auto-called before generate_pairs/generate_tables.
     """
     from pymongo import UpdateOne, InsertOne
 
@@ -1046,7 +1046,7 @@ def refresh_candidates(admin=Depends(require_admin)):
     if not people:
         return {"created": 0, "updated": 0, "total": 0}
 
-    person_ids   = [p["id"] for p in people]
+    person_ids    = [p["id"] for p in people]
     person_id_set = set(person_ids)
 
     # ── Batch 1: rager identity ───────────────────────────────────────────────
@@ -1272,6 +1272,11 @@ def refresh_candidates(admin=Depends(require_admin)):
     }
 
 
+@router.post("/admin/podcast/candidates/refresh")
+def refresh_candidates(admin=Depends(require_admin)):
+    return _run_refresh()
+
+
 @router.get("/admin/podcast/candidates/{candidate_id}")
 def get_candidate(candidate_id: str, admin=Depends(require_admin)):
     cand = db.podcast_candidates.find_one({"id": candidate_id}, {"_id": 0})
@@ -1431,7 +1436,10 @@ def generate_pairs(admin=Depends(require_admin)):
     """
     Regenerate pairs from top 50 non-excluded candidates.
     Auto-generated pairs are replaced. Manually set pairs (source=manual) are preserved.
+    Auto-refreshes candidates first so topic assignments made since last refresh are reflected.
     """
+    _run_refresh()
+
     candidates = list(db.podcast_candidates.find(
         {"status": {"$nin": ["not_fit_now", "declined"]}},
         {"_id": 0}
@@ -1553,6 +1561,7 @@ def generate_tables(admin=Depends(require_admin)):
     Generate 4-person Sunday Table suggestions, grouped by topic.
     Pool: top 40 non-excluded candidates.
     Per topic: try all C(pool, 4) combinations; store top 5 per topic.
+    Auto-refreshes candidates first so topic assignments made since last refresh are reflected.
 
     Hard reject:
       - any two people from same company
@@ -1560,6 +1569,8 @@ def generate_tables(admin=Depends(require_admin)):
       - fewer than 2 people anchored to this topic
       - score < 25
     """
+    _run_refresh()
+
     candidates = list(db.podcast_candidates.find(
         {"status": {"$nin": ["not_fit_now", "declined"]}},
         {"_id": 0}
