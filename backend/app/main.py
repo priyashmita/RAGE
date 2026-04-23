@@ -86,21 +86,35 @@ def auto_seed_content():
     db.seatings.create_index("event_id",  background=True)
 
     # ── Podcast Intelligence ─────────────────────────────────────────────────
+    # people: working identity layer (rager_id → live from ragers)
+    db.podcast_people.create_index("id",       unique=True, background=True)
+    db.podcast_people.create_index("rager_id", unique=True, sparse=True, background=True)
+    db.podcast_people.create_index("status",               background=True)
+    # content: looked up by person and topic
+    db.podcast_content.create_index("id",        unique=True, background=True)
+    db.podcast_content.create_index("person_id",            background=True)
+    db.podcast_content.create_index("topic_ids",            background=True)
+    # topics: looked up by slug, sorted by name
+    db.podcast_topics.create_index("id",   unique=True, background=True)
+    db.podcast_topics.create_index("slug", unique=True, background=True)
+    # candidates: primary sort key is score
     db.podcast_candidates.create_index("id",        unique=True, background=True)
     db.podcast_candidates.create_index("person_id", unique=True, background=True)
     db.podcast_candidates.create_index("score",                  background=True)
-    # pairs: sorted by score, and looked up by either person
+    db.podcast_candidates.create_index("topic_ids",              background=True)
+    # pairs: sorted by score, looked up by either person
     db.podcast_pairs.create_index("id",                   unique=True, background=True)
     db.podcast_pairs.create_index("compatibility_score",            background=True)
     db.podcast_pairs.create_index("person_1_id",                    background=True)
     db.podcast_pairs.create_index("person_2_id",                    background=True)
-    # panels
-    db.podcast_panels.create_index("id",    unique=True, background=True)
-    db.podcast_panels.create_index("score",             background=True)
+    # tables (4-person): sorted by score, looked up by topic
+    db.podcast_tables.create_index("id",         unique=True, background=True)
+    db.podcast_tables.create_index("score",                   background=True)
+    db.podcast_tables.create_index("topic_id",                background=True)
+    db.podcast_tables.create_index("status",                  background=True)
     # decisions: looked up per candidate in detail view
     db.podcast_invite_decisions.create_index("id",           unique=True, background=True)
     db.podcast_invite_decisions.create_index("candidate_id",            background=True)
-    db.podcast_topic_signals.create_index("id",              unique=True, background=True)
 
 
 @app.get("/")
