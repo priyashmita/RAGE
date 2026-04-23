@@ -14,25 +14,20 @@ import {
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-const TABS = ['People', 'Topics', 'Content', 'Candidates', 'Pairs', 'Tables', 'Analytics'];
+// Demo tabs — Content and Analytics hidden; re-add when ready
+const TABS = ['People', 'Topics', 'Candidates', 'Pairs', 'Tables'];
 
 const TAB_META = {
-  People:     'Add and enrich your pool of potential guests.',
-  Topics:     'Create and manage the themes you want to build conversations around.',
-  Content:    'Add raw notes, transcripts, articles, or research to extract topics and viewpoints.',
-  Candidates: 'See who stands out based on profiles, topics, and content.',
-  Pairs:      'Generate strong 2-person conversation combinations.',
-  Tables:     'Generate curated 4-person Sunday Table rooms.',
-  Analytics:  'Track topic strength, candidate mix, and output quality.',
+  People:     'Your guest pool — add people manually or import from Ragers.',
+  Topics:     'Conversation themes — assign people to topics to power scoring.',
+  Candidates: 'Ranked guest list — scored by profile, topics, and content.',
+  Pairs:      '2-person conversation combinations from the current candidate pool.',
+  Tables:     '4-person Sunday Table groups built from candidates and shared topics.',
 };
 
+// Flow strip — display only, not clickable
 const FLOW_STEPS = [
-  { label: 'Build Pool',    tab: 'People' },
-  { label: 'Define Themes', tab: 'Topics' },
-  { label: 'Add Input',     tab: 'Content' },
-  { label: 'Rank Guests',   tab: 'Candidates' },
-  { label: 'Build Pairs',   tab: 'Pairs' },
-  { label: 'Build Tables',  tab: 'Tables' },
+  'People', '→', 'Topics', '→', 'Candidates', '→', 'Pairs', '→', 'Tables',
 ];
 
 // ─── Status metadata ──────────────────────────────────────────────────────────
@@ -1742,7 +1737,7 @@ function PairsTab() {
       ) : filtered.length === 0 ? (
         <EmptyState icon={ArrowLeftRight}
           text="No pairs yet"
-          sub='Click "Generate Pairs" to build 2-person conversation combinations from the current candidate pool.' />
+          sub="Refresh Candidates first, then Generate Pairs. Pairs with shared topics will score higher." />
       ) : (
         <div className="space-y-2">
           {paged.map(pair => (
@@ -2159,35 +2154,24 @@ export default function AdminPodcastPage() {
   return (
     <div>
       {/* Page header */}
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-xl font-medium text-[#F5F5F0]">Podcast Intelligence</h1>
         <p className="text-sm text-[#71717A] mt-0.5">Sunday Table guest research and curation.</p>
       </div>
 
-      {/* Flow strip */}
-      <div className="flex items-center mb-6 overflow-x-auto border border-white/6 bg-[#080808] px-4 py-2.5">
-        {FLOW_STEPS.map((step, i) => (
-          <div key={step.tab} className="flex items-center shrink-0">
-            <button
-              onClick={() => setTab(step.tab)}
-              className={`text-[10px] uppercase tracking-[0.12em] font-medium transition-colors px-1 ${
-                tab === step.tab
-                  ? 'text-[#DC143C]'
-                  : 'text-[#3F3F46] hover:text-[#71717A]'
-              }`}
-            >
-              {step.label}
-            </button>
-            {i < FLOW_STEPS.length - 1 && (
-              <span className="text-[#27272A] mx-2 text-[10px]">→</span>
-            )}
-          </div>
+      {/* Flow strip — display only, not interactive */}
+      <div className="flex items-center gap-1.5 mb-5 select-none" aria-hidden="true">
+        {FLOW_STEPS.map((s, i) => (
+          s === '→'
+            ? <span key={i} className="text-[#27272A] text-[10px]">→</span>
+            : <span key={s} className={`text-[10px] uppercase tracking-[0.12em] font-medium px-1 ${
+                tab === s ? 'text-[#DC143C]' : 'text-[#3F3F46]'
+              }`}>{s}</span>
         ))}
-        <span className="ml-3 text-[#27272A] text-[10px]">· Analytics</span>
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-white/8 mb-2 overflow-x-auto">
+      <div className="flex border-b border-white/8 mb-2">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition-colors ${
@@ -2200,16 +2184,14 @@ export default function AdminPodcastPage() {
         ))}
       </div>
 
-      {/* Tab helper */}
-      <p className="text-xs text-[#3F3F46] mb-6 pt-1">{TAB_META[tab]}</p>
+      {/* Tab description */}
+      <p className="text-xs text-[#3F3F46] mb-5 pt-1">{TAB_META[tab]}</p>
 
       {tab === 'People'     && <PeopleTab />}
       {tab === 'Topics'     && <TopicsTab />}
-      {tab === 'Content'    && <ContentTab />}
       {tab === 'Candidates' && <CandidatesTab />}
       {tab === 'Pairs'      && <PairsTab />}
       {tab === 'Tables'     && <TablesTab />}
-      {tab === 'Analytics'  && <AnalyticsTab />}
     </div>
   );
 }

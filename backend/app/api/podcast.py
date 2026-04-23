@@ -322,8 +322,8 @@ def _pair_compat(ca: dict, cb: dict, topics_map: dict = None, viewpoints_map: di
         names = [t["name"] for tid in list(shared)[:3] if (t := _topic(tid))]
         reasons.append(f"Shared topics: {', '.join(names)}" if names else "Shared topics")
     else:
-        score -= 5
-        reasons.append("No topic overlap — review manually")
+        # No penalty — pairs can form before topics are assigned; topic overlap is a bonus not a gate
+        reasons.append("No shared topics yet — assign topics to surface stronger pairs")
 
     # Role compatibility
     ra  = ca.get("role", "other")
@@ -1458,7 +1458,7 @@ def generate_pairs(admin=Depends(require_admin)):
     created = 0
     for ca, cb in combinations(candidates, 2):
         score, reasons, primary_topic, role_pairing = _pair_compat(ca, cb, topics_map, viewpoints_map)
-        if score <= 0:
+        if score < 5:
             continue
         db.podcast_pairs.insert_one({
             "id":                  str(uuid.uuid4()),
