@@ -136,28 +136,32 @@ export default function SundayTablePage() {
       {c.sponsorship.title && (
         <section className="py-14 border-b border-gray-100">
           <div className={WRAP}>
-            <div className="max-w-[680px]">
-              {c.sponsorship.overline && (
-                <p className="rage-overline mb-4">{c.sponsorship.overline}</p>
-              )}
-              <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-4 leading-snug">
-                {c.sponsorship.title}
-              </h2>
-              {c.sponsorship.body && (
-                <p className="text-base text-gray-600 leading-relaxed mb-6">
-                  {c.sponsorship.body}
-                </p>
-              )}
-              {c.sponsorship.rules?.length > 0 && (
-                <ul className="flex flex-col gap-2">
-                  {c.sponsorship.rules.map((r, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <span className="w-1 h-1 bg-[#DC143C] rounded-full mt-[7px] shrink-0" />
-                      <span className="text-sm text-gray-600 leading-relaxed">{r}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <div className="grid grid-cols-12 gap-16 items-start">
+              <div className="col-span-12 lg:col-span-4">
+                {c.sponsorship.overline && (
+                  <p className="rage-overline mb-4">{c.sponsorship.overline}</p>
+                )}
+                <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug">
+                  {c.sponsorship.title}
+                </h2>
+              </div>
+              <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
+                {c.sponsorship.body && (
+                  <p className="text-base text-gray-600 leading-relaxed">
+                    {c.sponsorship.body}
+                  </p>
+                )}
+                {c.sponsorship.rules?.length > 0 && (
+                  <ul className="flex flex-col gap-2">
+                    {c.sponsorship.rules.map((r, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="w-1 h-1 bg-[#DC143C] rounded-full mt-[7px] shrink-0" />
+                        <span className="text-sm text-gray-600 leading-relaxed">{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
         </section>
