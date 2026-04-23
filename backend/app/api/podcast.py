@@ -39,11 +39,11 @@ _NOW = lambda: datetime.now(timezone.utc).isoformat()
 VALID_PERSON_ROLES    = {"founder", "investor", "operator", "expert", "advisor", "other"}
 VALID_PERSON_SOURCES  = {"manual", "rager", "imported"}
 VALID_PERSON_STATUSES = {"active", "archived"}
-VALID_CAND_STATUSES   = {"candidate", "podcast_ready", "maybe_later", "not_fit_now",
-                         "already_invited", "invited", "booked", "declined"}
-VALID_PAIR_STATUSES   = {"suggested", "shortlisted", "rejected", "invited", "booked"}
-VALID_TABLE_STATUSES  = {"suggested", "shortlisted", "rejected", "invited", "booked"}
-VALID_CONTENT_TYPES   = {"note", "transcript", "article", "research"}
+VALID_CAND_STATUSES    = {"candidate", "podcast_ready", "maybe_later", "not_fit_now",
+                          "already_invited", "invited", "booked", "declined"}
+VALID_CONTENT_TYPES    = {"note", "transcript", "article", "research"}
+VALID_SEASON_STATUSES  = {"planning", "active", "complete"}
+VALID_EPISODE_STATUSES = {"planning", "inviting", "confirmed", "recorded", "published"}
 VALID_TOPIC_SOURCES   = {"manual", "ai", "both"}
 
 ROLE_WEIGHT = {
@@ -374,95 +374,6 @@ def _pair_compat(ca: dict, cb: dict, topics_map: dict = None, viewpoints_map: di
     return score, reasons, primary_topic, role_pairing
 
 
-# ── Table scoring ─────────────────────────────────────────────────────────────
-
-def _table_score(combo: list, topic_id: str, topics_map: dict = None, viewpoints_map: dict = None):
-    """
-    Returns (total, breakdown, reasons, why_it_works, role_composition).
-    combo = list of 4 podcast_candidate dicts.
-
-    topics_map     : {topic_id: topic_doc}  — pre-loaded by caller
-    viewpoints_map : {person_id: set[str]}  — pre-loaded by caller
-    """
-    def _views(person_id):
-        if viewpoints_map is not None:
-            return viewpoints_map.get(person_id, set())
-        return _get_person_viewpoints(person_id)
-
-    # Topic coherence
-    on_topic        = sum(1 for m in combo if topic_id in (m.get("topic_ids") or []))
-    topic_coherence = round((on_topic / 4) * 30)
-
-    # Perspective diversity
-    all_views = set()
-    for m in combo:
-        all_views |= _views(m["person_id"])
-    perspective_diversity = min(len(all_views) * 2, 20)
-
-    # Role diversity
-    roles        = [m.get("role", "other") for m in combo]
-    unique_roles = set(roles)
-    role_diversity = 15 if len(unique_roles) == 4 else round((len(unique_roles) / 4) * 15)
-
-    # Company diversity
-    companies         = [m.get("company", "").strip().lower() for m in combo]
-    unique_companies  = set(c for c in companies if c)
-    company_diversity = round((len(unique_companies) / 4) * 15)
-
-    # Overall strength
-    avg_raw          = sum(m.get("raw_score", 0) for m in combo) / 4
-    overall_strength = round((avg_raw / 100) * 20)
-
-    total = (
-        topic_coherence + perspective_diversity +
-        role_diversity  + company_diversity + overall_strength
-    )
-
-    breakdown = {
-        "topic_coherence":       topic_coherence,
-        "perspective_diversity": perspective_diversity,
-        "role_diversity":        role_diversity,
-        "company_diversity":     company_diversity,
-        "overall_strength":      overall_strength,
-    }
-
-    # Reasons
-    reasons = []
-    if on_topic == 4:
-        reasons.append("All 4 anchored to primary topic")
-    elif on_topic >= 3:
-        reasons.append(f"{on_topic}/4 anchored to primary topic")
-
-    if len(unique_roles) == 4:
-        reasons.append("Full role diversity: " + " + ".join(r.title() for r in sorted(unique_roles)))
-    elif len(unique_roles) >= 3:
-        reasons.append(f"{len(unique_roles)} distinct roles")
-
-    if len(unique_companies) == 4:
-        reasons.append("All from different organisations")
-    elif len(unique_companies) >= 3:
-        reasons.append(f"{len(unique_companies)} different organisations")
-
-    if all_views:
-        reasons.append(f"{len(all_views)} distinct perspectives in evidence")
-
-    # Role composition
-    role_comp = {}
-    for r in roles:
-        role_comp[r] = role_comp.get(r, 0) + 1
-
-    # why_it_works
-    t_doc      = (topics_map or {}).get(topic_id) or db.podcast_topics.find_one({"id": topic_id}, {"name": 1, "_id": 0})
-    topic_name = t_doc["name"] if t_doc else "shared topic"
-    why        = f"{topic_name} focus"
-    if len(unique_roles) >= 3:
-        why += f". {' + '.join(r.title() for r in sorted(unique_roles))}"
-    if len(unique_companies) >= 3:
-        why += ". Diverse organisations"
-
-    return total, breakdown, reasons, why, role_comp
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Pydantic models
 # ─────────────────────────────────────────────────────────────────────────────
@@ -539,11 +450,35 @@ class DecisionIn(BaseModel):
     action:       str
     notes:        Optional[str] = ""
 
-class PairStatusUpdate(BaseModel):
-    status: str
+class SeasonIn(BaseModel):
+    name:  str
+    theme: Optional[str] = ""
 
-class TableStatusUpdate(BaseModel):
-    status: str
+class SeasonUpdate(BaseModel):
+    name:   Optional[str] = None
+    theme:  Optional[str] = None
+    status: Optional[str] = None
+
+class EpisodeIn(BaseModel):
+    topic: str
+    title: Optional[str] = ""
+    date:  Optional[str] = ""
+    time:  Optional[str] = ""
+
+class EpisodeUpdate(BaseModel):
+    topic:       Optional[str] = None
+    title:       Optional[str] = None
+    date:        Optional[str] = None
+    time:        Optional[str] = None
+    status:      Optional[str] = None
+    youtube_url: Optional[str] = None
+
+class GuestConfirm(BaseModel):
+    person_id: str
+    source:    str = "manual"   # "suggested" | "manual"
+
+class RsvpIn(BaseModel):
+    rsvp: str   # pending | yes | no
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1416,341 +1351,334 @@ def add_decision(data: DecisionIn, admin=Depends(require_admin)):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# MODULE 5 — PAIRS
+# MODULE 5 — SEASONS & EPISODES
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.get("/admin/podcast/pairs")
-def list_pairs(
-    status: Optional[str] = None,
-    topic:  Optional[str] = None,
-    admin=Depends(require_admin),
-):
-    q = {}
-    if status: q["status"] = status
-    if topic:  q["primary_topic"] = {"$regex": topic, "$options": "i"}
-    return list(db.podcast_pairs.find(q, {"_id": 0}).sort("compatibility_score", -1))
+# ── Seasons ───────────────────────────────────────────────────────────────────
 
-
-@router.post("/admin/podcast/pairs/generate")
-def generate_pairs(admin=Depends(require_admin)):
-    """
-    Regenerate pairs from top 50 non-excluded candidates.
-    Auto-generated pairs are replaced. Manually set pairs (source=manual) are preserved.
-    Auto-refreshes candidates first so topic assignments made since last refresh are reflected.
-    """
-    _run_refresh()
-
-    candidates = list(db.podcast_candidates.find(
-        {"status": {"$nin": ["not_fit_now", "declined"]}},
-        {"_id": 0}
-    ).sort("score", -1).limit(50))
-
-    if len(candidates) < 2:
-        raise HTTPException(400, "Need at least 2 candidates to generate pairs")
-
-    # ── Pre-load shared data — eliminates N+1 inside the combo loop ──────────
-    topics_map: dict = {
-        t["id"]: t
-        for t in db.podcast_topics.find({"merged_into": None}, {"_id": 0})
+@router.get("/admin/podcast/seasons")
+def list_seasons(admin=Depends(require_admin)):
+    seasons = list(db.podcast_seasons.find({}, {"_id": 0}).sort("created_at", 1))
+    ep_counts = {
+        row["_id"]: row["n"]
+        for row in db.podcast_episodes.aggregate([
+            {"$group": {"_id": "$season_id", "n": {"$sum": 1}}}
+        ])
     }
+    for s in seasons:
+        s["episode_count"] = ep_counts.get(s["id"], 0)
+    return seasons
 
-    person_ids      = [c["person_id"] for c in candidates]
-    viewpoints_map: dict = {}
-    for pp in db.podcast_people.find(
-        {"id": {"$in": person_ids}}, {"id": 1, "viewpoints": 1, "_id": 0}
-    ):
-        viewpoints_map[pp["id"]] = set(
-            v.lower().strip() for v in (pp.get("viewpoints") or [])
-        )
-    for doc in db.podcast_content.find(
-        {"person_id": {"$in": person_ids}},
-        {"person_id": 1, "extracted.viewpoints": 1, "_id": 0}
-    ):
-        pid = doc["person_id"]
-        for v in (doc.get("extracted") or {}).get("viewpoints", []):
-            viewpoints_map.setdefault(pid, set()).add(v.lower().strip())
-    # ─────────────────────────────────────────────────────────────────────────
 
-    db.podcast_pairs.delete_many({"source": "auto"})
-
-    created        = 0
-    evaluated      = 0
-    below_threshold = 0
-    score_sum      = 0
-
-    for ca, cb in combinations(candidates, 2):
-        evaluated += 1
-        score, reasons, primary_topic, role_pairing = _pair_compat(ca, cb, topics_map, viewpoints_map)
-        score_sum += score
-        if score < 5:
-            below_threshold += 1
-            continue
-        db.podcast_pairs.insert_one({
-            "id":                  str(uuid.uuid4()),
-            "person_1_id":         ca["person_id"],
-            "person_1_name":       ca.get("name", ""),
-            "person_1_company":    ca.get("company", ""),
-            "person_1_role":       ca.get("role", "other"),
-            "person_2_id":         cb["person_id"],
-            "person_2_name":       cb.get("name", ""),
-            "person_2_company":    cb.get("company", ""),
-            "person_2_role":       cb.get("role", "other"),
-            "compatibility_score": score,
-            "primary_topic":       primary_topic,
-            "role_pairing":        role_pairing,
-            "reasons":             reasons,
-            "status":              "suggested",
-            "source":              "auto",
-            "created_at":          _NOW(),
-            "updated_at":          _NOW(),
-        })
-        created += 1
-
-    avg_score = round(score_sum / evaluated, 1) if evaluated else 0
-    rejection_hint = None
-    if created == 0:
-        if not any(c.get("topic_ids") for c in candidates):
-            rejection_hint = "no_topics_assigned"
-        elif not any(c.get("role") != "other" for c in candidates):
-            rejection_hint = "all_roles_other"
-        else:
-            rejection_hint = "scores_below_threshold"
-
-    return {
-        "pairs_created":      created,
-        "candidates_in_pool": len(candidates),
-        "combos_evaluated":   evaluated,
-        "below_threshold":    below_threshold,
-        "avg_combo_score":    avg_score,
-        "rejection_hint":     rejection_hint,
+@router.post("/admin/podcast/seasons")
+def create_season(data: SeasonIn, admin=Depends(require_admin)):
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(400, "Season name is required")
+    doc = {
+        "id":         str(uuid.uuid4()),
+        "name":       name,
+        "theme":      data.theme or "",
+        "status":     "planning",
+        "created_at": _NOW(),
+        "updated_at": _NOW(),
     }
+    db.podcast_seasons.insert_one(doc)
+    doc.pop("_id", None)
+    doc["episode_count"] = 0
+    return doc
 
 
-@router.patch("/admin/podcast/pairs/{pair_id}")
-def update_pair(pair_id: str, data: PairStatusUpdate, admin=Depends(require_admin)):
-    if data.status not in VALID_PAIR_STATUSES:
-        raise HTTPException(400, f"Invalid status")
-    r = db.podcast_pairs.update_one(
-        {"id": pair_id},
-        {"$set": {"status": data.status, "updated_at": _NOW()}}
-    )
-    if r.matched_count == 0:
-        raise HTTPException(404, "Pair not found")
-    return db.podcast_pairs.find_one({"id": pair_id}, {"_id": 0})
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MODULE 6 — 4-PERSON TABLES
-# ─────────────────────────────────────────────────────────────────────────────
-
-@router.get("/admin/podcast/tables")
-def list_tables(
-    status: Optional[str] = None,
-    topic:  Optional[str] = None,
-    admin=Depends(require_admin),
-):
-    q = {}
-    if status: q["status"] = status
-    if topic:  q["primary_topic"] = {"$regex": topic, "$options": "i"}
-    return list(db.podcast_tables.find(q, {"_id": 0}).sort("score", -1))
-
-
-@router.post("/admin/podcast/tables/generate")
-def generate_tables(admin=Depends(require_admin)):
-    """
-    Generate 4-person Sunday Table suggestions, grouped by topic.
-    Pool: top 40 non-excluded candidates.
-    Per topic: try all C(pool, 4) combinations; store top 5 per topic.
-    Auto-refreshes candidates first so topic assignments made since last refresh are reflected.
-
-    Hard reject:
-      - any two people from same company
-      - fewer than 2 distinct roles
-      - fewer than 2 people anchored to this topic
-      - score < 25
-    """
-    _run_refresh()
-
-    candidates = list(db.podcast_candidates.find(
-        {"status": {"$nin": ["not_fit_now", "declined"]}},
-        {"_id": 0}
-    ).sort("score", -1).limit(40))
-
-    if len(candidates) < 4:
-        raise HTTPException(400, "Need at least 4 candidates to generate tables")
-
-    # ── Pre-load shared data — eliminates N+1 inside the combo loops ─────────
-    topics_map: dict = {
-        t["id"]: t
-        for t in db.podcast_topics.find({"merged_into": None}, {"_id": 0})
-    }
-
-    person_ids       = [c["person_id"] for c in candidates]
-    viewpoints_map: dict = {}
-    for pp in db.podcast_people.find(
-        {"id": {"$in": person_ids}}, {"id": 1, "viewpoints": 1, "_id": 0}
-    ):
-        viewpoints_map[pp["id"]] = set(
-            v.lower().strip() for v in (pp.get("viewpoints") or [])
-        )
-    for doc in db.podcast_content.find(
-        {"person_id": {"$in": person_ids}},
-        {"person_id": 1, "extracted.viewpoints": 1, "_id": 0}
-    ):
-        pid = doc["person_id"]
-        for v in (doc.get("extracted") or {}).get("viewpoints", []):
-            viewpoints_map.setdefault(pid, set()).add(v.lower().strip())
-    # ─────────────────────────────────────────────────────────────────────────
-
-    db.podcast_tables.delete_many({"source": "auto"})
-
-    # Group candidates by topic_id
-    topic_groups: dict = {}
-    for c in candidates:
-        for tid in (c.get("topic_ids") or []):
-            topic_groups.setdefault(tid, []).append(c)
-
-    seen_combos: set = set()
-    created          = 0
-
-    for topic_id, pool in topic_groups.items():
-        if len(pool) < 4:
-            continue
-
-        best_for_topic = []   # (score, doc)
-
-        for combo in combinations(pool[:20], 4):
-            ids = tuple(sorted(m["person_id"] for m in combo))
-            if ids in seen_combos:
-                continue
-
-            # Hard reject: duplicate company
-            companies = [m.get("company", "").strip().lower() for m in combo if m.get("company")]
-            if len(companies) != len(set(companies)):
-                continue
-
-            # Hard reject: fewer than 2 people on primary topic
-            on_topic = sum(1 for m in combo if topic_id in (m.get("topic_ids") or []))
-            if on_topic < 2:
-                continue
-
-            score, breakdown, reasons, why, role_comp = _table_score(
-                list(combo), topic_id, topics_map, viewpoints_map
-            )
-            if score < 25:
-                continue
-
-            seen_combos.add(ids)
-            best_for_topic.append((score, breakdown, reasons, why, role_comp, list(combo)))
-
-        # Keep top 5 for this topic
-        best_for_topic.sort(key=lambda x: x[0], reverse=True)
-        topic_name = (topics_map.get(topic_id) or {}).get("name", topic_id)
-
-        for score, breakdown, reasons, why, role_comp, combo in best_for_topic[:5]:
-            db.podcast_tables.insert_one({
-                "id":            str(uuid.uuid4()),
-                "title":         f"Table: {topic_name}",
-                "primary_topic": topic_name,
-                "topic_id":      topic_id,
-                "person_ids":    [m["person_id"] for m in combo],
-                "member_summaries": [
-                    {
-                        "person_id": m["person_id"],
-                        "name":      m.get("name", ""),
-                        "company":   m.get("company", ""),
-                        "role":      m.get("role", "other"),
-                    }
-                    for m in combo
-                ],
-                "score":            score,
-                "score_breakdown":  breakdown,
-                "role_composition": role_comp,
-                "why_it_works":     why,
-                "reasons":          reasons,
-                "status":           "suggested",
-                "source":           "auto",
-                "created_at":       _NOW(),
-                "updated_at":       _NOW(),
-            })
-            created += 1
-
-    return {"tables_created": created}
-
-
-@router.patch("/admin/podcast/tables/{table_id}")
-def update_table(table_id: str, data: TableStatusUpdate, admin=Depends(require_admin)):
-    if data.status not in VALID_TABLE_STATUSES:
+@router.patch("/admin/podcast/seasons/{season_id}")
+def update_season(season_id: str, data: SeasonUpdate, admin=Depends(require_admin)):
+    if not db.podcast_seasons.find_one({"id": season_id}):
+        raise HTTPException(404, "Season not found")
+    patch = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not patch:
+        raise HTTPException(400, "Nothing to update")
+    if "status" in patch and patch["status"] not in VALID_SEASON_STATUSES:
         raise HTTPException(400, "Invalid status")
-    r = db.podcast_tables.update_one(
-        {"id": table_id},
-        {"$set": {"status": data.status, "updated_at": _NOW()}}
-    )
-    if r.matched_count == 0:
-        raise HTTPException(404, "Table not found")
-    return db.podcast_tables.find_one({"id": table_id}, {"_id": 0})
+    patch["updated_at"] = _NOW()
+    db.podcast_seasons.update_one({"id": season_id}, {"$set": patch})
+    s = db.podcast_seasons.find_one({"id": season_id}, {"_id": 0})
+    s["episode_count"] = db.podcast_episodes.count_documents({"season_id": season_id})
+    return s
 
 
-@router.delete("/admin/podcast/tables/{table_id}")
-def delete_table(table_id: str, admin=Depends(require_admin)):
-    r = db.podcast_tables.delete_one({"id": table_id})
-    if r.deleted_count == 0:
-        raise HTTPException(404, "Table not found")
+@router.delete("/admin/podcast/seasons/{season_id}")
+def delete_season(season_id: str, admin=Depends(require_admin)):
+    if not db.podcast_seasons.find_one({"id": season_id}):
+        raise HTTPException(404, "Season not found")
+    db.podcast_episodes.delete_many({"season_id": season_id})
+    db.podcast_seasons.delete_one({"id": season_id})
     return {"deleted": True}
 
 
+# ── Episodes ──────────────────────────────────────────────────────────────────
+
+@router.get("/admin/podcast/seasons/{season_id}/episodes")
+def list_episodes(season_id: str, admin=Depends(require_admin)):
+    if not db.podcast_seasons.find_one({"id": season_id}):
+        raise HTTPException(404, "Season not found")
+    return list(db.podcast_episodes.find(
+        {"season_id": season_id}, {"_id": 0}
+    ).sort("episode_number", 1))
+
+
+@router.post("/admin/podcast/seasons/{season_id}/episodes")
+def create_episode(season_id: str, data: EpisodeIn, admin=Depends(require_admin)):
+    if not db.podcast_seasons.find_one({"id": season_id}):
+        raise HTTPException(404, "Season not found")
+    topic = data.topic.strip()
+    if not topic:
+        raise HTTPException(400, "Topic is required")
+    count = db.podcast_episodes.count_documents({"season_id": season_id})
+    doc = {
+        "id":             str(uuid.uuid4()),
+        "season_id":      season_id,
+        "episode_number": count + 1,
+        "topic":          topic,
+        "title":          (data.title or topic).strip(),
+        "date":           data.date or "",
+        "time":           data.time or "",
+        "status":         "planning",
+        "guests":         [],
+        "youtube_url":    "",
+        "created_at":     _NOW(),
+        "updated_at":     _NOW(),
+    }
+    db.podcast_episodes.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/admin/podcast/episodes/{episode_id}")
+def get_episode(episode_id: str, admin=Depends(require_admin)):
+    ep = db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+    if not ep:
+        raise HTTPException(404, "Episode not found")
+    return ep
+
+
+@router.patch("/admin/podcast/episodes/{episode_id}")
+def update_episode(episode_id: str, data: EpisodeUpdate, admin=Depends(require_admin)):
+    if not db.podcast_episodes.find_one({"id": episode_id}):
+        raise HTTPException(404, "Episode not found")
+    patch = {k: v for k, v in data.model_dump().items() if v is not None}
+    if not patch:
+        raise HTTPException(400, "Nothing to update")
+    if "status" in patch and patch["status"] not in VALID_EPISODE_STATUSES:
+        raise HTTPException(400, "Invalid status")
+    patch["updated_at"] = _NOW()
+    db.podcast_episodes.update_one({"id": episode_id}, {"$set": patch})
+    return db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+
+
+@router.delete("/admin/podcast/episodes/{episode_id}")
+def delete_episode(episode_id: str, admin=Depends(require_admin)):
+    r = db.podcast_episodes.delete_one({"id": episode_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Episode not found")
+    return {"deleted": True}
+
+
+# ── Suggestions ───────────────────────────────────────────────────────────────
+
+@router.get("/admin/podcast/episodes/{episode_id}/suggestions")
+def get_suggestions(episode_id: str, admin=Depends(require_admin)):
+    """
+    Return up to 8 ranked candidates for this episode, excluding already-confirmed guests.
+    Uses existing candidate scores + a topic-keyword bonus.
+    On cold start (no candidates at all), runs refresh once.
+    """
+    ep = db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+    if not ep:
+        raise HTTPException(404, "Episode not found")
+
+    confirmed_ids = {g["person_id"] for g in (ep.get("guests") or [])}
+
+    # Cold-start guard
+    if db.podcast_candidates.count_documents({}) == 0:
+        _run_refresh()
+
+    candidates = list(db.podcast_candidates.find(
+        {
+            "status":    {"$nin": ["not_fit_now", "declined"]},
+            "person_id": {"$nin": list(confirmed_ids)},
+        },
+        {"_id": 0}
+    ).sort("score", -1).limit(30))
+
+    if not candidates:
+        return {"suggestions": [], "pool_size": 0, "no_one_available": True}
+
+    # Topic-keyword bonus
+    episode_topic = (ep.get("topic") or "").lower()
+    stop_words    = {"and", "the", "in", "of", "for", "a", "an", "on", "with", "to"}
+    topic_words   = set(episode_topic.split()) - stop_words
+
+    for c in candidates:
+        bonus = 0
+        if topic_words:
+            for t in (c.get("suggested_topics") or []):
+                if topic_words & (set(t.lower().split()) - stop_words):
+                    bonus += 10
+        c["topic_bonus"]      = min(bonus, 20)
+        c["suggestion_score"] = c.get("score", 0) + c["topic_bonus"]
+
+    candidates.sort(key=lambda x: x["suggestion_score"], reverse=True)
+    top = candidates[:8]
+
+    # Enrich with full identity details
+    person_ids = [c["person_id"] for c in top]
+    people_map = {
+        p["id"]: p
+        for p in db.podcast_people.find({"id": {"$in": person_ids}}, {"_id": 0})
+    }
+    rager_ids  = [p["rager_id"] for p in people_map.values() if p.get("rager_id")]
+    ragers_map = {}
+    if rager_ids:
+        for r in db.ragers.find({"id": {"$in": rager_ids}}, {"_id": 0, "phone": 0}):
+            ragers_map[r["id"]] = r
+
+    results = []
+    for c in top:
+        pp  = people_map.get(c["person_id"], {})
+        rid = pp.get("rager_id")
+        if rid and rid in ragers_map:
+            r = ragers_map[rid]
+            name     = r.get("name",     pp.get("name",    ""))
+            company  = r.get("company",  pp.get("company", ""))
+            title    = r.get("title",    pp.get("title",   ""))
+            bio      = r.get("bio",      pp.get("bio",     ""))
+            linkedin = r.get("linkedin", pp.get("linkedin",""))
+        else:
+            name     = pp.get("name",    c.get("name",    ""))
+            company  = pp.get("company", c.get("company", ""))
+            title    = pp.get("title",   "")
+            bio      = pp.get("bio",     "")
+            linkedin = pp.get("linkedin","")
+        results.append({
+            **c,
+            "name":      name,
+            "company":   company or c.get("company", ""),
+            "title":     title,
+            "bio":       bio,
+            "linkedin":  linkedin,
+            "known_for": pp.get("known_for", ""),
+        })
+
+    return {
+        "suggestions":     results,
+        "pool_size":       len(candidates),
+        "no_one_available": False,
+    }
+
+
+# ── Episode Guests ────────────────────────────────────────────────────────────
+
+@router.post("/admin/podcast/episodes/{episode_id}/guests")
+def add_guest(episode_id: str, data: GuestConfirm, admin=Depends(require_admin)):
+    ep = db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+    if not ep:
+        raise HTTPException(404, "Episode not found")
+    guests = ep.get("guests") or []
+    if len(guests) >= 4:
+        raise HTTPException(400, "Episode already has 4 confirmed guests")
+    if any(g["person_id"] == data.person_id for g in guests):
+        raise HTTPException(409, "Person already confirmed for this episode")
+    pp = db.podcast_people.find_one({"id": data.person_id}, {"_id": 0})
+    if not pp:
+        raise HTTPException(404, "Person not found")
+    resolved = _resolve_person(pp)
+    guest = {
+        "person_id":  data.person_id,
+        "name":       resolved.get("name",    ""),
+        "company":    resolved.get("company", ""),
+        "title":      resolved.get("title",   ""),
+        "role":       pp.get("role", "other"),
+        "source":     data.source,
+        "rsvp":       "pending",
+        "invited_at": None,
+        "added_at":   _NOW(),
+    }
+    db.podcast_episodes.update_one(
+        {"id": episode_id},
+        {"$push": {"guests": guest}, "$set": {"updated_at": _NOW()}}
+    )
+    return db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+
+
+@router.delete("/admin/podcast/episodes/{episode_id}/guests/{person_id}")
+def remove_guest(episode_id: str, person_id: str, admin=Depends(require_admin)):
+    if not db.podcast_episodes.find_one({"id": episode_id}):
+        raise HTTPException(404, "Episode not found")
+    db.podcast_episodes.update_one(
+        {"id": episode_id},
+        {"$pull": {"guests": {"person_id": person_id}}, "$set": {"updated_at": _NOW()}}
+    )
+    return db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+
+
+@router.patch("/admin/podcast/episodes/{episode_id}/guests/{person_id}/rsvp")
+def update_guest_rsvp(episode_id: str, person_id: str, data: RsvpIn, admin=Depends(require_admin)):
+    if data.rsvp not in {"pending", "yes", "no"}:
+        raise HTTPException(400, "rsvp must be pending, yes, or no")
+    ep = db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+    if not ep:
+        raise HTTPException(404, "Episode not found")
+    guests = ep.get("guests") or []
+    if not any(g["person_id"] == person_id for g in guests):
+        raise HTTPException(404, "Guest not in this episode")
+    updated = [{**g, "rsvp": data.rsvp} if g["person_id"] == person_id else g for g in guests]
+    db.podcast_episodes.update_one(
+        {"id": episode_id},
+        {"$set": {"guests": updated, "updated_at": _NOW()}}
+    )
+    return db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+
+
+@router.post("/admin/podcast/episodes/{episode_id}/invite")
+def send_invites(episode_id: str, admin=Depends(require_admin)):
+    """Mark all un-invited guests as invited. Sets episode status to 'inviting'."""
+    ep = db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+    if not ep:
+        raise HTTPException(404, "Episode not found")
+    guests = ep.get("guests") or []
+    if not guests:
+        raise HTTPException(400, "No guests to invite")
+    now = _NOW()
+    updated = [{**g, "invited_at": g.get("invited_at") or now} for g in guests]
+    db.podcast_episodes.update_one(
+        {"id": episode_id},
+        {"$set": {"guests": updated, "status": "inviting", "updated_at": now}}
+    )
+    return db.podcast_episodes.find_one({"id": episode_id}, {"_id": 0})
+
+
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# MODULE 7 — ANALYTICS
+# MODULE 6 — ANALYTICS
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/admin/podcast/analytics")
 def podcast_analytics(admin=Depends(require_admin)):
-    # Candidate funnel
-    by_status = {
-        s: db.podcast_candidates.count_documents({"status": s})
-        for s in VALID_CAND_STATUSES
-    }
+    total_seasons  = db.podcast_seasons.count_documents({})
+    total_episodes = db.podcast_episodes.count_documents({})
+    confirmed_eps  = db.podcast_episodes.count_documents({"status": "confirmed"})
+    total_people   = db.podcast_people.count_documents({"status": "active"})
 
-    # People breakdown
-    by_source = {
-        s: db.podcast_people.count_documents({"source": s, "status": "active"})
-        for s in VALID_PERSON_SOURCES
-    }
     by_role = {
         r: db.podcast_people.count_documents({"role": r, "status": "active"})
         for r in VALID_PERSON_ROLES
     }
 
-    # Topic coverage (topics with people assigned)
-    topics = list(db.podcast_topics.find(
-        {"merged_into": None},
-        {"_id": 0, "name": 1, "people_ids": 1}
-    ))
-    topic_coverage = sorted(
-        [{"topic": t["name"], "count": len(t.get("people_ids") or [])} for t in topics],
-        key=lambda x: x["count"],
-        reverse=True
-    )
-
-    # Tables readiness: topics with 4+ active candidates
-    table_ready_topics = [t for t in topic_coverage if t["count"] >= 4]
-
-    # Content stats
-    total_content  = db.podcast_content.count_documents({})
-    extracted_count = db.podcast_content.count_documents({"extraction_status": "done"})
-
     return {
-        "total_people":        db.podcast_people.count_documents({"status": "active"}),
-        "by_source":           by_source,
-        "by_role":             by_role,
-        "total_topics":        len(topics),
-        "topic_coverage":      topic_coverage[:15],
-        "table_ready_topics":  table_ready_topics,
-        "total_content":       total_content,
-        "extracted_content":   extracted_count,
-        "total_candidates":    db.podcast_candidates.count_documents({}),
-        "by_status":           by_status,
-        "shortlisted_pairs":   db.podcast_pairs.count_documents({"status": "shortlisted"}),
-        "total_tables":        db.podcast_tables.count_documents({}),
-        "shortlisted_tables":  db.podcast_tables.count_documents({"status": "shortlisted"}),
+        "total_seasons":   total_seasons,
+        "total_episodes":  total_episodes,
+        "confirmed_eps":   confirmed_eps,
+        "total_people":    total_people,
+        "by_role":         by_role,
+        "total_candidates": db.podcast_candidates.count_documents({}),
     }

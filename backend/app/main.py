@@ -85,6 +85,11 @@ def auto_seed_content():
     db.seatings.create_index("id",        unique=True, background=True)
     db.seatings.create_index("event_id",  background=True)
 
+    # ── Podcast Seasons & Episodes ───────────────────────────────────────────
+    db.podcast_seasons.create_index("id",        unique=True, background=True)
+    db.podcast_episodes.create_index("id",       unique=True, background=True)
+    db.podcast_episodes.create_index("season_id",             background=True)
+
     # ── Podcast Intelligence ─────────────────────────────────────────────────
     # people: working identity layer (rager_id → live from ragers)
     db.podcast_people.create_index("id",       unique=True, background=True)
