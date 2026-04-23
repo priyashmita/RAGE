@@ -74,36 +74,45 @@ export default function SundayTablePage() {
                 </p>
               )}
               <div>
-                {c.episodes.list.map((ep, i) => (
-                  <div key={i} className="py-4 border-b border-gray-200">
-                    <div className="flex items-start gap-4">
-                      <span className="text-sm font-mono text-[#DC143C] w-8 shrink-0 mt-0.5">
-                        E{i + 1}
-                      </span>
-                      <div className="flex flex-col gap-1">
-                        {ep.title && (
-                          <p
-                            className="text-sm font-medium text-gray-900"
-                            style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
-                          >
-                            {ep.title}
-                          </p>
-                        )}
-                        {ep.founder && (
-                          <p className="text-xs text-gray-500">
-                            {ep.founder}{ep.company ? ` · ${ep.company}` : ''}
-                          </p>
-                        )}
-                        {ep.desc && (
-                          <p className="text-xs text-gray-400">{ep.desc}</p>
-                        )}
-                        {ep.date && (
-                          <p className="text-[10px] font-mono text-gray-400">{ep.date}</p>
-                        )}
+                {c.episodes.list.map((ep, i) => {
+                  // Support both new `people` array and legacy `founder`/`company` fields
+                  const people = ep.people?.filter(p => p.name) ||
+                    (ep.founder ? [{ name: ep.founder, company: ep.company }] : []);
+                  return (
+                    <div key={i} className="py-4 border-b border-gray-200">
+                      <div className="flex items-start gap-4">
+                        <span className="text-sm font-mono text-[#DC143C] w-8 shrink-0 mt-0.5">
+                          E{i + 1}
+                        </span>
+                        <div className="flex flex-col gap-1 flex-1">
+                          {ep.title && (
+                            <p
+                              className="text-sm font-medium text-gray-900"
+                              style={{ fontFamily: 'Playfair Display, Georgia, serif' }}
+                            >
+                              {ep.title}
+                            </p>
+                          )}
+                          {people.length > 0 && (
+                            <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+                              {people.map((p, j) => (
+                                <p key={j} className="text-xs text-gray-500">
+                                  {p.name}{p.company ? ` · ${p.company}` : ''}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                          {ep.desc && (
+                            <p className="text-xs text-gray-400">{ep.desc}</p>
+                          )}
+                          {ep.date && (
+                            <p className="text-[10px] font-mono text-gray-400">{ep.date}</p>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

@@ -276,7 +276,17 @@ DEFAULT_CONTENT = [
             "episodes": {
                 "theme": "Season 1 — In Development",
                 "list": [
-                    {"title": "", "founder": "", "company": "", "desc": "", "date": ""}
+                    {
+                        "title": "",
+                        "people": [
+                            {"name": "", "company": ""},
+                            {"name": "", "company": ""},
+                            {"name": "", "company": ""},
+                            {"name": "", "company": ""}
+                        ],
+                        "desc": "",
+                        "date": ""
+                    }
                 ]
             },
             "production": [
