@@ -14,7 +14,26 @@ import {
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 
-const TABS = ['People', 'Content', 'Topics', 'Candidates', 'Pairs', 'Tables', 'Analytics'];
+const TABS = ['People', 'Topics', 'Content', 'Candidates', 'Pairs', 'Tables', 'Analytics'];
+
+const TAB_META = {
+  People:     'Add and enrich your pool of potential guests.',
+  Topics:     'Create and manage the themes you want to build conversations around.',
+  Content:    'Add raw notes, transcripts, articles, or research to extract topics and viewpoints.',
+  Candidates: 'See who stands out based on profiles, topics, and content.',
+  Pairs:      'Generate strong 2-person conversation combinations.',
+  Tables:     'Generate curated 4-person Sunday Table rooms.',
+  Analytics:  'Track topic strength, candidate mix, and output quality.',
+};
+
+const FLOW_STEPS = [
+  { label: 'Build Pool',    tab: 'People' },
+  { label: 'Define Themes', tab: 'Topics' },
+  { label: 'Add Input',     tab: 'Content' },
+  { label: 'Rank Guests',   tab: 'Candidates' },
+  { label: 'Build Pairs',   tab: 'Pairs' },
+  { label: 'Build Tables',  tab: 'Tables' },
+];
 
 // ─── Status metadata ──────────────────────────────────────────────────────────
 
@@ -812,7 +831,11 @@ function PeopleTab() {
     <div>
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <p className="text-sm text-[#71717A]">{people.length} people in pool</p>
+        <p className="text-sm text-[#71717A]">
+          {people.length > 0
+            ? <>{people.length} people in pool <span className="text-[#3F3F46]">· working pool for podcast and Sunday Table selection</span></>
+            : 'No people yet'}
+        </p>
         <div className="flex gap-2">
           <button onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 transition-colors">
@@ -820,12 +843,12 @@ function PeopleTab() {
           </button>
           <button onClick={() => setShowSelect(true)}
             className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 transition-colors">
-            <Users className="w-3.5 h-3.5" /> Select Ragers
+            <Users className="w-3.5 h-3.5" /> Import Ragers
           </button>
           <button onClick={importAll} disabled={importing}
             className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 transition-colors">
             {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            Import All
+            Import All Ragers
           </button>
         </div>
       </div>
@@ -864,8 +887,8 @@ function PeopleTab() {
         <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
       ) : filtered.length === 0 && people.length === 0 ? (
         <EmptyState icon={Users}
-          text="No people in the pool yet"
-          sub="Add someone manually or import from Ragers to get started" />
+          text="No people yet"
+          sub='Add someone manually or use "Import Ragers" to bring in existing members.' />
       ) : filtered.length === 0 ? (
         <EmptyState icon={Users} text="No results" sub="Try adjusting your filters" />
       ) : (
@@ -965,7 +988,10 @@ function ContentRow({ item, people, onExtracted, onDeleted }) {
             {isFailed && <span className="text-[9px] uppercase tracking-wider text-red-400 border border-red-500/20 px-1.5 py-0.5">failed</span>}
           </div>
           <div className="flex items-center gap-3 text-xs text-[#52525B]">
-            {person && <span>{person.name}</span>}
+            {person
+              ? <span className="text-[#71717A]">{person.name}</span>
+              : <span className="text-[#3F3F46] italic">standalone · not linked to a person</span>
+            }
             <span className="font-mono">{item.created_at?.slice(0, 10)}</span>
           </div>
         </div>
@@ -1078,7 +1104,12 @@ function ContentTab() {
 
       {showAdd && (
         <div className="bg-[#080808] border border-white/8 p-4 mb-5 space-y-3">
-          <p className="text-[10px] uppercase tracking-wider text-[#52525B]">Add Content</p>
+          <div className="flex items-start justify-between">
+            <p className="text-[10px] uppercase tracking-wider text-[#52525B]">Add Content</p>
+            <p className="text-[10px] text-[#3F3F46] max-w-xs text-right">
+              Raw input only — content enriches topics and viewpoints. It does not replace Topics.
+            </p>
+          </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Person (optional)</Label>
@@ -1120,7 +1151,9 @@ function ContentTab() {
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={FileText} text="No content yet" sub="Add notes, transcripts or articles to build topic intelligence" />
+        <EmptyState icon={FileText}
+          text="No content yet"
+          sub="Add notes, transcripts, or research to enrich topics and extract viewpoints. Content is raw input — it supports Topics, it does not replace them." />
       ) : (
         <div className="space-y-1.5">
           {filtered.map(item => (
@@ -1212,11 +1245,11 @@ function TopicsTab() {
         <div className="flex gap-2 flex-1 min-w-[260px]">
           <Input value={newName} onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && addTopic()}
-            placeholder="New topic name…"
+            placeholder="e.g. Fundraising, Hiring, Scaling, D2C…"
             className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm flex-1" />
           <Button onClick={addTopic} disabled={adding || !newName.trim()}
             className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-4 text-xs">
-            {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Add'}
+            {adding ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Add Topic'}
           </Button>
         </div>
         <button onClick={() => setShowMerge(v => !v)}
@@ -1260,7 +1293,9 @@ function TopicsTab() {
 
       {/* Topics list */}
       {topics.length === 0 ? (
-        <EmptyState icon={Tag} text="No topics yet" sub="Add topics manually or run content extraction — topics will be auto-suggested" />
+        <EmptyState icon={Tag}
+          text="No topics yet"
+          sub="Add a theme to start structuring conversations. Once people are assigned to a topic, it becomes available for scoring and table generation." />
       ) : (
         <div className="space-y-1.5">
           {topics.map(t => (
@@ -1579,14 +1614,18 @@ function CandidatesTab() {
         <button onClick={refresh} disabled={refreshing}
           className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 transition-colors shrink-0">
           {refreshing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-          Rescore All
+          Refresh Candidates
         </button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
+      ) : filtered.length === 0 && candidates.length === 0 ? (
+        <EmptyState icon={Mic}
+          text="No candidates yet"
+          sub='Candidates appear after people exist and topics are assigned. Click "Refresh Candidates" to score the pool.' />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Mic} text="No candidates" sub='Click "Rescore All" after adding people and assigning topics' />
+        <EmptyState icon={Mic} text="No results for this filter" sub="Try a different status filter" />
       ) : (
         <div className="space-y-1.5">
           {filtered.map((c, idx) => (
@@ -1696,14 +1735,16 @@ function PairsTab() {
         <button onClick={generate} disabled={generating}
           className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 transition-colors">
           {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-          Generate Pairs
+          {generating ? 'Generating…' : 'Generate Pairs'}
         </button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={ArrowLeftRight} text="No pairs yet" sub="Generate after rescoring candidates" />
+        <EmptyState icon={ArrowLeftRight}
+          text="No pairs yet"
+          sub='Click "Generate Pairs" to build 2-person conversation combinations from the current candidate pool.' />
       ) : (
         <div className="space-y-2">
           {paged.map(pair => (
@@ -1844,14 +1885,24 @@ function TablesTab() {
         <button onClick={generate} disabled={generating}
           className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 transition-colors">
           {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-          Generate Tables
+          {generating ? 'Generating…' : 'Generate Tables'}
         </button>
       </div>
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Users} text="No tables yet" sub="Generate 4-person tables after assigning topics to candidates" />
+        <div className="text-center py-16 border border-white/8">
+          <Users className="w-7 h-7 text-[#3F3F46] mx-auto mb-3" />
+          <p className="text-sm text-[#52525B] mb-3">No tables yet</p>
+          <div className="text-xs text-[#3F3F46] space-y-1 inline-block text-left">
+            <p className="text-[10px] uppercase tracking-wider text-[#27272A] mb-2">To generate tables:</p>
+            <p>1. Add people to the pool</p>
+            <p>2. Assign topics to at least 4 people</p>
+            <p>3. Ensure 2+ distinct roles per topic group</p>
+            <p>4. Click Generate Tables</p>
+          </div>
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(table => {
@@ -1982,6 +2033,13 @@ function AnalyticsTab() {
   if (loading) return <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>;
   if (!stats) return null;
 
+  const hasData = stats.total_people > 0 || stats.total_candidates > 0 || stats.total_tables > 0;
+  if (!hasData) return (
+    <EmptyState icon={BarChart2}
+      text="No analytics yet"
+      sub="Analytics will appear once people are added, candidates are refreshed, and tables or pairs are generated." />
+  );
+
   return (
     <div className="space-y-6">
 
@@ -2104,14 +2162,36 @@ export default function AdminPodcastPage() {
 
   return (
     <div>
-      <div className="mb-8">
+      {/* Page header */}
+      <div className="mb-6">
         <h1 className="text-xl font-medium text-[#F5F5F0]">Podcast Intelligence</h1>
-        <p className="text-sm text-[#71717A] mt-0.5">
-          Build the guest pool · assign topics · generate 4-person tables
-        </p>
+        <p className="text-sm text-[#71717A] mt-0.5">Sunday Table guest research and curation.</p>
       </div>
 
-      <div className="flex border-b border-white/8 mb-6 overflow-x-auto">
+      {/* Flow strip */}
+      <div className="flex items-center mb-6 overflow-x-auto border border-white/6 bg-[#080808] px-4 py-2.5">
+        {FLOW_STEPS.map((step, i) => (
+          <div key={step.tab} className="flex items-center shrink-0">
+            <button
+              onClick={() => setTab(step.tab)}
+              className={`text-[10px] uppercase tracking-[0.12em] font-medium transition-colors px-1 ${
+                tab === step.tab
+                  ? 'text-[#DC143C]'
+                  : 'text-[#3F3F46] hover:text-[#71717A]'
+              }`}
+            >
+              {step.label}
+            </button>
+            {i < FLOW_STEPS.length - 1 && (
+              <span className="text-[#27272A] mx-2 text-[10px]">→</span>
+            )}
+          </div>
+        ))}
+        <span className="ml-3 text-[#27272A] text-[10px]">· Analytics</span>
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex border-b border-white/8 mb-2 overflow-x-auto">
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition-colors ${
@@ -2124,9 +2204,12 @@ export default function AdminPodcastPage() {
         ))}
       </div>
 
+      {/* Tab helper */}
+      <p className="text-xs text-[#3F3F46] mb-6 pt-1">{TAB_META[tab]}</p>
+
       {tab === 'People'     && <PeopleTab />}
-      {tab === 'Content'    && <ContentTab />}
       {tab === 'Topics'     && <TopicsTab />}
+      {tab === 'Content'    && <ContentTab />}
       {tab === 'Candidates' && <CandidatesTab />}
       {tab === 'Pairs'      && <PairsTab />}
       {tab === 'Tables'     && <TablesTab />}
