@@ -1942,7 +1942,7 @@ function TablesTab() {
       const { data } = await api.post('/admin/podcast/tables/generate');
       toast.success(data.tables_created > 0
         ? `${data.tables_created} tables generated`
-        : 'No tables generated — assign topics to 4+ people with 2+ distinct roles, then refresh candidates');
+        : 'No tables generated — assign topics to 4+ people, then try again');
       load();
     } catch (err) { toast.error(err?.response?.data?.detail || 'Failed — need 4+ candidates with topics assigned'); }
     finally { setGen(false); }
@@ -1997,9 +1997,8 @@ function TablesTab() {
           <div className="text-xs text-[#3F3F46] space-y-1 inline-block text-left">
             <p className="text-[10px] uppercase tracking-wider text-[#27272A] mb-2">To generate tables:</p>
             <p>1. Add people to the pool</p>
-            <p>2. Assign topics to at least 4 people</p>
-            <p>3. Ensure 2+ distinct roles per topic group</p>
-            <p>4. Click Generate Tables</p>
+            <p>2. Assign topics to at least 4 people per topic</p>
+            <p>3. Click Generate Tables</p>
           </div>
         </div>
       ) : (

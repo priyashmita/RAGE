@@ -1629,10 +1629,6 @@ def generate_tables(admin=Depends(require_admin)):
             if len(companies) != len(set(companies)):
                 continue
 
-            # Hard reject: fewer than 2 distinct roles
-            if len(set(m.get("role", "other") for m in combo)) < 2:
-                continue
-
             # Hard reject: fewer than 2 people on primary topic
             on_topic = sum(1 for m in combo if topic_id in (m.get("topic_ids") or []))
             if on_topic < 2:
