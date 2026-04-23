@@ -88,30 +88,315 @@ function EmptyState({ icon: Icon, text, sub }) {
 // MODULE 1 — PEOPLE TAB
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Shared field helpers ──────────────────────────────────────────────────────
+
+function SectionLabel({ children }) {
+  return (
+    <p className="text-[10px] uppercase tracking-[0.15em] text-[#52525B] font-semibold mt-5 mb-3 pb-1.5 border-b border-white/5">
+      {children}
+    </p>
+  );
+}
+
+function FieldLabel({ children, hint }) {
+  return (
+    <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">
+      {children}
+      {hint && <span className="normal-case tracking-normal text-[#3F3F46] ml-1.5 font-normal">{hint}</span>}
+    </Label>
+  );
+}
+
+function FI({ children }) {   // form input wrapper
+  return <div>{children}</div>;
+}
+
+// Chip-list input: items entered one at a time, shown as removable chips.
+// value: string[] — onChange: (string[]) => void
+function ChipInput({ value = [], onChange, placeholder }) {
+  const [draft, setDraft] = useState('');
+  function add() {
+    const v = draft.trim();
+    if (!v || value.includes(v)) { setDraft(''); return; }
+    onChange([...value, v]);
+    setDraft('');
+  }
+  return (
+    <div className="space-y-1.5">
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {value.map(chip => (
+            <span key={chip} className="flex items-center gap-1 text-xs text-[#A1A1AA] bg-white/[0.03] border border-white/10 pl-2 pr-1 py-0.5">
+              {chip}
+              <button onClick={() => onChange(value.filter(c => c !== chip))}
+                className="text-[#3F3F46] hover:text-red-400 transition-colors">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-1.5">
+        <Input
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
+          placeholder={placeholder}
+          className="flex-1 bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm"
+        />
+        <button
+          onClick={add}
+          disabled={!draft.trim()}
+          className="text-[10px] px-3 border border-white/15 text-[#52525B] hover:text-[#A1A1AA] disabled:opacity-30 transition-colors h-8"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Add/Edit Person form — used both for new manual people and detail edits ───
+
+const EMPTY_PERSON_FORM = {
+  // Identity
+  name: '', title: '', company: '', location: '', linkedin: '',
+  // About
+  bio: '', known_for: '', current_focus: '',
+  // Classification
+  role: 'other', tags: [], expertise: [], viewpoints: [],
+  admin_boost: 0,
+};
+
+function personToForm(data) {
+  return {
+    name:          data.name          || '',
+    title:         data.title         || '',
+    company:       data.company       || '',
+    location:      data.location      || '',
+    linkedin:      data.linkedin      || '',
+    bio:           data.bio           || '',
+    known_for:     data.known_for     || '',
+    current_focus: data.current_focus || '',
+    role:          data.role          || 'other',
+    tags:          data.tags          || [],
+    expertise:     data.expertise     || [],
+    viewpoints:    data.viewpoints    || [],
+    admin_boost:   data.admin_boost   || 0,
+  };
+}
+
+// ── Full profile form (shared between add-new and edit-in-dialog) ─────────────
+
+function PersonProfileForm({ form, setForm, isLinked = false, compact = false }) {
+  const f = (field, val) => setForm(prev => ({ ...prev, [field]: val }));
+
+  return (
+    <div>
+
+      {/* ── Identity ── */}
+      {isLinked ? (
+        <>
+          <SectionLabel>Identity — synced from Rager profile</SectionLabel>
+          <div className="bg-[#080808] border border-white/8 rounded-none p-3 space-y-0.5 mb-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm text-[#F5F5F0] font-medium">{form.name || '—'}</span>
+              {form.title && <span className="text-xs text-[#71717A]">· {form.title}</span>}
+            </div>
+            {form.company && <p className="text-xs text-[#71717A]">{form.company}</p>}
+            {form.location && <p className="text-xs text-[#52525B]">{form.location}</p>}
+            {form.linkedin && (
+              <a href={form.linkedin} target="_blank" rel="noreferrer"
+                className="text-xs text-[#52525B] hover:text-[#A1A1AA] transition-colors inline-block">
+                LinkedIn ↗
+              </a>
+            )}
+            <p className="text-[10px] text-[#3F3F46] pt-1">
+              To update identity, edit the Rager profile directly.
+            </p>
+          </div>
+        </>
+      ) : (
+        <>
+          <SectionLabel>Identity</SectionLabel>
+          <div className="grid grid-cols-2 gap-3">
+            <FI>
+              <FieldLabel>Name *</FieldLabel>
+              <Input value={form.name} onChange={e => f('name', e.target.value)}
+                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+            </FI>
+            <FI>
+              <FieldLabel hint="job title / role at org">Title</FieldLabel>
+              <Input value={form.title} onChange={e => f('title', e.target.value)}
+                placeholder="e.g. Founder & CEO"
+                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+            </FI>
+            <FI>
+              <FieldLabel>Company / Organisation</FieldLabel>
+              <Input value={form.company} onChange={e => f('company', e.target.value)}
+                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+            </FI>
+            <FI>
+              <FieldLabel>Location</FieldLabel>
+              <Input value={form.location} onChange={e => f('location', e.target.value)}
+                placeholder="City, Country"
+                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+            </FI>
+          </div>
+          <div className="mt-3">
+            <FieldLabel>LinkedIn URL</FieldLabel>
+            <Input value={form.linkedin} onChange={e => f('linkedin', e.target.value)}
+              placeholder="https://linkedin.com/in/…"
+              className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+          </div>
+        </>
+      )}
+
+      {/* ── About ── */}
+      {/* Bio only editable for manual; for linked it comes from rager */}
+      {!isLinked && (
+        <>
+          <SectionLabel>About</SectionLabel>
+          <FI>
+            <FieldLabel hint="full paragraph — affects bio_completeness score">Bio</FieldLabel>
+            <Textarea value={form.bio} onChange={e => f('bio', e.target.value)}
+              rows={compact ? 3 : 4} placeholder="Background, history, what they've built…"
+              className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] rounded-none text-sm resize-none" />
+          </FI>
+        </>
+      )}
+
+      {/* known_for and current_focus editable for everyone */}
+      {isLinked && <SectionLabel>About</SectionLabel>}
+      {isLinked && form.bio && (
+        <p className="text-xs text-[#52525B] leading-relaxed mb-3 line-clamp-3">{form.bio}</p>
+      )}
+      <div className={`space-y-3 ${!isLinked ? 'mt-3' : ''}`}>
+        <FI>
+          <FieldLabel hint="1–2 sentences — shown in candidate card">Known for</FieldLabel>
+          <Input value={form.known_for} onChange={e => f('known_for', e.target.value)}
+            placeholder="e.g. Built and exited Acme (Series B); known for contrarian take on D2C"
+            className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+        </FI>
+        <FI>
+          <FieldLabel hint="what are they working on right now">Current focus</FieldLabel>
+          <Input value={form.current_focus} onChange={e => f('current_focus', e.target.value)}
+            placeholder="e.g. Building Series A fund; advising 3 portfolio companies"
+            className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+        </FI>
+      </div>
+
+      {/* ── Podcast Classification ── */}
+      <SectionLabel>Podcast Classification</SectionLabel>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <FI>
+          <FieldLabel hint="used in role-diversity scoring">Role *</FieldLabel>
+          <select value={form.role} onChange={e => f('role', e.target.value)}
+            className="w-full bg-[#0A0A0A] border border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm px-2">
+            {ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
+          </select>
+        </FI>
+        <FI>
+          <FieldLabel hint="0 – 20 override">Admin boost</FieldLabel>
+          <Input type="number" min={0} max={20} value={form.admin_boost}
+            onChange={e => f('admin_boost', parseInt(e.target.value) || 0)}
+            className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+        </FI>
+      </div>
+
+      <div className="space-y-4">
+        <FI>
+          <FieldLabel hint="broad sectors / themes — combined with expertise for tag_richness score">
+            Tags
+          </FieldLabel>
+          <ChipInput value={form.tags} onChange={v => f('tags', v)}
+            placeholder="e.g. Climate, D2C, B2B SaaS" />
+        </FI>
+
+        <FI>
+          <FieldLabel hint="specific domain expertise — combined with tags for scoring">
+            Expertise
+          </FieldLabel>
+          <ChipInput value={form.expertise} onChange={v => f('expertise', v)}
+            placeholder="e.g. Supply chain finance, Go-to-market, Regulatory strategy" />
+        </FI>
+
+        <FI>
+          <FieldLabel hint="stated positions, opinions, contrarian takes — used directly in pairing logic">
+            Viewpoints
+          </FieldLabel>
+          <ChipInput value={form.viewpoints} onChange={v => f('viewpoints', v)}
+            placeholder="e.g. Believes bootstrapping before raising is critical" />
+        </FI>
+      </div>
+
+    </div>
+  );
+}
+
+// ── Add Manual Person Dialog ───────────────────────────────────────────────────
+
+function AddPersonDialog({ open, onClose, onAdded }) {
+  const [form, setForm]     = useState({ ...EMPTY_PERSON_FORM });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => { if (open) setForm({ ...EMPTY_PERSON_FORM }); }, [open]);
+
+  async function save() {
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    setSaving(true);
+    try {
+      await api.post('/admin/podcast/people', {
+        ...form,
+        source: 'manual',
+      });
+      toast.success('Person added');
+      onAdded();
+      onClose();
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Failed to add'); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-[#F5F5F0] font-medium">Add Person Manually</DialogTitle>
+        </DialogHeader>
+        <PersonProfileForm form={form} setForm={setForm} isLinked={false} />
+        <div className="flex gap-2 mt-5 pt-4 border-t border-white/8">
+          <Button onClick={save} disabled={saving || !form.name.trim()}
+            className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-9 px-6 text-sm">
+            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save Profile'}
+          </Button>
+          <button onClick={onClose} className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Person Detail Dialog ──────────────────────────────────────────────────────
+
 function PersonDetailDialog({ personId, allTopics, onClose, onSaved }) {
   const [person, setPerson]         = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [form, setForm]             = useState({ ...EMPTY_PERSON_FORM });
   const [saving, setSaving]         = useState(false);
-  const [form, setForm]             = useState({ role: 'other', tags: '', admin_boost: 0, name: '', company: '', bio: '', linkedin: '' });
   const [addTopicId, setAddTopicId] = useState('');
   const [assigning, setAssigning]   = useState(false);
-  const [linking, setLinking]       = useState(false);
-  const [linkForm, setLinkForm]     = useState({ rager_id: '' });
   const [showLink, setShowLink]     = useState(false);
+  const [linkId, setLinkId]         = useState('');
+  const [linking, setLinking]       = useState(false);
+  const [activeTab, setActiveTab]   = useState('profile');  // 'profile' | 'topics' | 'content' | 'score'
 
   const load = useCallback(async () => {
     try {
       const { data } = await api.get(`/admin/podcast/people/${personId}`);
       setPerson(data);
-      setForm({
-        role:        data.role || 'other',
-        tags:        (data.tags || []).join(', '),
-        admin_boost: data.admin_boost || 0,
-        name:        data.name || '',
-        company:     data.company || '',
-        bio:         data.bio || '',
-        linkedin:    data.linkedin || '',
-      });
+      setForm(personToForm(data));
     } catch { toast.error('Failed to load person'); }
     finally { setLoading(false); }
   }, [personId]);
@@ -121,25 +406,12 @@ function PersonDetailDialog({ personId, allTopics, onClose, onSaved }) {
   async function save() {
     setSaving(true);
     try {
-      const patch = {
-        role:        form.role,
-        tags:        form.tags.split(',').map(t => t.trim()).filter(Boolean),
-        admin_boost: parseInt(form.admin_boost) || 0,
-      };
-      // Only send identity fields for manual (no rager_id)
-      if (!person?.rager_id) {
-        patch.name    = form.name;
-        patch.company = form.company;
-        patch.bio     = form.bio;
-        patch.linkedin = form.linkedin;
-      }
-      await api.patch(`/admin/podcast/people/${personId}`, patch);
+      await api.patch(`/admin/podcast/people/${personId}`, form);
       toast.success('Saved');
       onSaved?.();
       load();
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Save failed');
-    } finally { setSaving(false); }
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Save failed'); }
+    finally { setSaving(false); }
   }
 
   async function assignTopic() {
@@ -148,8 +420,7 @@ function PersonDetailDialog({ personId, allTopics, onClose, onSaved }) {
     try {
       await api.post(`/admin/podcast/people/${personId}/topics/${addTopicId}`);
       setAddTopicId('');
-      load();
-      onSaved?.();
+      load(); onSaved?.();
       toast.success('Topic assigned');
     } catch (err) { toast.error(err?.response?.data?.detail || 'Failed'); }
     finally { setAssigning(false); }
@@ -158,20 +429,18 @@ function PersonDetailDialog({ personId, allTopics, onClose, onSaved }) {
   async function unassignTopic(topicId) {
     try {
       await api.delete(`/admin/podcast/people/${personId}/topics/${topicId}`);
-      load();
-      onSaved?.();
-    } catch { toast.error('Failed to unassign'); }
+      load(); onSaved?.();
+    } catch { toast.error('Failed'); }
   }
 
   async function linkRager() {
-    if (!linkForm.rager_id.trim()) return;
+    if (!linkId.trim()) return;
     setLinking(true);
     try {
-      await api.post(`/admin/podcast/people/${personId}/link-rager`, { rager_id: linkForm.rager_id.trim() });
-      toast.success('Linked to rager — identity now read live');
-      setShowLink(false);
-      load();
-      onSaved?.();
+      await api.post(`/admin/podcast/people/${personId}/link-rager`, { rager_id: linkId.trim() });
+      toast.success('Linked — identity now reads live from rager');
+      setShowLink(false); setLinkId('');
+      load(); onSaved?.();
     } catch (err) { toast.error(err?.response?.data?.detail || 'Link failed'); }
     finally { setLinking(false); }
   }
@@ -181,188 +450,210 @@ function PersonDetailDialog({ personId, allTopics, onClose, onSaved }) {
     try {
       await api.delete(`/admin/podcast/people/${personId}`);
       toast.success('Archived');
-      onSaved?.();
-      onClose();
-    } catch { toast.error('Failed to archive'); }
+      onSaved?.(); onClose();
+    } catch { toast.error('Failed'); }
   }
 
   if (loading) return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-2xl">
+      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-3xl">
         <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
       </DialogContent>
     </Dialog>
   );
   if (!person) return null;
 
-  const isLinked = !!person.rager_id;
+  const isLinked       = !!person.rager_id;
   const assignedTopicIds = (person.topics || []).map(t => t.id);
   const unassignedTopics = (allTopics || []).filter(t => !assignedTopicIds.includes(t.id));
+  const cand           = person.candidate || {};
+
+  const DETAIL_TABS = ['Profile', 'Topics', 'Content', 'Score'];
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-[#F5F5F0] font-medium flex items-center gap-2">
-            {person.name || '(unnamed)'}
-            {isLinked && <span className="text-[10px] text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 font-normal tracking-wider uppercase">Rager-linked</span>}
+          <DialogTitle className="text-[#F5F5F0] font-medium flex items-center gap-2 flex-wrap">
+            <span>{person.name || '(unnamed)'}</span>
+            {person.title && <span className="text-sm text-[#71717A] font-normal">· {person.title}</span>}
+            <RoleBadge role={person.role} />
+            {isLinked && (
+              <span className="text-[10px] text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 font-normal tracking-wider uppercase">
+                Identity synced from Rager
+              </span>
+            )}
           </DialogTitle>
+          {person.known_for && (
+            <p className="text-xs text-[#71717A] mt-1">{person.known_for}</p>
+          )}
         </DialogHeader>
 
-        <div className="space-y-6 mt-2">
+        {/* Tab bar */}
+        <div className="flex border-b border-white/8 mt-3 -mx-1">
+          {DETAIL_TABS.map(t => (
+            <button key={t} onClick={() => setActiveTab(t.toLowerCase())}
+              className={`px-4 py-2 text-xs transition-colors border-b-2 ${
+                activeTab === t.toLowerCase()
+                  ? 'border-[#DC143C] text-[#F5F5F0]'
+                  : 'border-transparent text-[#71717A] hover:text-[#A1A1AA]'
+              }`}>
+              {t}
+              {t === 'Topics' && ` (${assignedTopicIds.length})`}
+              {t === 'Content' && ` (${(person.content || []).length})`}
+            </button>
+          ))}
+        </div>
 
-          {/* Identity — read-only section if linked */}
-          {isLinked && (
-            <div className="bg-[#080808] border border-white/8 p-4 space-y-1">
-              <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-2">Identity (from rager record)</p>
-              <p className="text-sm text-[#F5F5F0]">{person.name}</p>
-              <p className="text-xs text-[#71717A]">{[person.company].filter(Boolean).join(' · ')}</p>
-              {person.bio && <p className="text-xs text-[#52525B] leading-relaxed line-clamp-3">{person.bio}</p>}
-              {person.linkedin && <a href={person.linkedin} target="_blank" rel="noreferrer" className="text-xs text-[#52525B] hover:text-[#A1A1AA]">LinkedIn ↗</a>}
-            </div>
-          )}
-
-          {/* Editable identity — only for manual */}
-          {!isLinked && (
-            <div className="space-y-3">
-              <p className="text-[10px] uppercase tracking-wider text-[#52525B]">Identity</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Name</Label>
-                  <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                    className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-                </div>
-                <div>
-                  <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Company</Label>
-                  <Input value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))}
-                    className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">LinkedIn URL</Label>
-                <Input value={form.linkedin} onChange={e => setForm(f => ({ ...f, linkedin: e.target.value }))}
-                  className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Bio</Label>
-                <Textarea value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))} rows={3}
-                  className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] rounded-none text-sm resize-none" />
-              </div>
-            </div>
-          )}
-
-          {/* Role + boost + tags — always editable */}
-          <div className="space-y-3">
-            <p className="text-[10px] uppercase tracking-wider text-[#52525B]">Podcast Profile</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Role</Label>
-                <select
-                  value={form.role}
-                  onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
-                  className="w-full bg-[#0A0A0A] border border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm px-2"
-                >
-                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
-                <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Admin Boost (0–20)</Label>
-                <Input type="number" min={0} max={20} value={form.admin_boost}
-                  onChange={e => setForm(f => ({ ...f, admin_boost: e.target.value }))}
-                  className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-              </div>
-            </div>
-            <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Tags (comma-separated)</Label>
-              <Input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
-                placeholder="e.g. B2B SaaS, climate, early-stage"
-                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-            </div>
-            <Button onClick={save} disabled={saving}
-              className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-5 text-sm">
-              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
-            </Button>
-          </div>
-
-          {/* Assigned topics */}
+        {/* ── Profile tab ── */}
+        {activeTab === 'profile' && (
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-2">Assigned Topics ({assignedTopicIds.length})</p>
-            {(person.topics || []).length > 0 ? (
-              <div className="flex flex-wrap gap-1.5 mb-3">
+            <PersonProfileForm form={form} setForm={setForm} isLinked={isLinked} compact />
+            <div className="flex gap-2 mt-5 pt-4 border-t border-white/8">
+              <Button onClick={save} disabled={saving}
+                className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-5 text-sm">
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Save'}
+              </Button>
+              {!isLinked && (
+                <button onClick={() => setShowLink(v => !v)}
+                  className="flex items-center gap-1.5 text-xs text-[#52525B] hover:text-[#A1A1AA] transition-colors px-3">
+                  <Link2 className="w-3.5 h-3.5" />
+                  Link to Rager
+                </button>
+              )}
+              <button onClick={archive}
+                className="ml-auto text-xs text-[#3F3F46] hover:text-red-400 transition-colors">
+                Archive
+              </button>
+            </div>
+            {showLink && (
+              <div className="mt-3 p-3 bg-[#080808] border border-white/8 space-y-2">
+                <p className="text-[10px] uppercase tracking-wider text-[#52525B]">Link to Rager — enter Rager ID</p>
+                <div className="flex gap-2">
+                  <Input value={linkId} onChange={e => setLinkId(e.target.value)}
+                    placeholder="Rager ID (UUID)…"
+                    className="flex-1 bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
+                  <Button onClick={linkRager} disabled={linking || !linkId.trim()}
+                    className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-4 text-xs">
+                    {linking ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Link'}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-[#3F3F46]">
+                  Identity will be read live from the rager record. Podcast-specific fields are preserved.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Topics tab ── */}
+        {activeTab === 'topics' && (
+          <div className="mt-4 space-y-4">
+            {(person.topics || []).length === 0 ? (
+              <p className="text-xs text-[#3F3F46] py-4">No topics assigned yet</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
                 {person.topics.map(t => (
                   <div key={t.id} className="flex items-center gap-1 bg-[#080808] border border-white/8 pl-2 pr-1 py-0.5">
                     <span className="text-xs text-[#A1A1AA]">{t.name}</span>
-                    <button onClick={() => unassignTopic(t.id)} className="text-[#3F3F46] hover:text-red-400 transition-colors p-0.5">
+                    <button onClick={() => unassignTopic(t.id)}
+                      className="text-[#3F3F46] hover:text-red-400 transition-colors p-0.5">
                       <X className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
               </div>
-            ) : (
-              <p className="text-xs text-[#3F3F46] mb-3">No topics assigned yet</p>
             )}
             {unassignedTopics.length > 0 && (
-              <div className="flex gap-2">
-                <select
-                  value={addTopicId}
-                  onChange={e => setAddTopicId(e.target.value)}
-                  className="flex-1 bg-[#0A0A0A] border border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm px-2"
-                >
-                  <option value="">Select topic to assign…</option>
-                  {unassignedTopics.map(t => (
-                    <option key={t.id} value={t.id}>{t.name} ({t.people_count ?? 0})</option>
-                  ))}
-                </select>
-                <Button onClick={assignTopic} disabled={assigning || !addTopicId}
-                  className="bg-white/8 hover:bg-white/15 text-[#A1A1AA] rounded-none h-8 px-3 text-xs">
-                  {assigning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                </Button>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-2">Assign topic</p>
+                <div className="flex gap-2">
+                  <select value={addTopicId} onChange={e => setAddTopicId(e.target.value)}
+                    className="flex-1 bg-[#0A0A0A] border border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm px-2">
+                    <option value="">Select topic…</option>
+                    {unassignedTopics.map(t => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.people_count ?? 0} people)</option>
+                    ))}
+                  </select>
+                  <Button onClick={assignTopic} disabled={assigning || !addTopicId}
+                    className="bg-white/8 hover:bg-white/15 text-[#A1A1AA] rounded-none h-8 px-3 text-xs">
+                    {assigning ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  </Button>
+                </div>
               </div>
             )}
           </div>
+        )}
 
-          {/* Link to rager (if not linked) */}
-          {!isLinked && (
-            <div className="border-t border-white/8 pt-4">
-              {!showLink ? (
-                <button onClick={() => setShowLink(true)}
-                  className="flex items-center gap-1.5 text-xs text-[#52525B] hover:text-[#A1A1AA] transition-colors">
-                  <Link2 className="w-3.5 h-3.5" />
-                  Link this person to a Rager record
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-[10px] uppercase tracking-wider text-[#52525B]">Enter Rager ID to link</p>
-                  <div className="flex gap-2">
-                    <Input value={linkForm.rager_id} onChange={e => setLinkForm({ rager_id: e.target.value })}
-                      placeholder="Rager ID (UUID)…"
-                      className="flex-1 bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-                    <Button onClick={linkRager} disabled={linking || !linkForm.rager_id.trim()}
-                      className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-4 text-xs">
-                      {linking ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Link'}
-                    </Button>
-                    <button onClick={() => setShowLink(false)} className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-2">Cancel</button>
-                  </div>
-                  <p className="text-[10px] text-[#3F3F46]">Identity (name, bio, linkedin) will then be read live from that rager.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Archive */}
-          <div className="border-t border-white/8 pt-4">
-            <button onClick={archive} className="text-xs text-[#3F3F46] hover:text-red-400 transition-colors">
-              Archive this person
-            </button>
+        {/* ── Content tab ── */}
+        {activeTab === 'content' && (
+          <div className="mt-4 space-y-2">
+            {(person.content || []).length === 0 ? (
+              <p className="text-xs text-[#3F3F46] py-4">
+                No content linked yet. Add from the Content tab.
+              </p>
+            ) : (person.content || []).map(c => (
+              <div key={c.id} className="flex items-center gap-3 bg-[#080808] border border-white/8 px-3 py-2 text-xs">
+                <span className="text-[#A1A1AA] flex-1 truncate">{c.title}</span>
+                <span className="text-[#52525B] uppercase text-[9px] shrink-0">{c.content_type}</span>
+                {c.extraction_status === 'done'
+                  ? <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                  : <span className="text-[9px] text-[#3F3F46] uppercase shrink-0">{c.extraction_status}</span>}
+              </div>
+            ))}
           </div>
+        )}
 
-        </div>
+        {/* ── Score tab ── */}
+        {activeTab === 'score' && (
+          <div className="mt-4">
+            {!cand.id ? (
+              <p className="text-xs text-[#3F3F46] py-4">
+                No candidate record yet — run Rescore All from the Candidates tab.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <ScoreBadge score={cand.score} />
+                  <StatusBadge status={cand.status} meta={CAND_STATUS_META} />
+                  {cand.activity_bonus > 0 && (
+                    <span className="text-xs text-yellow-400">+{cand.activity_bonus} activity bonus</span>
+                  )}
+                </div>
+                <div className="bg-[#080808] border border-white/8 p-4 space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-3">Score breakdown</p>
+                  {Object.entries(cand.score_breakdown || {}).map(([key, val]) => (
+                    <div key={key} className="flex items-start justify-between gap-4 text-xs">
+                      <span className="text-[#71717A] capitalize">{key.replace(/_/g, ' ')}</span>
+                      <span className="text-[#A1A1AA] font-mono text-right">
+                        {typeof val === 'object'
+                          ? `+${val.points ?? 0}  ${Object.entries(val).filter(([k]) => k !== 'points').map(([k,v]) => `${k}:${v}`).join(' ')}`
+                          : `+${val}`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {(cand.suggested_topics || []).length > 0 && (
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-[#52525B] mb-2">Topics contributing</p>
+                    <div className="flex flex-wrap gap-1">
+                      {cand.suggested_topics.map(t => (
+                        <span key={t} className="text-xs text-[#A1A1AA] border border-white/10 px-2 py-0.5">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
       </DialogContent>
     </Dialog>
   );
 }
 
-// ─── Select Ragers Dialog ─────────────────────────────────────────────────────
+// ── Select Ragers Dialog ──────────────────────────────────────────────────────
 
 function SelectRagersDialog({ open, alreadyImportedIds, onClose, onImported }) {
   const [allRagers, setAllRagers]   = useState([]);
@@ -374,30 +665,26 @@ function SelectRagersDialog({ open, alreadyImportedIds, onClose, onImported }) {
   useEffect(() => {
     if (!open) return;
     setLoading(true);
+    setSelected(new Set());
+    setSearch('');
     api.get('/admin/ragers')
       .then(r => setAllRagers(r.data))
       .catch(() => toast.error('Failed to load ragers'))
       .finally(() => setLoading(false));
   }, [open]);
 
-  const available = allRagers.filter(r => !alreadyImportedIds.has(r.id));
+  const available   = allRagers.filter(r => !alreadyImportedIds.has(r.id));
   const searchLower = search.toLowerCase();
-  const shown = searchLower
+  const shown       = searchLower
     ? available.filter(r =>
         (r.name || '').toLowerCase().includes(searchLower) ||
         (r.company || '').toLowerCase().includes(searchLower) ||
-        (r.title || '').toLowerCase().includes(searchLower)
-      )
+        (r.title || '').toLowerCase().includes(searchLower))
     : available;
 
   function toggle(id) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
-
   function selectAll() { setSelected(new Set(shown.map(r => r.id))); }
   function clearAll()  { setSelected(new Set()); }
 
@@ -424,15 +711,10 @@ function SelectRagersDialog({ open, alreadyImportedIds, onClose, onImported }) {
         <DialogHeader>
           <DialogTitle className="text-[#F5F5F0] font-medium">Select Ragers to Add</DialogTitle>
         </DialogHeader>
-
         <div className="flex flex-col flex-1 min-h-0 gap-3 mt-3">
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <Input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search by name, company, title…"
-            className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm shrink-0"
-          />
-
+            className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm shrink-0" />
           <div className="flex items-center justify-between text-[10px] text-[#52525B] shrink-0">
             <span>{shown.length} available · {selected.size} selected</span>
             <div className="flex gap-3">
@@ -440,7 +722,6 @@ function SelectRagersDialog({ open, alreadyImportedIds, onClose, onImported }) {
               <button onClick={clearAll}  className="hover:text-[#A1A1AA] transition-colors">Clear</button>
             </div>
           </div>
-
           <div className="flex-1 overflow-y-auto space-y-1 min-h-0">
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
@@ -449,28 +730,20 @@ function SelectRagersDialog({ open, alreadyImportedIds, onClose, onImported }) {
                 {available.length === 0 ? 'All ragers are already in the pool' : 'No results'}
               </p>
             ) : shown.map(r => (
-              <label key={r.id}
-                className={`flex items-start gap-3 cursor-pointer px-3 py-2.5 border transition-colors ${
-                  selected.has(r.id) ? 'border-[#DC143C]/30 bg-[#DC143C]/5' : 'border-white/8 hover:border-white/15'
-                }`}>
+              <label key={r.id} className={`flex items-start gap-3 cursor-pointer px-3 py-2.5 border transition-colors ${
+                selected.has(r.id) ? 'border-[#DC143C]/30 bg-[#DC143C]/5' : 'border-white/8 hover:border-white/15'}`}>
                 <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)}
                   className="accent-[#DC143C] mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-[#F5F5F0] truncate">{r.name}</p>
-                  <p className="text-xs text-[#52525B] truncate">
-                    {[r.title, r.company].filter(Boolean).join(' · ')}
-                  </p>
+                  <p className="text-xs text-[#52525B] truncate">{[r.title, r.company].filter(Boolean).join(' · ')}</p>
                 </div>
               </label>
             ))}
           </div>
-
           <div className="flex gap-2 shrink-0 pt-2 border-t border-white/8">
-            <Button
-              onClick={importSelected}
-              disabled={importing || selected.size === 0}
-              className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-5 text-sm"
-            >
+            <Button onClick={importSelected} disabled={importing || selected.size === 0}
+              className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-5 text-sm">
               {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `Add ${selected.size > 0 ? selected.size : ''} to Pool`}
             </Button>
             <button onClick={onClose} className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3">Cancel</button>
@@ -484,16 +757,16 @@ function SelectRagersDialog({ open, alreadyImportedIds, onClose, onImported }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PeopleTab() {
-  const [people, setPeople]           = useState([]);
-  const [topics, setTopics]           = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [importing, setImporting]     = useState(false);
-  const [selected, setSelected]       = useState(null);
-  const [showAdd, setShowAdd]         = useState(false);
-  const [showSelect, setShowSelect]   = useState(false);
-  const [filter, setFilter]           = useState('all');
-  const [addForm, setAddForm]         = useState({ name: '', role: 'other', company: '', bio: '', linkedin: '', tags: '' });
-  const [adding, setAdding]           = useState(false);
+  const [people, setPeople]         = useState([]);
+  const [topics, setTopics]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [importing, setImporting]   = useState(false);
+  const [selected, setSelected]     = useState(null);
+  const [showAdd, setShowAdd]       = useState(false);
+  const [showSelect, setShowSelect] = useState(false);
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterSource, setFilterSource] = useState('all');
+  const [search, setSearch]         = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -519,54 +792,35 @@ function PeopleTab() {
     finally { setImporting(false); }
   }
 
-  async function addManual() {
-    setAdding(true);
-    try {
-      await api.post('/admin/podcast/people', {
-        name:        addForm.name.trim(),
-        role:        addForm.role,
-        company:     addForm.company.trim(),
-        bio:         addForm.bio.trim(),
-        linkedin:    addForm.linkedin.trim(),
-        tags:        addForm.tags.split(',').map(t => t.trim()).filter(Boolean),
-        source:      'manual',
-      });
-      toast.success('Person added');
-      setShowAdd(false);
-      setAddForm({ name: '', role: 'other', company: '', bio: '', linkedin: '', tags: '' });
-      load();
-    } catch (err) { toast.error(err?.response?.data?.detail || 'Failed to add'); }
-    finally { setAdding(false); }
-  }
-
   const alreadyImportedIds = new Set(people.filter(p => p.rager_id).map(p => p.rager_id));
-  const filtered = filter === 'all' ? people : people.filter(p => p.role === filter);
+
+  const filtered = people.filter(p => {
+    if (filterRole !== 'all' && p.role !== filterRole) return false;
+    if (filterSource !== 'all') {
+      if (filterSource === 'linked' && !p.rager_id) return false;
+      if (filterSource === 'manual' && p.rager_id)  return false;
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      return (p.name || '').toLowerCase().includes(q) ||
+             (p.company || '').toLowerCase().includes(q);
+    }
+    return true;
+  });
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <div className="flex gap-1.5 flex-wrap">
-          {['all', ...ROLES].map(r => (
-            <button key={r}
-              onClick={() => setFilter(r)}
-              className={`text-[10px] uppercase tracking-wider px-3 py-1.5 border transition-colors ${
-                filter === r ? 'border-[#DC143C]/40 text-[#DC143C]' : 'border-white/8 text-[#52525B] hover:text-[#A1A1AA]'
-              }`}
-            >
-              {r} {r === 'all' ? `(${people.length})` : `(${people.filter(p => p.role === r).length})`}
-            </button>
-          ))}
-        </div>
+      {/* Top bar */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+        <p className="text-sm text-[#71717A]">{people.length} people in pool</p>
         <div className="flex gap-2">
-          <button onClick={() => setShowAdd(v => !v)}
+          <button onClick={() => setShowAdd(true)}
             className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 transition-colors">
-            <Plus className="w-3.5 h-3.5" />
-            Add Manual
+            <Plus className="w-3.5 h-3.5" /> Add Manual
           </button>
           <button onClick={() => setShowSelect(true)}
             className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 transition-colors">
-            <Users className="w-3.5 h-3.5" />
-            Select Ragers
+            <Users className="w-3.5 h-3.5" /> Select Ragers
           </button>
           <button onClick={importAll} disabled={importing}
             className="flex items-center gap-2 text-xs px-4 py-2 border border-white/15 text-[#A1A1AA] hover:text-[#F5F5F0] hover:border-white/30 disabled:opacity-40 transition-colors">
@@ -576,61 +830,44 @@ function PeopleTab() {
         </div>
       </div>
 
-      <SelectRagersDialog
-        open={showSelect}
-        alreadyImportedIds={alreadyImportedIds}
-        onClose={() => setShowSelect(false)}
-        onImported={load}
-      />
+      {/* Filters */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <Input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search name or company…"
+          className="bg-[#080808] border-white/10 text-[#F5F5F0] h-8 rounded-none text-sm w-56" />
+        <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+          className="bg-[#080808] border border-white/10 text-[#71717A] h-8 rounded-none text-xs px-2">
+          <option value="all">All roles</option>
+          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
+          className="bg-[#080808] border border-white/10 text-[#71717A] h-8 rounded-none text-xs px-2">
+          <option value="all">All sources</option>
+          <option value="linked">Rager-linked</option>
+          <option value="manual">Manual only</option>
+        </select>
+        {(filterRole !== 'all' || filterSource !== 'all' || search) && (
+          <button onClick={() => { setFilterRole('all'); setFilterSource('all'); setSearch(''); }}
+            className="text-[10px] text-[#52525B] hover:text-[#A1A1AA] transition-colors">
+            Clear filters
+          </button>
+        )}
+      </div>
 
-      {/* Add manual form */}
-      {showAdd && (
-        <div className="bg-[#080808] border border-white/8 p-4 mb-5 space-y-3">
-          <p className="text-[10px] uppercase tracking-wider text-[#52525B]">Add Manual Person</p>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Name *</Label>
-              <Input value={addForm.name} onChange={e => setAddForm(f => ({ ...f, name: e.target.value }))}
-                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-            </div>
-            <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Role</Label>
-              <select value={addForm.role} onChange={e => setAddForm(f => ({ ...f, role: e.target.value }))}
-                className="w-full bg-[#0A0A0A] border border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm px-2">
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Company</Label>
-              <Input value={addForm.company} onChange={e => setAddForm(f => ({ ...f, company: e.target.value }))}
-                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-            </div>
-            <div>
-              <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">LinkedIn</Label>
-              <Input value={addForm.linkedin} onChange={e => setAddForm(f => ({ ...f, linkedin: e.target.value }))}
-                className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-            </div>
-          </div>
-          <div>
-            <Label className="text-[10px] uppercase tracking-wider text-[#52525B] mb-1.5 block">Tags (comma-separated)</Label>
-            <Input value={addForm.tags} onChange={e => setAddForm(f => ({ ...f, tags: e.target.value }))}
-              placeholder="B2B SaaS, climate, early-stage"
-              className="bg-[#0A0A0A] border-white/15 text-[#F5F5F0] h-8 rounded-none text-sm" />
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={addManual} disabled={adding || !addForm.name.trim()}
-              className="bg-[#DC143C] hover:bg-[#b01030] text-white rounded-none h-8 px-5 text-sm">
-              {adding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Add'}
-            </Button>
-            <button onClick={() => setShowAdd(false)} className="text-xs text-[#52525B] hover:text-[#A1A1AA] px-3">Cancel</button>
-          </div>
-        </div>
-      )}
+      {/* Dialogs */}
+      <AddPersonDialog open={showAdd} onClose={() => setShowAdd(false)} onAdded={load} />
+      <SelectRagersDialog open={showSelect} alreadyImportedIds={alreadyImportedIds}
+        onClose={() => setShowSelect(false)} onImported={load} />
 
+      {/* List */}
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[#52525B]" /></div>
+      ) : filtered.length === 0 && people.length === 0 ? (
+        <EmptyState icon={Users}
+          text="No people in the pool yet"
+          sub="Add someone manually or import from Ragers to get started" />
       ) : filtered.length === 0 ? (
-        <EmptyState icon={Users} text="No people yet" sub='Import Ragers or add manually' />
+        <EmptyState icon={Users} text="No results" sub="Try adjusting your filters" />
       ) : (
         <div className="space-y-1.5">
           {filtered.map((p, idx) => (
@@ -642,17 +879,25 @@ function PeopleTab() {
                   <div className="flex items-center gap-2 flex-wrap mb-0.5">
                     <span className="text-sm font-medium text-[#F5F5F0]">{p.name || '(unnamed)'}</span>
                     <RoleBadge role={p.role} />
-                    {p.rager_id && <span className="text-[9px] text-emerald-400 border border-emerald-500/20 px-1 py-0.5 uppercase tracking-wider">linked</span>}
+                    {p.rager_id && (
+                      <span className="text-[9px] text-emerald-400 border border-emerald-500/20 px-1 py-0.5 uppercase tracking-wider">
+                        synced
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-[#52525B]">
+                    {p.title && <span>{p.title}</span>}
                     {p.company && <span>{p.company}</span>}
-                    {p.topic_count > 0 && <span>{p.topic_count} topic{p.topic_count !== 1 ? 's' : ''}</span>}
-                    {p.content_count > 0 && <span>{p.content_count} content</span>}
+                    {p.topic_count > 0 && <span className="text-[#3F3F46]">· {p.topic_count} topic{p.topic_count !== 1 ? 's' : ''}</span>}
+                    {p.content_count > 0 && <span className="text-[#3F3F46]">· {p.content_count} content</span>}
                   </div>
-                  {(p.tags || []).length > 0 && (
+                  {p.known_for && (
+                    <p className="text-[10px] text-[#52525B] truncate mt-0.5">{p.known_for}</p>
+                  )}
+                  {((p.tags || []).length > 0 || (p.expertise || []).length > 0) && (
                     <div className="flex gap-1 flex-wrap mt-1">
-                      {p.tags.slice(0, 4).map(t => (
-                        <span key={t} className="text-[9px] text-[#52525B] bg-white/[0.02] border border-white/5 px-1.5 py-0.5">{t}</span>
+                      {[...(p.tags || []), ...(p.expertise || [])].slice(0, 5).map((t, i) => (
+                        <span key={i} className="text-[9px] text-[#3F3F46] bg-white/[0.02] border border-white/5 px-1.5 py-0.5">{t}</span>
                       ))}
                     </div>
                   )}
@@ -665,12 +910,8 @@ function PeopleTab() {
       )}
 
       {selected && (
-        <PersonDetailDialog
-          personId={selected}
-          allTopics={topics}
-          onClose={() => setSelected(null)}
-          onSaved={load}
-        />
+        <PersonDetailDialog personId={selected} allTopics={topics}
+          onClose={() => setSelected(null)} onSaved={load} />
       )}
     </div>
   );

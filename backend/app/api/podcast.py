@@ -88,18 +88,23 @@ Rules:
 def _resolve_person(pp: dict) -> dict:
     """
     Merge podcast_people with ragers identity if rager_id is set.
-    rager fields win over anything stored on podcast_people for shared keys.
-    podcast-specific fields (role, tags, admin_boost, status) always come from pp.
+    Identity fields (name, title, company, bio, linkedin, location) come from ragers.
+    Podcast-specific fields (role, tags, expertise, admin_boost, viewpoints …) always
+    come from pp — rager.expertise used as fallback if pp has none.
     """
     rager_id = pp.get("rager_id")
     if rager_id:
         rager = db.ragers.find_one({"id": rager_id}, {"_id": 0, "phone": 0}) or {}
         return {
             **pp,
-            "name":     rager.get("name",     pp.get("name",     "")),
-            "company":  rager.get("company",  pp.get("company",  "")),
-            "bio":      rager.get("bio",      pp.get("bio",      "")),
-            "linkedin": rager.get("linkedin", pp.get("linkedin", "")),
+            "name":      rager.get("name",     pp.get("name",     "")),
+            "title":     rager.get("title",    pp.get("title",    "")),
+            "company":   rager.get("company",  pp.get("company",  "")),
+            "bio":       rager.get("bio",      pp.get("bio",      "")),
+            "linkedin":  rager.get("linkedin", pp.get("linkedin", "")),
+            "location":  rager.get("location", pp.get("location", "")),
+            # Use rager's expertise as fallback only when none set on pp
+            "expertise": pp.get("expertise") or rager.get("expertise") or [],
         }
     return pp
 
@@ -118,10 +123,13 @@ def _resolve_many(pps: list) -> list:
             r = ragers_map[rid]
             result.append({
                 **pp,
-                "name":     r.get("name",     pp.get("name",     "")),
-                "company":  r.get("company",  pp.get("company",  "")),
-                "bio":      r.get("bio",      pp.get("bio",      "")),
-                "linkedin": r.get("linkedin", pp.get("linkedin", "")),
+                "name":      r.get("name",     pp.get("name",     "")),
+                "title":     r.get("title",    pp.get("title",    "")),
+                "company":   r.get("company",  pp.get("company",  "")),
+                "bio":       r.get("bio",      pp.get("bio",      "")),
+                "linkedin":  r.get("linkedin", pp.get("linkedin", "")),
+                "location":  r.get("location", pp.get("location", "")),
+                "expertise": pp.get("expertise") or r.get("expertise") or [],
             })
         else:
             result.append(pp)
@@ -129,7 +137,9 @@ def _resolve_many(pps: list) -> list:
 
 
 def _get_person_viewpoints(person_id: str) -> set:
-    viewpoints = set()
+    """Inline viewpoints (from podcast_people) + extracted viewpoints (from content)."""
+    pp = db.podcast_people.find_one({"id": person_id}, {"viewpoints": 1, "_id": 0}) or {}
+    viewpoints = set(v.lower().strip() for v in (pp.get("viewpoints") or []))
     for c in db.podcast_content.find(
         {"person_id": person_id},
         {"extracted.viewpoints": 1, "_id": 0}
@@ -191,18 +201,30 @@ def _score_person(person_id: str):
     role        = pp.get("role", "other")
     role_weight = ROLE_WEIGHT.get(role, 4)
 
-    # Bio completeness (uses resolved identity)
-    bio      = resolved.get("bio", "") or ""
-    linkedin = resolved.get("linkedin", "") or ""
-    bio_completeness = (
-        (5 if bio else 0) +
-        (3 if len(bio) > 200 else 0) +
-        (2 if linkedin else 0)
+    # Bio completeness (uses resolved identity + inline profile fields)
+    bio           = resolved.get("bio", "") or ""
+    linkedin      = resolved.get("linkedin", "") or ""
+    known_for     = pp.get("known_for", "") or ""
+    current_focus = pp.get("current_focus", "") or ""
+    bio_completeness = min(
+        (3 if bio else 0) +
+        (2 if len(bio) > 200 else 0) +
+        (2 if linkedin else 0) +
+        (2 if known_for else 0) +
+        (1 if current_focus else 0),
+        10
     )
 
-    # Tags
-    tags        = pp.get("tags") or []
-    tag_richness = min(len(tags) * 2, 10)
+    # Tag richness — broad tags + specific expertise combined
+    tags      = pp.get("tags") or []
+    expertise = resolved.get("expertise") or []
+    all_tags  = list(set(tags + expertise))
+    tag_richness = min(len(all_tags) * 2, 10)
+
+    # Inline viewpoints count as a content signal (before any uploads)
+    inline_viewpoints = len(pp.get("viewpoints") or [])
+    if inline_viewpoints:
+        content_quality = min(content_quality + min(inline_viewpoints * 2, 6), 15)
 
     raw_score = (
         topic_relevance + content_quantity + content_quality +
@@ -210,12 +232,12 @@ def _score_person(person_id: str):
     )
 
     breakdown = {
-        "topic_relevance":  {"topics":  len(topic_ids),   "points": topic_relevance},
-        "content_quantity": {"pieces":  content_count,    "points": content_quantity},
-        "content_quality":  {"signals": total_signals,    "points": content_quality},
-        "role_weight":      {"role":    role,              "points": role_weight},
-        "bio_completeness": {                              "points": bio_completeness},
-        "tag_richness":     {"tags":    len(tags),         "points": tag_richness},
+        "topic_relevance":  {"topics":   len(topic_ids),   "points": topic_relevance},
+        "content_quantity": {"pieces":   content_count,    "points": content_quantity},
+        "content_quality":  {"signals":  total_signals + inline_viewpoints, "points": content_quality},
+        "role_weight":      {"role":     role,              "points": role_weight},
+        "bio_completeness": {                               "points": bio_completeness},
+        "tag_richness":     {"tags":     len(all_tags),     "points": tag_richness},
     }
 
     # ── Activity layer (additive, only for rager-linked people) ───────────────
@@ -429,25 +451,45 @@ def _table_score(combo: list, topic_id: str):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class PersonIn(BaseModel):
-    name:        Optional[str]       = ""
-    role:        str                 = "other"
-    company:     Optional[str]       = ""
-    bio:         Optional[str]       = ""
-    linkedin:    Optional[str]       = ""
-    tags:        Optional[List[str]] = []
-    source:      Optional[str]       = "manual"
-    admin_boost: Optional[int]       = 0
-    rager_id:    Optional[str]       = None
+    # ── Identity (stored only when source=manual / no rager_id) ──────────────
+    name:             Optional[str]       = ""
+    title:            Optional[str]       = ""   # job title / role at company
+    company:          Optional[str]       = ""
+    location:         Optional[str]       = ""
+    linkedin:         Optional[str]       = ""
+    # ── Description ───────────────────────────────────────────────────────────
+    bio:              Optional[str]       = ""
+    known_for:        Optional[str]       = ""   # 1-2 sentence hook
+    current_focus:    Optional[str]       = ""   # what they're working on now
+    # ── Classification (always stored on podcast_people) ─────────────────────
+    role:             str                 = "other"
+    tags:             Optional[List[str]] = []   # broad sectors / themes
+    expertise:        Optional[List[str]] = []   # specific domains
+    viewpoints:       Optional[List[str]] = []   # stated positions / opinions
+    # ── System ────────────────────────────────────────────────────────────────
+    source:           Optional[str]       = "manual"
+    admin_boost:      Optional[int]       = 0
+    rager_id:         Optional[str]       = None
 
 class PersonUpdate(BaseModel):
-    name:        Optional[str]       = None
-    role:        Optional[str]       = None
-    company:     Optional[str]       = None
-    bio:         Optional[str]       = None
-    linkedin:    Optional[str]       = None
-    tags:        Optional[List[str]] = None
-    admin_boost: Optional[int]       = None
-    status:      Optional[str]       = None
+    # Identity — only applied for manual (no rager_id) records in the endpoint
+    name:             Optional[str]       = None
+    title:            Optional[str]       = None
+    company:          Optional[str]       = None
+    location:         Optional[str]       = None
+    linkedin:         Optional[str]       = None
+    # Description — always applied
+    bio:              Optional[str]       = None
+    known_for:        Optional[str]       = None
+    current_focus:    Optional[str]       = None
+    # Classification — always applied
+    role:             Optional[str]       = None
+    tags:             Optional[List[str]] = None
+    expertise:        Optional[List[str]] = None
+    viewpoints:       Optional[List[str]] = None
+    # System
+    admin_boost:      Optional[int]       = None
+    status:           Optional[str]       = None
 
 class PersonLink(BaseModel):
     rager_id: str   # link a manual person to a rager record
@@ -527,20 +569,28 @@ def create_person(data: PersonIn, admin=Depends(require_admin)):
             raise HTTPException(409, "This rager is already in the podcast people pool")
 
     doc = {
-        "id":          str(uuid.uuid4()),
-        "rager_id":    data.rager_id,
-        "role":        data.role,
-        "tags":        data.tags or [],
-        "source":      data.source,
-        "admin_boost": max(0, min(20, data.admin_boost or 0)),
-        "status":      "active",
-        "created_at":  _NOW(),
-        "updated_at":  _NOW(),
+        "id":             str(uuid.uuid4()),
+        "rager_id":       data.rager_id,
+        "role":           data.role,
+        "tags":           data.tags or [],
+        # Classification fields always stored on podcast_people
+        "expertise":      data.expertise or [],
+        "viewpoints":     data.viewpoints or [],
+        "known_for":      data.known_for or "",
+        "current_focus":  data.current_focus or "",
+        "source":         data.source,
+        "admin_boost":    max(0, min(20, data.admin_boost or 0)),
+        "status":         "active",
+        "created_at":     _NOW(),
+        "updated_at":     _NOW(),
     }
-    # Identity fields only stored when no rager_id
+    # Identity fields only stored when source=manual (no rager_id)
+    # For rager-linked records these are always read live from ragers collection
     if not data.rager_id:
         doc["name"]     = data.name or ""
+        doc["title"]    = data.title or ""
         doc["company"]  = data.company or ""
+        doc["location"] = data.location or ""
         doc["bio"]      = data.bio or ""
         doc["linkedin"] = data.linkedin or ""
 
@@ -576,12 +626,26 @@ def update_person(person_id: str, data: PersonUpdate, admin=Depends(require_admi
     if not pp:
         raise HTTPException(404, "Person not found")
 
-    patch = {k: v for k, v in data.model_dump().items() if v is not None}
+    raw = data.model_dump()
+
+    # Identity fields may only be written for manual (no rager_id) records.
+    # For rager-linked people these fields are always read live from ragers.
+    IDENTITY_FIELDS = {"name", "title", "company", "location", "linkedin", "bio"}
+    is_manual = not pp.get("rager_id")
+
+    patch = {}
+    for k, v in raw.items():
+        if v is None:
+            continue
+        if k in IDENTITY_FIELDS and not is_manual:
+            continue   # silently ignore — identity comes from rager
+        patch[k] = v
+
     if not patch:
         raise HTTPException(400, "Nothing to update")
 
     if "role" in patch and patch["role"] not in VALID_PERSON_ROLES:
-        raise HTTPException(400, f"Invalid role")
+        raise HTTPException(400, "Invalid role")
     if "status" in patch and patch["status"] not in VALID_PERSON_STATUSES:
         raise HTTPException(400, "Invalid status")
     if "admin_boost" in patch:
