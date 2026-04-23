@@ -364,7 +364,7 @@ function PersonDetailDialog({ personId, allTopics, onClose, onSaved }) {
 
 // ─── Select Ragers Dialog ─────────────────────────────────────────────────────
 
-function SelectRagersDialog({ alreadyImportedIds, onClose, onImported }) {
+function SelectRagersDialog({ open, alreadyImportedIds, onClose, onImported }) {
   const [allRagers, setAllRagers]   = useState([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState('');
@@ -372,11 +372,13 @@ function SelectRagersDialog({ alreadyImportedIds, onClose, onImported }) {
   const [importing, setImporting]   = useState(false);
 
   useEffect(() => {
+    if (!open) return;
+    setLoading(true);
     api.get('/admin/ragers')
       .then(r => setAllRagers(r.data))
       .catch(() => toast.error('Failed to load ragers'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [open]);
 
   const available = allRagers.filter(r => !alreadyImportedIds.has(r.id));
   const searchLower = search.toLowerCase();
@@ -417,7 +419,7 @@ function SelectRagersDialog({ alreadyImportedIds, onClose, onImported }) {
   }
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="bg-[#0C0C0C] border-white/10 rounded-none max-w-xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-[#F5F5F0] font-medium">Select Ragers to Add</DialogTitle>
@@ -574,13 +576,12 @@ function PeopleTab() {
         </div>
       </div>
 
-      {showSelect && (
-        <SelectRagersDialog
-          alreadyImportedIds={alreadyImportedIds}
-          onClose={() => setShowSelect(false)}
-          onImported={load}
-        />
-      )}
+      <SelectRagersDialog
+        open={showSelect}
+        alreadyImportedIds={alreadyImportedIds}
+        onClose={() => setShowSelect(false)}
+        onImported={load}
+      />
 
       {/* Add manual form */}
       {showAdd && (
