@@ -36,17 +36,13 @@ app.add_middleware(
 )
 
 
-def _is_legacy_sections(sections: dict) -> bool:
-    return bool(sections) and all(isinstance(v, str) for v in sections.values())
-
-
 @app.on_event("startup")
 def auto_seed_content():
-    """On every deploy: upsert any page that is missing or has legacy flat format."""
+    """On every deploy: insert any page that is missing. Never overwrite saved content."""
     for item in DEFAULT_CONTENT:
         existing = db.content.find_one({"page": item["page"]}, {"_id": 0})
         existing_sections = existing.get("sections", {}) if existing else {}
-        if not existing or not existing_sections or _is_legacy_sections(existing_sections):
+        if not existing or not existing_sections:
             db.content.replace_one({"page": item["page"]}, item, upsert=True)
 
     # ── Core uniqueness indexes ──────────────────────────────────────────────
