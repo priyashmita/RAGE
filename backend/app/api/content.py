@@ -440,11 +440,11 @@ def _is_legacy_sections(sections: dict) -> bool:
 @router.get("/public/content/{page}")
 def get_public_content(page: str):
     doc = db.content.find_one({"page": page}, {"_id": 0})
-    # Return DB content only if it uses the current nested format and has actual content
     sections = doc.get("sections", {}) if doc else {}
-    if doc and sections and not _is_legacy_sections(sections):
+    # Return DB content if the page exists and has sections (trust what's saved)
+    if doc and sections:
         return doc
-    # Fall back to hardcoded defaults (covers missing OR legacy-format docs)
+    # Fall back to hardcoded defaults only if the page is missing or has empty sections
     default = next((d for d in DEFAULT_CONTENT if d["page"] == page), None)
     if default:
         return default

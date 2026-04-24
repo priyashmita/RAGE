@@ -21,10 +21,11 @@ function merge(defaults, overrides) {
 }
 
 export function useSiteContent(page, defaults = {}) {
+  // Use cache as instant initial state to avoid flash of default content,
+  // but ALWAYS fetch fresh data on mount so saves are reflected immediately.
   const [content, setContent] = useState(cache[page] ? merge(defaults, cache[page]) : defaults);
 
   useEffect(() => {
-    if (cache[page]) { setContent(merge(defaults, cache[page])); return; }
     let cancelled = false;
     api.get(`/public/content/${page}`)
       .then(res => {
