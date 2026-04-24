@@ -109,8 +109,10 @@ export default function AdminContentEditor() {
 
   var handleSeed = function() {
     setSaving(true);
-    api.post('/admin/content/seed')
-      .then(function() { toast.success('Content seeded'); fetchAll(); })
+    var page = activePage || null;
+    var url = page ? '/admin/content/seed/' + page : '/admin/content/seed';
+    api.post(url)
+      .then(function() { toast.success((page || 'All pages') + ' re-seeded'); fetchAll(); })
       .catch(function() { toast.error('Seed failed'); })
       .finally(function() { setSaving(false); });
   };
@@ -150,7 +152,7 @@ export default function AdminContentEditor() {
           <a href={PAGES.find(function(p) { return p.key === activePage; })?.path || '/'} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#A1A1AA] border border-white/15 hover:border-white/30 hover:text-[#F5F5F0] transition-colors" data-testid="content-preview-btn">
             <ExternalLink className="w-3.5 h-3.5" /> Preview
           </a>
-          <button type="button" onClick={handleSeed} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#71717A] border border-white/8 hover:border-white/20 hover:text-[#A1A1AA] transition-colors" title="Re-seed all pages with defaults" data-testid="content-reseed-btn">
+          <button type="button" onClick={handleSeed} disabled={saving} className="inline-flex items-center gap-1.5 h-9 px-4 text-xs uppercase tracking-wider text-[#71717A] border border-white/8 hover:border-white/20 hover:text-[#A1A1AA] transition-colors" title="Re-seed this page with defaults" data-testid="content-reseed-btn">
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Re-seed'}
           </button>
           <Button onClick={handleSave} disabled={saving || !editing} className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none h-9 px-5 text-xs uppercase tracking-wider" data-testid="content-save-btn">

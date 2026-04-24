@@ -420,6 +420,15 @@ def seed_content(admin=Depends(require_admin)):
     return {"status": "seeded", "pages": [i["page"] for i in DEFAULT_CONTENT]}
 
 
+@router.post("/admin/content/seed/{page}")
+def seed_content_page(page: str, admin=Depends(require_admin)):
+    item = next((d for d in DEFAULT_CONTENT if d["page"] == page), None)
+    if not item:
+        raise HTTPException(status_code=404, detail=f"No default content for page '{page}'")
+    db.content.replace_one({"page": page}, item, upsert=True)
+    return {"status": "seeded", "page": page}
+
+
 def _is_legacy_sections(sections: dict) -> bool:
     """Old DB content uses flat string keys like hero_title. New format has nested dicts."""
     if not sections:
