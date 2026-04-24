@@ -140,20 +140,36 @@ export default function LandingPage() {
 
       {c.network_preview.title && (
         <section className="py-14 border-t border-gray-100" data-testid="network-preview-section">
-          <div className={WRAP}><div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              {c.network_preview.overline && <p className="rage-overline mb-3">{c.network_preview.overline}</p>}
-              <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-4">{c.network_preview.title}</h2>
-              {c.network_preview.body && <p className="text-base text-gray-600 leading-relaxed mb-6">{c.network_preview.body}</p>}
-              {c.network_preview.stats.length > 0 && (
-                <div className="grid grid-cols-3 gap-3 mb-6">{c.network_preview.stats.map(s => (<div key={s.label} className="bg-gray-50 border border-gray-200 p-4"><p className="text-2xl font-light text-gray-900 font-mono">{s.value}</p><p className="text-[10px] uppercase tracking-widest text-gray-400 mt-1">{s.label}</p></div>))}</div>
-              )}
-              <Link to="/network" className="inline-flex items-center gap-2 text-sm text-[#DC143C] hover:text-gray-900 transition-colors font-medium" data-testid="view-network-link">View the Network <ArrowRight className="w-4 h-4" /></Link>
-            </div>
-            {c.network_preview.image_url && (
-              <div className="relative h-72 lg:h-[380px]"><img src={c.network_preview.image_url} alt="" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-r from-white/60 to-transparent" /></div>
+          <div className={WRAP}>
+            {c.network_preview.image_url ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                  {c.network_preview.overline && <p className="rage-overline mb-3">{c.network_preview.overline}</p>}
+                  <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 mb-4">{c.network_preview.title}</h2>
+                  {c.network_preview.body && <p className="text-base text-gray-600 leading-relaxed mb-6">{c.network_preview.body}</p>}
+                  {c.network_preview.stats.length > 0 && (
+                    <div className="grid grid-cols-3 gap-3 mb-6">{c.network_preview.stats.map(s => (<div key={s.label} className="bg-gray-50 border border-gray-200 p-4"><p className="text-2xl font-light text-gray-900 font-mono">{s.value}</p><p className="text-[10px] uppercase tracking-widest text-gray-400 mt-1">{s.label}</p></div>))}</div>
+                  )}
+                  <Link to="/network" className="inline-flex items-center gap-2 text-sm text-[#DC143C] hover:text-gray-900 transition-colors font-medium" data-testid="view-network-link">View the Network <ArrowRight className="w-4 h-4" /></Link>
+                </div>
+                <div className="relative h-72 lg:h-[380px]"><img src={c.network_preview.image_url} alt="" className="w-full h-full object-cover" /><div className="absolute inset-0 bg-gradient-to-r from-white/60 to-transparent" /></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-12 gap-16 items-start">
+                <div className="col-span-12 lg:col-span-4">
+                  {c.network_preview.overline && <p className="rage-overline mb-4">{c.network_preview.overline}</p>}
+                  <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug" style={{fontFamily:'Playfair Display, Georgia, serif'}}>{c.network_preview.title}</h2>
+                </div>
+                <div className="col-span-12 lg:col-span-8 flex flex-col gap-6 justify-center">
+                  {c.network_preview.body && <p className="text-base text-gray-600 leading-relaxed">{c.network_preview.body}</p>}
+                  {c.network_preview.stats.length > 0 && (
+                    <div className="grid grid-cols-3 gap-6">{c.network_preview.stats.map(s => (<div key={s.label} className="border-t border-gray-200 pt-3"><p className="text-2xl font-light text-gray-900 font-mono leading-none mb-1">{s.value}</p><p className="text-[10px] uppercase tracking-widest text-gray-400">{s.label}</p></div>))}</div>
+                  )}
+                  <Link to="/network" className="inline-flex items-center gap-2 text-sm text-[#DC143C] hover:text-gray-900 transition-colors font-medium self-start" data-testid="view-network-link">View the Network <ArrowRight className="w-4 h-4" /></Link>
+                </div>
+              </div>
             )}
-          </div></div>
+          </div>
         </section>
       )}
 
