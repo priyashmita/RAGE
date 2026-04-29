@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useSiteContent } from '@/hooks/useSiteContent';
-import { ArrowRight, Lock, Clock, Users, Repeat, CheckCircle } from 'lucide-react';
+import { ArrowRight, Lock, Clock, Users, Repeat } from 'lucide-react';
 
 const RI = [Lock, Clock, Users, Repeat];
 const D = {
-  hero:         { overline: '', title: '', body: '' },
-  what:         { title: '', body: '', points: [] },
+  hero:         { overline: '', title: '', subtitle: '', image_url: '' },
+  what:         { title: '', body: '' },
   how_it_works: { title: '', steps: [] },
   rules:        { title: '', items: [] },
   tiers:        [],
@@ -23,23 +23,29 @@ export default function ClosedTablePage() {
   return (
     <div data-testid="closed-table-page">
 
-      {/* ── HERO — py-12 (48px) ───────────────────────────────────────── */}
+      {/* ── HERO ─────────────────────────────────────────────────────── */}
       {c.hero.title && (
-        <section className="py-12 border-b border-gray-100">
-          <div className={WRAP}>
-            {c.hero.overline && (
-              <p className="rage-overline mb-4">{c.hero.overline}</p>
-            )}
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl leading-[1.05]">
-              {c.hero.title}
-            </h1>
-            {c.hero.body && (
-              <p className="mt-4 text-lg text-gray-600 max-w-xl leading-relaxed">
-                {c.hero.body}
-              </p>
-            )}
-          </div>
-        </section>
+        c.hero.image_url ? (
+          <section className="relative h-[60vh] min-h-[400px] flex items-end">
+            <div className="absolute inset-0">
+              <img src={c.hero.image_url} alt="" className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/10" />
+            </div>
+            <div className={`relative z-10 ${WRAP} pb-16 w-full`}>
+              {c.hero.overline && <p className="rage-overline mb-4 !text-white/70">{c.hero.overline}</p>}
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white">{c.hero.title}</h1>
+              {c.hero.subtitle && <p className="mt-4 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
+            </div>
+          </section>
+        ) : (
+          <section className="py-12 border-b border-gray-100">
+            <div className={WRAP}>
+              {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl leading-[1.05]">{c.hero.title}</h1>
+              {c.hero.subtitle && <p className="mt-5 text-lg text-gray-600 max-w-xl leading-relaxed">{c.hero.subtitle}</p>}
+            </div>
+          </section>
+        )
       )}
 
       {/* ── WHAT IS CLOSED TABLE — py-14 ─────────────────────────────────── */}
@@ -48,24 +54,10 @@ export default function ClosedTablePage() {
           <div className={WRAP}>
             <div className="grid grid-cols-12 gap-16 items-start">
               <div className="col-span-12 lg:col-span-4">
-                <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug">
-                  {c.what.title}
-                </h2>
+                <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug">{c.what.title}</h2>
               </div>
-              <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
-                {c.what.body && (
-                  <p className="text-base text-gray-600 leading-relaxed">{c.what.body}</p>
-                )}
-                {c.what.points?.length > 0 && (
-                  <div className="flex flex-col gap-3">
-                    {c.what.points.map((pt, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <CheckCircle className="w-4 h-4 text-[#DC143C] mt-0.5 shrink-0" />
-                        <p className="text-sm text-gray-600">{pt}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <div className="col-span-12 lg:col-span-8">
+                {c.what.body && <p className="text-base text-gray-600 leading-relaxed">{c.what.body}</p>}
               </div>
             </div>
           </div>
