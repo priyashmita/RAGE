@@ -36,14 +36,36 @@ app.add_middleware(
 )
 
 
+def _deep_merge(default, saved):
+    """Merge saved content over default, adding any new default keys that are missing.
+    Existing saved values are never overwritten — only new fields are injected."""
+    if isinstance(default, dict) and isinstance(saved, dict):
+        result = dict(default)
+        for key, saved_val in saved.items():
+            if key in result and isinstance(result[key], dict) and isinstance(saved_val, dict):
+                result[key] = _deep_merge(result[key], saved_val)
+            else:
+                result[key] = saved_val
+        return result
+    if isinstance(default, list) and isinstance(saved, list):
+        return saved if saved else default
+    return saved if saved is not None else default
+
+
 @app.on_event("startup")
 def auto_seed_content():
-    """On every deploy: insert any page that is missing. Never overwrite saved content."""
+    """On every deploy: deep-merge DEFAULT_CONTENT into each existing page document.
+    New fields from the default are injected; existing saved values are preserved."""
     for item in DEFAULT_CONTENT:
         existing = db.content.find_one({"page": item["page"]}, {"_id": 0})
-        existing_sections = existing.get("sections", {}) if existing else {}
-        if not existing or not existing_sections:
+        if not existing or not existing.get("sections"):
             db.content.replace_one({"page": item["page"]}, item, upsert=True)
+        else:
+            merged_sections = _deep_merge(item["sections"], existing["sections"])
+            db.content.update_one(
+                {"page": item["page"]},
+                {"$set": {"sections": merged_sections}}
+            )
 
     # ── Core uniqueness indexes ──────────────────────────────────────────────
     db.users.create_index("email", unique=True, background=True)
