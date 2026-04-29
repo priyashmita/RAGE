@@ -78,16 +78,16 @@ export default function ClosedTablePage() {
       {(c.rules.title || c.tiers.length > 0) && (
         <section className="py-14 bg-gray-50 border-b border-gray-100">
           <div className={WRAP}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
 
               {/* Rules */}
               {c.rules.title && (
-                <div>
+                <div className="flex flex-col h-full">
                   <h2 className="text-2xl font-normal tracking-tight text-gray-900 mb-6">
                     {c.rules.title}
                   </h2>
                   {c.rules.items.length > 0 && (
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col flex-1 justify-between gap-4">
                       {c.rules.items.map((r, i) => {
                         const Icon = RI[i] || Lock;
                         return (
@@ -112,11 +112,11 @@ export default function ClosedTablePage() {
                 </div>
               )}
 
-              {/* Pricing — [Title] / [Price] / [Description] stacked */}
+              {/* Formats — [Title] / [Price] / [Description] stacked */}
               {c.tiers.length > 0 && (
                 <div>
                   <p className="text-xs uppercase tracking-[0.2em] text-gray-400 font-semibold mb-4">
-                    Pricing
+                    Formats
                   </p>
                   <div className="flex flex-col gap-3">
                     {c.tiers.map(t => (
