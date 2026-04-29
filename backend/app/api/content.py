@@ -165,6 +165,15 @@ DEFAULT_CONTENT = [
                 "title": "One-on-one advisory. No fluff.",
                 "body": "Closed Table connects women founders with vetted senior advisors for paid, structured 1:1 working sessions. You come with a problem. You leave with a plan."
             },
+            "what": {
+                "title": "What is Closed Table?",
+                "body": "Closed Table is RAGE's one-on-one advisory offering. A founder brings a real problem. A vetted senior advisor brings real operating experience. The session is focused, confidential, and time-boxed — so you walk away with a plan, not just a conversation.",
+                "points": [
+                    "1:1 only. No panels, no group calls.",
+                    "Paid sessions. Advisors are compensated — because serious advice costs something.",
+                    "Vetted both ways. We check the advisor's track record and the founder's brief."
+                ]
+            },
             "how_it_works": {
                 "title": "How it works",
                 "steps": [

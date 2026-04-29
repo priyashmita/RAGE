@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useSiteContent } from '@/hooks/useSiteContent';
-import { ArrowRight, Lock, Clock, Users, Repeat } from 'lucide-react';
+import { ArrowRight, Lock, Clock, Users, Repeat, CheckCircle } from 'lucide-react';
 
 const RI = [Lock, Clock, Users, Repeat];
 const D = {
   hero:         { overline: '', title: '', body: '' },
+  what:         { title: '', body: '', points: [] },
   how_it_works: { title: '', steps: [] },
   rules:        { title: '', items: [] },
   tiers:        [],
@@ -37,6 +38,36 @@ export default function ClosedTablePage() {
                 {c.hero.body}
               </p>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* ── WHAT IS CLOSED TABLE — py-14 ─────────────────────────────────── */}
+      {c.what.title && (
+        <section className="py-14 border-b border-gray-100">
+          <div className={WRAP}>
+            <div className="grid grid-cols-12 gap-16 items-start">
+              <div className="col-span-12 lg:col-span-4">
+                <h2 className="text-3xl md:text-4xl font-normal tracking-tight text-gray-900 leading-snug">
+                  {c.what.title}
+                </h2>
+              </div>
+              <div className="col-span-12 lg:col-span-8 flex flex-col gap-4">
+                {c.what.body && (
+                  <p className="text-base text-gray-600 leading-relaxed">{c.what.body}</p>
+                )}
+                {c.what.points?.length > 0 && (
+                  <div className="flex flex-col gap-3">
+                    {c.what.points.map((pt, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <CheckCircle className="w-4 h-4 text-[#DC143C] mt-0.5 shrink-0" />
+                        <p className="text-sm text-gray-600">{pt}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </section>
       )}
