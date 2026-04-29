@@ -2,6 +2,7 @@ import { EnquiryDialog } from '@/components/EnquiryDialog';
 import { Button } from '@/components/ui/button';
 import { useSiteContent } from '@/hooks/useSiteContent';
 import { ArrowRight } from 'lucide-react';
+import PageHero from '@/components/PageHero';
 
 const D = {
   hero:        { overline: '', title: '', subtitle: '', body: '', image_url: '' },
@@ -20,30 +21,7 @@ export default function SundayTablePage() {
   return (
     <div data-testid="sunday-table-page">
 
-      {/* ── HERO ──────────────────────────────────────────────────────── */}
-      {c.hero.image_url ? (
-        <section className="relative h-[60vh] min-h-[400px] flex items-end">
-          <div className="absolute inset-0">
-            <img src={c.hero.image_url} alt="" className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/10" />
-          </div>
-          <div className={`relative z-10 ${WRAP} pb-16 w-full`}>
-            {c.hero.overline && <p className="rage-overline mb-4 !text-white/70">{c.hero.overline}</p>}
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white">{c.hero.title}</h1>
-            {c.hero.subtitle && <p className="mt-4 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
-            {c.hero.body && <p className="mt-4 text-base text-white/70 max-w-xl leading-relaxed">{c.hero.body}</p>}
-          </div>
-        </section>
-      ) : (
-        <section className="py-12 border-b border-gray-100">
-          <div className={WRAP}>
-            {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl leading-[1.05]">{c.hero.title}</h1>
-            {c.hero.subtitle && <p className="mt-4 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
-            {c.hero.body && <p className="mt-4 text-base text-gray-600 max-w-xl leading-relaxed">{c.hero.body}</p>}
-          </div>
-        </section>
-      )}
+      <PageHero hero={c.hero} />
 
       {/* ── FORMAT + EPISODES ─────────────────────────────────────────────
           Two-column: description left, episode list right.
