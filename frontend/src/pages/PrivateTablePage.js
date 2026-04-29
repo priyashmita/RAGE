@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useSiteContent } from '@/hooks/useSiteContent';
 import { ArrowRight, Shield, MessageSquare, Users } from 'lucide-react';
 const RI = [Shield, MessageSquare, Users];
-const D = { hero:{overline:'',title:'',subtitle:'',image_url:''}, what:{title:'',body:'',rules:[]}, table_types:[], flow:{overline:'',title:'',steps:[]}, economics:{stats:[],note:''}, upcoming:[], faqs:[], cta:{title:'',body:''} };
+const D = { hero:{overline:'',title:'',subtitle:'',body:'',image_url:''}, what:{title:'',body:'',rules:[]}, table_types:[], flow:{overline:'',title:'',steps:[]}, economics:{stats:[],note:''}, upcoming:[], faqs:[], cta:{title:'',body:''} };
 const WRAP = 'max-w-[1200px] mx-auto px-6 lg:px-8';
 
 export default function PrivateTablePage() {
@@ -20,6 +20,7 @@ export default function PrivateTablePage() {
             {c.hero.overline && <p className="rage-overline mb-4 !text-white/70">{c.hero.overline}</p>}
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white">{c.hero.title}</h1>
             {c.hero.subtitle && <p className="mt-4 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
+            {c.hero.body && <p className="mt-4 text-base text-white/70 max-w-xl leading-relaxed">{c.hero.body}</p>}
           </div>
         </section>
         ) : (
@@ -27,7 +28,8 @@ export default function PrivateTablePage() {
           <div className={WRAP}>
             {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl leading-[1.05]">{c.hero.title}</h1>
-            {c.hero.subtitle && <p className="mt-5 text-lg text-gray-600 max-w-xl leading-relaxed">{c.hero.subtitle}</p>}
+            {c.hero.subtitle && <p className="mt-4 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
+            {c.hero.body && <p className="mt-4 text-base text-gray-600 max-w-xl leading-relaxed">{c.hero.body}</p>}
           </div>
         </section>
         )

@@ -5,7 +5,7 @@ import { ArrowRight, Lock, Clock, Users, Repeat } from 'lucide-react';
 
 const RI = [Lock, Clock, Users, Repeat];
 const D = {
-  hero:         { overline: '', title: '', subtitle: '', image_url: '' },
+  hero:         { overline: '', title: '', subtitle: '', body: '', image_url: '' },
   what:         { title: '', body: '' },
   how_it_works: { title: '', steps: [] },
   rules:        { title: '', items: [] },
@@ -35,6 +35,7 @@ export default function ClosedTablePage() {
               {c.hero.overline && <p className="rage-overline mb-4 !text-white/70">{c.hero.overline}</p>}
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white">{c.hero.title}</h1>
               {c.hero.subtitle && <p className="mt-4 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
+              {c.hero.body && <p className="mt-4 text-base text-white/70 max-w-xl leading-relaxed">{c.hero.body}</p>}
             </div>
           </section>
         ) : (
@@ -42,7 +43,8 @@ export default function ClosedTablePage() {
             <div className={WRAP}>
               {c.hero.overline && <p className="rage-overline mb-4">{c.hero.overline}</p>}
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl leading-[1.05]">{c.hero.title}</h1>
-              {c.hero.subtitle && <p className="mt-5 text-lg text-gray-600 max-w-xl leading-relaxed">{c.hero.subtitle}</p>}
+              {c.hero.subtitle && <p className="mt-4 text-lg text-gray-600 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
+              {c.hero.body && <p className="mt-4 text-base text-gray-600 max-w-xl leading-relaxed">{c.hero.body}</p>}
             </div>
           </section>
         )

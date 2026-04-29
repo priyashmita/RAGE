@@ -5,7 +5,7 @@ import { useSiteContent } from '@/hooks/useSiteContent';
 import { ArrowRight, ArrowUpRight, Users, TrendingUp, Banknote, Shield } from 'lucide-react';
 
 const ICON_MAP = { 'Women Founders': TrendingUp, 'Financial Institutions & Funds': Banknote, 'Governments & Multilaterals': Shield };
-const D = { hero:{overline:'',title:'',body:'',image_url:'',cta_primary_text:'See How It Works',cta_primary_link:'/private-table',cta_secondary_text:'Request a Table'}, problem:{overline:'',title:'',body:''}, stats:[], focus:{overline:'',title:'',items:[]}, formats:{overline:'',title:'',body:'',items:[]}, users:{overline:'',title:'',body:'',items:[]}, network_preview:{overline:'',title:'',body:'',stats:[],image_url:''}, why_different:{overline:'',title:'',body:'',items:[]}, cta:{title:'',body:'',cta_primary_text:'Request a Table',cta_secondary_text:'Explore Formats'} };
+const D = { hero:{overline:'',title:'',subtitle:'',body:'',image_url:'',cta_primary_text:'See How It Works',cta_primary_link:'/private-table',cta_secondary_text:'Request a Table'}, problem:{overline:'',title:'',body:''}, stats:[], focus:{overline:'',title:'',items:[]}, formats:{overline:'',title:'',body:'',items:[]}, users:{overline:'',title:'',body:'',items:[]}, network_preview:{overline:'',title:'',body:'',stats:[],image_url:''}, why_different:{overline:'',title:'',body:'',items:[]}, cta:{title:'',body:'',cta_primary_text:'Request a Table',cta_secondary_text:'Explore Formats'} };
 const WRAP = 'max-w-[1200px] mx-auto px-6 lg:px-8';
 
 export default function LandingPage() {
@@ -20,7 +20,8 @@ export default function LandingPage() {
             <div className="relative z-10 w-full pb-20" style={{maxWidth:'1200px',margin:'0 auto',padding:'0 24px'}}>
               {c.hero.overline && <p className="rage-overline mb-6 !text-white/70">{c.hero.overline}</p>}
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white leading-[1.05] max-w-4xl">{c.hero.title}</h1>
-              {c.hero.body && <p className="mt-6 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.body}</p>}
+              {c.hero.subtitle && <p className="mt-4 text-lg text-white/70 max-w-2xl leading-relaxed">{c.hero.subtitle}</p>}
+              {c.hero.body && <p className="mt-4 text-base text-white/70 max-w-2xl leading-relaxed">{c.hero.body}</p>}
               <div className="mt-10 flex flex-wrap gap-4">
                 {c.hero.cta_primary_text && <Link to={c.hero.cta_primary_link || '/private-table'}><Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-explore-btn">{c.hero.cta_primary_text} <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>}
                 {c.hero.cta_secondary_text && <EnquiryDialog interest="general" title="Talk to Us" trigger={<Button variant="outline" className="border-white/30 text-white hover:bg-white/10 rounded-none h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-enquiry-btn">{c.hero.cta_secondary_text}</Button>} />}
@@ -35,7 +36,8 @@ export default function LandingPage() {
                 <div className="flex flex-col justify-center py-16 pr-12 border-r border-gray-100">
                   {c.hero.overline && <p className="rage-overline mb-5">{c.hero.overline}</p>}
                   <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 leading-[1.05]">{c.hero.title}</h1>
-                  {c.hero.body && <p className="mt-6 text-lg text-gray-600 leading-relaxed">{c.hero.body}</p>}
+                  {c.hero.subtitle && <p className="mt-4 text-lg text-gray-600 leading-relaxed">{c.hero.subtitle}</p>}
+                  {c.hero.body && <p className="mt-4 text-base text-gray-600 leading-relaxed">{c.hero.body}</p>}
                   <div className="mt-10 flex flex-wrap gap-4">
                     {c.hero.cta_primary_text && <Link to={c.hero.cta_primary_link || '/private-table'}><Button className="bg-[#DC143C] hover:bg-[#B01030] text-white rounded-none rage-btn-glow h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-explore-btn">{c.hero.cta_primary_text} <ArrowRight className="w-4 h-4 ml-2" /></Button></Link>}
                     {c.hero.cta_secondary_text && <EnquiryDialog interest="general" title="Talk to Us" trigger={<Button variant="outline" className="border-gray-300 text-gray-900 hover:bg-gray-100 rounded-none h-12 px-8 text-sm tracking-wider uppercase font-semibold" data-testid="hero-enquiry-btn">{c.hero.cta_secondary_text}</Button>} />}

@@ -1,6 +1,6 @@
 import { useSiteContent } from '@/hooks/useSiteContent';
 const D = {
-  hero: { overline: 'Legal', title: 'Terms & Privacy', body: '' },
+  hero: { overline: 'Legal', title: 'Terms & Privacy', subtitle: '', body: '', image_url: '' },
   terms_title: 'Terms & Conditions',
   terms_body: '',
   privacy_title: 'Privacy Policy',
@@ -18,7 +18,8 @@ export default function PrivacyPage() {
         <div className="max-w-[1400px] mx-auto px-6">
           <p className="rage-overline mb-4">{c.hero.overline}</p>
           <h1 className="text-5xl sm:text-6xl font-light tracking-tighter text-gray-900 max-w-3xl">{c.hero.title}</h1>
-          {c.hero.body && <p className="mt-6 text-lg text-gray-600">{c.hero.body}</p>}
+          {c.hero.subtitle && <p className="mt-4 text-lg text-gray-600">{c.hero.subtitle}</p>}
+          {c.hero.body && <p className="mt-4 text-base text-gray-600">{c.hero.body}</p>}
         </div>
       </section>
 

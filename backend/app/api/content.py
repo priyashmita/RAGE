@@ -23,6 +23,7 @@ DEFAULT_CONTENT = [
             "hero": {
                 "overline": "A Curated Network",
                 "title": "For Women Who Mean Business",
+                "subtitle": "",
                 "body": "RAGE connects India's most ambitious women founders with the expertise, community, and capital they need to build something real.",
                 "image_url": "",
                 "cta_primary_text": "See How It Works",
@@ -105,7 +106,9 @@ DEFAULT_CONTENT = [
             "hero": {
                 "overline": "About",
                 "title": "We exist for the women building the future of Indian business.",
-                "body": "RAGE is a curated network, platform, and community. Not a networking event. Not a mentorship programme. A working infrastructure for women founders who are serious about building."
+                "subtitle": "",
+                "body": "RAGE is a curated network, platform, and community. Not a networking event. Not a mentorship programme. A working infrastructure for women founders who are serious about building.",
+                "image_url": ""
             },
             "mission": {
                 "title": "Why RAGE exists",
@@ -164,6 +167,7 @@ DEFAULT_CONTENT = [
                 "overline": "Closed Table",
                 "title": "One-on-one advisory. No fluff.",
                 "subtitle": "Closed Table connects women founders with vetted senior advisors for paid, structured 1:1 working sessions. You come with a problem. You leave with a plan.",
+                "body": "",
                 "image_url": ""
             },
             "what": {
@@ -217,6 +221,7 @@ DEFAULT_CONTENT = [
                 "overline": "Private Table",
                 "title": "Dinner. Off the record.",
                 "subtitle": "A curated evening for founders building serious companies.",
+                "body": "",
                 "image_url": ""
             },
             "what": {
@@ -271,7 +276,9 @@ DEFAULT_CONTENT = [
             "hero": {
                 "overline": "Sunday Table",
                 "title": "The real stories behind women-led business.",
-                "body": "Sunday Table is RAGE's documentary series — short, honest films about the decisions, setbacks, and turning points that define women-led businesses in India."
+                "subtitle": "",
+                "body": "Sunday Table is RAGE's documentary series — short, honest films about the decisions, setbacks, and turning points that define women-led businesses in India.",
+                "image_url": ""
             },
             "format": {
                 "title": "What is Sunday Table?",
@@ -327,7 +334,9 @@ DEFAULT_CONTENT = [
             "hero": {
                 "overline": "The Network",
                 "title": "India's best operators. All women.",
-                "body": "RAGERS are the core network behind R.A.G.E.—a curated group of experienced operators, investors, founders, and leaders across capital, entrepreneurship, policy, and technology. They engage through structured formats, not informal advisory—contributing to Private Tables, Closed Tables, and other platform interactions where their experience directly supports access, decisions, and credibility. This is not a directory. It is an active, high-trust network where participation is intentional, relevant, and outcome-oriented."
+                "subtitle": "",
+                "body": "RAGERS are the core network behind R.A.G.E.—a curated group of experienced operators, investors, founders, and leaders across capital, entrepreneurship, policy, and technology. They engage through structured formats, not informal advisory—contributing to Private Tables, Closed Tables, and other platform interactions where their experience directly supports access, decisions, and credibility. This is not a directory. It is an active, high-trust network where participation is intentional, relevant, and outcome-oriented.",
+                "image_url": ""
             },
             "stats": [
                 {"value": "20+", "label": "Active Ragers"},
@@ -359,7 +368,9 @@ DEFAULT_CONTENT = [
             "hero": {
                 "overline": "Contact",
                 "title": "Get in touch.",
-                "body": "For Closed Table enquiries, partnership proposals, press requests, or anything else. We reply within 48 hours."
+                "subtitle": "",
+                "body": "For Closed Table enquiries, partnership proposals, press requests, or anything else. We reply within 48 hours.",
+                "image_url": ""
             },
             "details": {
                 "email": "hello@rageforgood.com",
@@ -377,7 +388,9 @@ DEFAULT_CONTENT = [
             "hero": {
                 "overline": "Legal",
                 "title": "Terms & Privacy",
-                "body": ""
+                "subtitle": "",
+                "body": "",
+                "image_url": ""
             },
             "terms_title": "Terms & Conditions",
             "terms_body": "By using RAGE services, you agree to these terms. RAGE provides introductions and facilitated advisory sessions but does not guarantee specific outcomes. All sessions are confidential. RAGE reserves the right to decline or terminate any engagement at its discretion.",
