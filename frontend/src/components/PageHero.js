@@ -24,7 +24,7 @@ export default function PageHero({ hero = {} }) {
         </div>
         <div className={`relative z-10 ${WRAP} pb-16 w-full`}>
           {hero.overline && <p className="rage-overline mb-4 !text-white/70">{hero.overline}</p>}
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white max-w-3xl leading-[1.05]">{hero.title}</h1>
+          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-white leading-[1.05]">{hero.title}</h1>
           {hero.subtitle && <p className="mt-4 text-lg text-white/70 max-w-2xl leading-relaxed">{hero.subtitle}</p>}
           {hero.body    && <p className="mt-4 text-base text-white/70 max-w-xl leading-relaxed">{hero.body}</p>}
         </div>
@@ -36,7 +36,7 @@ export default function PageHero({ hero = {} }) {
     <section className="py-12 border-b border-gray-100">
       <div className={WRAP}>
         {hero.overline && <p className="rage-overline mb-4">{hero.overline}</p>}
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 max-w-3xl leading-[1.05]">{hero.title}</h1>
+        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-light tracking-tighter text-gray-900 leading-[1.05]">{hero.title}</h1>
         {hero.subtitle && <p className="mt-4 text-lg text-gray-600 max-w-2xl leading-relaxed">{hero.subtitle}</p>}
         {hero.body    && <p className="mt-4 text-base text-gray-600 max-w-xl leading-relaxed">{hero.body}</p>}
       </div>
