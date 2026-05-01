@@ -11,7 +11,7 @@ from app.core.db import db
 
 JWT_SECRET = os.getenv("JWT_SECRET", "CHANGE_THIS_NOW")
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))
+JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "43200"))  # 30 days default
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
