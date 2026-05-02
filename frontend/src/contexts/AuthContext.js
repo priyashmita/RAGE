@@ -33,8 +33,11 @@ export function AuthProvider({ children }) {
     try {
       const res = await api.get('/auth/me');
       setUser(res.data);
-    } catch {
-      clearToken();
+    } catch (err) {
+      // Only clear token on 401 — not on network errors or 5xx (Railway cold start, etc.)
+      if (err.response?.status === 401) {
+        clearToken();
+      }
     } finally {
       setLoading(false);
     }
